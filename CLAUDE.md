@@ -1,0 +1,2 @@
+- All plans MUST be documented in `docs\Plans\` of this project
+- Do not guess, ask questions and/or research for the answers
