@@ -128,7 +128,7 @@ struct ctx_images {
 |----------|-------------|----------|
 | 00 | System | daemon, pid_file, log_level |
 | 01 | Camera | camera_name, camera_id |
-| 02 | Source | device, video_device |
+| 02 | Source | device, video_device, libcam_device, libcam_buffer_count |
 | 03 | Image | width, height, framerate |
 | 04 | Overlay | text_left, text_right |
 | 05 | Method | detection method options |
@@ -226,6 +226,43 @@ cls_webu (main server)
 | `/camera/*/stream` | webu_stream | MJPEG video |
 | `/camera/*/ts` | webu_mpegts | MPEG-TS video |
 | `/action/*` | webu_post | Control actions |
+
+---
+
+### cls_libcam (libcam.hpp/cpp)
+**Purpose**: libcamera support for Raspberry Pi cameras
+
+**Multi-Buffer Pool Pattern** (Pi 5 optimized):
+```cpp
+// Request with associated buffer index for multi-buffer support
+struct ctx_reqinfo {
+    libcamera::Request *request;
+    int buffer_idx;
+};
+
+// Buffer tracking
+std::queue<ctx_reqinfo>            req_queue;      // Completed requests with buffer index
+std::vector<ctx_imgmap>            membuf_pool;    // Memory-mapped buffer pool
+```
+
+**Camera Selection**:
+```cpp
+// Three selection modes supported
+"auto"     // Auto-detect first Pi camera (filters out USB/UVC)
+"camera0"  // Specific camera by index (0, 1, etc.)
+"imx708"   // By sensor model name
+```
+
+**Key Configuration**:
+| Parameter | Default | Range | Purpose |
+|-----------|---------|-------|---------|
+| `libcam_device` | auto | auto/cameraX/model | Camera selection |
+| `libcam_buffer_count` | 4 | 2-8 | Buffer pool size |
+
+**Pi 5 Specific**:
+- Uses `StreamRole::VideoRecording` (required for PiSP pipeline)
+- Multi-buffer pool prevents pipeline stalls
+- USB/UVC cameras filtered from camera list
 
 ---
 

@@ -66,6 +66,7 @@ ctx_parm config_parms[] = {
     {"netcam_userpass",           PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED },
     {"libcam_device",             PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED },
     {"libcam_params",             PARM_TYP_PARAMS, PARM_CAT_02, PARM_LEVEL_ADVANCED },
+    {"libcam_buffer_count",       PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED },
 
     {"width",                     PARM_TYP_INT,    PARM_CAT_03, PARM_LEVEL_LIMITED },
     {"height",                    PARM_TYP_INT,    PARM_CAT_03, PARM_LEVEL_LIMITED },
@@ -957,6 +958,30 @@ void cls_config::edit_libcam_params(std::string &parm, enum PARM_ACT pact)
     }
     return;
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","libcam_params",_("libcam_params"));
+}
+
+void cls_config::edit_libcam_buffer_count(std::string &parm, enum PARM_ACT pact)
+{
+    int parm_in;
+    if (pact == PARM_ACT_DFLT) {
+        libcam_buffer_count = 4;
+    } else if (pact == PARM_ACT_SET) {
+        parm_in = mtoi(parm);
+        if (parm_in < 2) {
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+                , "libcam_buffer_count must be >= 2. Setting to 2.");
+            parm_in = 2;
+        } else if (parm_in > 8) {
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+                , "libcam_buffer_count must be <= 8. Setting to 8.");
+            parm_in = 8;
+        }
+        libcam_buffer_count = parm_in;
+    } else if (pact == PARM_ACT_GET) {
+        parm = std::to_string(libcam_buffer_count);
+    }
+    return;
+    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","libcam_buffer_count",_("libcam_buffer_count"));
 }
 
 void cls_config::edit_width(std::string &parm, enum PARM_ACT pact)
@@ -3211,6 +3236,7 @@ void cls_config::edit_cat02(std::string parm_nm, std::string &parm_val, enum PAR
     } else if (parm_nm == "netcam_userpass") {       edit_netcam_userpass(parm_val, pact);
     } else if (parm_nm == "libcam_device") {         edit_libcam_device(parm_val, pact);
     } else if (parm_nm == "libcam_params") {         edit_libcam_params(parm_val, pact);
+    } else if (parm_nm == "libcam_buffer_count") {   edit_libcam_buffer_count(parm_val, pact);
     }
 
 }

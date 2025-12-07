@@ -20,6 +20,8 @@
 #define _INCLUDE_LIBCAM_HPP_
     #ifdef HAVE_LIBCAM
         #include <queue>
+        #include <vector>
+        #include <algorithm>
         #include <sys/mman.h>
         #include <libcamera/libcamera.h>
 
@@ -29,6 +31,12 @@
         struct ctx_imgmap {
             uint8_t *buf;
             int     bufsz;
+        };
+
+        /* Request with associated buffer index for multi-buffer support */
+        struct ctx_reqinfo {
+            libcamera::Request *request;
+            int buffer_idx;
         };
 
         class cls_libcam {
@@ -47,9 +55,10 @@
                 std::unique_ptr<libcamera::FrameBufferAllocator>   frmbuf;
                 std::vector<std::unique_ptr<libcamera::Request>>   requests;
 
-                std::queue<libcamera::Request *>   req_queue;
+                std::queue<ctx_reqinfo>            req_queue;      /* Changed: now includes buffer index */
                 libcamera::ControlList             controls;
-                ctx_imgmap              membuf;
+                ctx_imgmap                         membuf;         /* Legacy single buffer (kept for compatibility) */
+                std::vector<ctx_imgmap>            membuf_pool;    /* NEW: Multi-buffer pool */
                 bool    started_cam;
                 bool    started_mgr;
                 bool    started_aqr;
@@ -73,6 +82,9 @@
                 void req_complete(libcamera::Request *request);
                 int req_add(libcamera::Request *request);
 
+                /* NEW: Pi 5 camera filtering and selection */
+                std::vector<std::shared_ptr<libcamera::Camera>> get_pi_cameras();
+                std::shared_ptr<libcamera::Camera> find_camera_by_model(const std::string &model);
 
         };
     #else

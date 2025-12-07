@@ -51,7 +51,7 @@ All classes use `cls_` prefix. Key classes:
 
 ### Video Input
 - `src/video_v4l2.cpp` - V4L2 (local cameras)
-- `src/libcam.cpp` - libcamera support
+- `src/libcam.cpp` - libcamera support (Pi 5 optimized with multi-buffer pool)
 - `src/netcam.cpp` - Network cameras (RTSP/HTTP)
 
 ### Video Output
@@ -81,8 +81,8 @@ All classes use `cls_` prefix. Key classes:
 
 | Prefix | Type | Example |
 |--------|------|---------|
-| `cls_` | Class | `cls_camera`, `cls_config` |
-| `ctx_` | Context struct | `ctx_image_data`, `ctx_coord` |
+| `cls_` | Class | `cls_camera`, `cls_config`, `cls_libcam` |
+| `ctx_` | Context struct | `ctx_image_data`, `ctx_coord`, `ctx_imgmap`, `ctx_reqinfo` |
 | `PARM_` | Parameter enum | `PARM_CAT_00`, `PARM_TYP_STRING` |
 
 ## Entry Points
@@ -130,6 +130,13 @@ Network cameras use three buffers:
 - `latest` - Most recent complete frame
 - `receiving` - Currently being written
 - `processing` - Being read by consumer
+
+### Multi-Buffer Pool (libcamera/Pi 5)
+libcamera uses configurable buffer pool (2-8 buffers, default 4):
+- `ctx_reqinfo` - Tracks request with associated buffer index
+- `membuf_pool` - Vector of memory-mapped buffers
+- `req_queue` - Queue of completed requests with buffer indices
+- Prevents pipeline stalls on Pi 5 PiSP
 
 ### Configuration Parameter
 Each parameter defined in `config_parms[]` array:
@@ -193,6 +200,12 @@ grep -rn '"endpoint"' src/webu*.cpp
 1. Create new class inheriting video capture pattern
 2. Add to camera type enum in `camera.hpp`
 3. Integrate in `cls_camera::capture()`
+
+### Modify libcamera (Pi 5)
+1. Camera selection in `src/libcam.cpp` - `start_mgr()`
+2. Buffer configuration in `start_config()` - uses `libcam_buffer_count`
+3. USB filtering in `get_pi_cameras()`
+4. Model matching in `find_camera_by_model()`
 
 ## Build Commands
 

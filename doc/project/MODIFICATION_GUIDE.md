@@ -336,7 +336,82 @@ void cls_dbse::create_tables()
 
 ---
 
-## 6. Adding a New Camera Source Type
+## 6. Modifying libcamera Support (Pi 5)
+
+### Camera Selection Enhancement
+
+**Location**: `src/libcam.cpp`
+
+The libcamera implementation supports three camera selection modes:
+
+```cpp
+// In start_mgr() function
+std::string device = cam->cfg->libcam_device;
+
+if (device == "auto" || device.empty()) {
+    // Auto-detect: filter USB cameras, select first Pi camera
+    auto pi_cams = get_pi_cameras();
+    camera = pi_cams[0];
+} else if (device.find("camera") == 0) {
+    // Index mode: "camera0", "camera1", etc.
+    int idx = std::stoi(device.substr(6));
+    auto pi_cams = get_pi_cameras();
+    camera = pi_cams[idx];
+} else {
+    // Model name mode: "imx708", "imx219", etc.
+    camera = find_camera_by_model(device);
+}
+```
+
+### USB Camera Filtering
+
+**Location**: `src/libcam.cpp` - `get_pi_cameras()` function
+
+```cpp
+std::vector<std::shared_ptr<Camera>> cls_libcam::get_pi_cameras()
+{
+    std::vector<std::shared_ptr<Camera>> pi_cams;
+    for (const auto& cam_item : cam_mgr->cameras()) {
+        std::string id = cam_item->id();
+        std::string id_lower = id;
+        std::transform(id_lower.begin(), id_lower.end(),
+                       id_lower.begin(), ::tolower);
+        // Exclude USB/UVC cameras
+        if (id_lower.find("usb") == std::string::npos &&
+            id_lower.find("uvc") == std::string::npos) {
+            pi_cams.push_back(cam_item);
+        }
+    }
+    return pi_cams;
+}
+```
+
+### Multi-Buffer Configuration
+
+**Location**: `src/libcam.cpp` - `start_config()` function
+
+```cpp
+// Pi 5 requires VideoRecording role for proper PiSP pipeline
+config = camera->generateConfiguration({ StreamRole::VideoRecording });
+
+// Multi-buffer support: configurable 2-8 buffers (default 4)
+int buffer_count = cam->cfg->libcam_buffer_count;
+if (buffer_count < 2) buffer_count = 2;
+if (buffer_count > 8) buffer_count = 8;
+config->at(0).bufferCount = (uint)buffer_count;
+```
+
+### Adding libcam_buffer_count Parameter
+
+Already added to `src/conf.cpp` and `src/conf.hpp`:
+- Parameter name: `libcam_buffer_count`
+- Type: `PARM_TYP_INT`
+- Category: `PARM_CAT_02` (Source)
+- Default: 4, Range: 2-8
+
+---
+
+## 7. Adding a New Camera Source Type (Generic)
 
 ### Step 1: Create source class
 

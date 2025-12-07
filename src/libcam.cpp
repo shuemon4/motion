@@ -214,10 +214,72 @@ void cls_libcam::start_params()
     }
 }
 
+/* Filter out USB/UVC cameras, return only Pi CSI cameras */
+std::vector<std::shared_ptr<Camera>> cls_libcam::get_pi_cameras()
+{
+    std::vector<std::shared_ptr<Camera>> pi_cams;
+
+    for (const auto& cam_item : cam_mgr->cameras()) {
+        std::string id = cam_item->id();
+        /* Filter out USB cameras (UVC devices)
+         * Pi cameras have IDs like: /base/axi/pcie@120000/rp1/i2c@88000/imx708@1a
+         * USB cameras have IDs containing "usb" or are UVC devices
+         */
+        std::string id_lower = id;
+        std::transform(id_lower.begin(), id_lower.end(), id_lower.begin(), ::tolower);
+
+        if (id_lower.find("usb") == std::string::npos &&
+            id_lower.find("uvc") == std::string::npos) {
+            pi_cams.push_back(cam_item);
+            MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+                , "Found Pi camera: %s", id.c_str());
+        } else {
+            MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+                , "Filtered out USB camera: %s", id.c_str());
+        }
+    }
+
+    /* Sort for consistent ordering across restarts */
+    std::sort(pi_cams.begin(), pi_cams.end(),
+        [](const std::shared_ptr<Camera>& a, const std::shared_ptr<Camera>& b) {
+            return a->id() < b->id();
+        });
+
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "Found %d Pi camera(s) after filtering", (int)pi_cams.size());
+
+    return pi_cams;
+}
+
+/* Find camera by sensor model name (e.g., "imx708", "imx477") */
+std::shared_ptr<Camera> cls_libcam::find_camera_by_model(const std::string &model)
+{
+    std::string model_lower = model;
+    std::transform(model_lower.begin(), model_lower.end(), model_lower.begin(), ::tolower);
+
+    for (const auto& cam_item : cam_mgr->cameras()) {
+        std::string id = cam_item->id();
+        std::string id_lower = id;
+        std::transform(id_lower.begin(), id_lower.end(), id_lower.begin(), ::tolower);
+
+        if (id_lower.find(model_lower) != std::string::npos) {
+            MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+                , "Found camera matching model '%s': %s"
+                , model.c_str(), id.c_str());
+            return cam_item;
+        }
+    }
+
+    MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+        , "No camera found matching model '%s'", model.c_str());
+    return nullptr;
+}
+
 int cls_libcam::start_mgr()
 {
     int retcd;
-    std::string camid;
+    std::string device;
+    std::vector<std::shared_ptr<Camera>> pi_cams;
 
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Starting.");
 
@@ -225,27 +287,72 @@ int cls_libcam::start_mgr()
     retcd = cam_mgr->start();
     if (retcd != 0) {
         MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
-            , "Error starting camera manager.  Return code: %d",retcd);
+            , "Error starting camera manager.  Return code: %d", retcd);
         return retcd;
     }
     started_mgr = true;
 
-    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "cam_mgr started.");
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "cam_mgr started. Total cameras available: %d"
+        , (int)cam_mgr->cameras().size());
 
-    if (cam->cfg->libcam_device == "camera0"){
-        if (cam_mgr->cameras().size() == 0) {
-            MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
-                , "No camera devices found");
-            return -1;
-        }
-        camid = cam_mgr->cameras()[0]->id();
-    } else {
+    /* Get filtered list of Pi cameras (excludes USB/UVC) */
+    pi_cams = get_pi_cameras();
+
+    if (pi_cams.empty()) {
         MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
-            , "Invalid libcam_device '%s'.  The only name supported is 'camera0' "
-            ,cam->cfg->libcam_device.c_str());
+            , "No Pi cameras found. Check camera connection and config.txt");
         return -1;
     }
-    camera = cam_mgr->get(camid);
+
+    device = cam->cfg->libcam_device;
+
+    /* Enhanced camera selection:
+     * - "auto" or "camera0": First Pi camera
+     * - "camera1", "camera2", etc.: Pi camera by index
+     * - "imx708", "imx477", etc.: Pi camera by sensor model
+     */
+    if (device == "auto" || device == "camera0") {
+        camera = pi_cams[0];
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+            , "Selected first Pi camera (auto/camera0)");
+    } else if (device.length() > 6 && device.substr(0, 6) == "camera") {
+        /* Camera by index: camera0, camera1, etc. */
+        int idx = 0;
+        try {
+            idx = std::stoi(device.substr(6));
+        } catch (...) {
+            MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+                , "Invalid camera index in '%s'", device.c_str());
+            return -1;
+        }
+
+        if (idx < 0 || idx >= (int)pi_cams.size()) {
+            MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+                , "Camera index %d out of range (have %d Pi cameras)"
+                , idx, (int)pi_cams.size());
+            return -1;
+        }
+        camera = pi_cams[(size_t)idx];
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+            , "Selected Pi camera by index: %d", idx);
+    } else {
+        /* Try to find camera by sensor model name */
+        camera = find_camera_by_model(device);
+        if (!camera) {
+            MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+                , "Camera '%s' not found. Available cameras:", device.c_str());
+            for (size_t i = 0; i < pi_cams.size(); i++) {
+                MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+                    , "  camera%d: %s", (int)i, pi_cams[i]->id().c_str());
+            }
+            return -1;
+        }
+    }
+
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "Selected camera: %s", camera->id().c_str());
+
     camera->acquire();
     started_aqr = true;
 
@@ -522,16 +629,28 @@ void cls_libcam:: config_orientation()
 int cls_libcam::start_config()
 {
     int retcd;
+    int buffer_count;
 
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Starting.");
 
-    config = camera->generateConfiguration({ StreamRole::Viewfinder });
+    /* Pi 5 requires VideoRecording role for proper PiSP pipeline initialization */
+    config = camera->generateConfiguration({ StreamRole::VideoRecording });
 
     config->at(0).pixelFormat = PixelFormat::fromString("YUV420");
 
     config->at(0).size.width = (uint)cam->cfg->width;
     config->at(0).size.height = (uint)cam->cfg->height;
-    config->at(0).bufferCount = 1;
+
+    /* Multi-buffer support for Pi 5: default 4 buffers to prevent pipeline stalls */
+    buffer_count = cam->cfg->libcam_buffer_count;
+    if (buffer_count < 2) {
+        buffer_count = 2;
+    } else if (buffer_count > 8) {
+        buffer_count = 8;
+    }
+    config->at(0).bufferCount = (uint)buffer_count;
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Buffer count: %d", buffer_count);
+
     config->at(0).stride = 0;
 
     retcd = config->validate();
@@ -591,6 +710,7 @@ int cls_libcam::req_add(Request *request)
 int cls_libcam::start_req()
 {
     int retcd, bytes, indx, width;
+    unsigned int buf_idx;
 
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Starting.");
 
@@ -604,61 +724,98 @@ int cls_libcam::start_req()
         return -1;
     }
 
-    std::unique_ptr<Request> request = camera->createRequest();
-    if (!request) {
-        MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
-            , "Create request error.");
-        return -1;
-    }
-
     Stream *stream = config->at(0).stream();
     const std::vector<std::unique_ptr<FrameBuffer>> &buffers =
         frmbuf->buffers(stream);
-    const std::unique_ptr<FrameBuffer> &buffer = buffers[0];
 
-    retcd = request->addBuffer(stream, buffer.get());
-    if (retcd < 0) {
-        MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
-            , "Add buffer for request error.");
-        return -1;
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "Allocated %d buffers for stream", (int)buffers.size());
+
+    /* Create a request for each buffer in the pool */
+    for (buf_idx = 0; buf_idx < buffers.size(); buf_idx++) {
+        std::unique_ptr<Request> request = camera->createRequest();
+        if (!request) {
+            MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+                , "Create request error for buffer %d.", buf_idx);
+            return -1;
+        }
+
+        retcd = request->addBuffer(stream, buffers[buf_idx].get());
+        if (retcd < 0) {
+            MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+                , "Add buffer %d for request error.", buf_idx);
+            return -1;
+        }
+
+        requests.push_back(std::move(request));
     }
 
     started_req = true;
 
+    /* Calculate buffer size from first buffer (all buffers same size) */
+    const std::unique_ptr<FrameBuffer> &buffer = buffers[0];
     const FrameBuffer::Plane &plane0 = buffer->planes()[0];
 
     bytes = 0;
-    for (indx=0; indx<(int)buffer->planes().size(); indx++){
+    for (indx = 0; indx < (int)buffer->planes().size(); indx++) {
         bytes += buffer->planes()[(uint)indx].length;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO, "Plane %d of %d length %d"
-            , indx, buffer->planes().size()
+            , indx, (int)buffer->planes().size()
             , buffer->planes()[(uint)indx].length);
     }
 
+    /* Adjust image dimensions if buffer size doesn't match expected */
     if (bytes > cam->imgs.size_norm) {
         width = ((int)buffer->planes()[0].length / cam->imgs.height);
         if (((int)buffer->planes()[0].length != (width * cam->imgs.height)) ||
-            (bytes > ((width * cam->imgs.height * 3)/2))) {
+            (bytes > ((width * cam->imgs.height * 3) / 2))) {
             MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
                 , "Error setting image size.  Plane 0 length %d, total bytes %d"
                 , buffer->planes()[0].length, bytes);
         }
         MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
             , "Image size adjusted from %d x %d to %d x %d"
-            , cam->imgs.width,cam->imgs.height
-            , width,cam->imgs.height);
+            , cam->imgs.width, cam->imgs.height
+            , width, cam->imgs.height);
         cam->imgs.width = width;
         cam->imgs.size_norm = (cam->imgs.width * cam->imgs.height * 3) / 2;
         cam->imgs.motionsize = cam->imgs.width * cam->imgs.height;
     }
 
+    /* Map memory for legacy single-buffer access (backwards compatibility) */
     membuf.buf = (uint8_t *)mmap(NULL, (uint)bytes, PROT_READ
         , MAP_SHARED, plane0.fd.get(), 0);
     membuf.bufsz = bytes;
 
-    requests.push_back(std::move(request));
+    /* Map memory for each buffer in the pool */
+    membuf_pool.clear();
+    for (buf_idx = 0; buf_idx < buffers.size(); buf_idx++) {
+        ctx_imgmap map;
+        const FrameBuffer::Plane &p0 = buffers[buf_idx]->planes()[0];
 
-    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Finished.");
+        int buf_bytes = 0;
+        for (const auto &plane : buffers[buf_idx]->planes()) {
+            buf_bytes += plane.length;
+        }
+
+        map.buf = (uint8_t *)mmap(NULL, (uint)buf_bytes, PROT_READ
+            , MAP_SHARED, p0.fd.get(), 0);
+        map.bufsz = buf_bytes;
+
+        if (map.buf == MAP_FAILED) {
+            MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+                , "mmap failed for buffer %d", buf_idx);
+            return -1;
+        }
+
+        membuf_pool.push_back(map);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Mapped buffer %d: %d bytes", buf_idx, buf_bytes);
+    }
+
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "Finished. Created %d requests with %d mapped buffers."
+        , (int)requests.size(), (int)membuf_pool.size());
 
     return 0;
 }
@@ -698,7 +855,38 @@ void cls_libcam::req_complete(Request *request)
     if (request->status() == Request::RequestCancelled) {
         return;
     }
-    req_queue.push(request);
+
+    /* Find which buffer index this request corresponds to */
+    Stream *stream = config->at(0).stream();
+    FrameBuffer *buffer = request->findBuffer(stream);
+
+    const std::vector<std::unique_ptr<FrameBuffer>> &buffers =
+        frmbuf->buffers(stream);
+
+    int buf_idx = -1;
+    for (size_t i = 0; i < buffers.size(); i++) {
+        if (buffers[i].get() == buffer) {
+            buf_idx = (int)i;
+            break;
+        }
+    }
+
+    if (buf_idx >= 0 && buf_idx < (int)membuf_pool.size()) {
+        ctx_reqinfo req_info;
+        req_info.request = request;
+        req_info.buffer_idx = buf_idx;
+        req_queue.push(req_info);
+    } else {
+        MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+            , "Request completed with unknown buffer index");
+        /* Fallback: use buffer 0 if available */
+        if (!membuf_pool.empty()) {
+            ctx_reqinfo req_info;
+            req_info.request = request;
+            req_info.buffer_idx = 0;
+            req_queue.push(req_info);
+        }
+    }
 }
 
 int cls_libcam::libcam_start()
@@ -814,20 +1002,35 @@ int cls_libcam::next(ctx_image_data *img_data)
         }
 
         cam->watchdog = cam->cfg->watchdog_tmo;
-        /* Allow time for request to finish.*/
-        indx=0;
-        while ((req_queue.empty() == true) && (indx < 50)) {
-            SLEEP(0,2000)
+
+        /* Allow time for request to finish */
+        indx = 0;
+        while (req_queue.empty() && indx < 50) {
+            SLEEP(0, 2000);
             indx++;
         }
 
         cam->watchdog = cam->cfg->watchdog_tmo;
-        if (req_queue.empty() == false) {
-            Request *request = this->req_queue.front();
 
-            memcpy(img_data->image_norm, membuf.buf, (uint)membuf.bufsz);
+        if (!req_queue.empty()) {
+            /* Get request info including buffer index */
+            ctx_reqinfo req_info = req_queue.front();
+            req_queue.pop();
 
-            this->req_queue.pop();
+            Request *request = req_info.request;
+            int buf_idx = req_info.buffer_idx;
+
+            /* Copy frame data from the correct buffer in the pool */
+            if (buf_idx >= 0 && buf_idx < (int)membuf_pool.size()) {
+                memcpy(img_data->image_norm,
+                       membuf_pool[(size_t)buf_idx].buf,
+                       (uint)membuf_pool[(size_t)buf_idx].bufsz);
+            } else {
+                /* Fallback to legacy single buffer for compatibility */
+                memcpy(img_data->image_norm, membuf.buf, (uint)membuf.bufsz);
+            }
+
+            /* Requeue request for next frame */
             request->reuse(Request::ReuseBuffers);
             req_add(request);
 

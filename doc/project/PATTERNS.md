@@ -18,6 +18,8 @@ class cls_webu { ... };
 struct ctx_image_data { ... };
 struct ctx_coord { ... };
 struct ctx_params { ... };
+struct ctx_imgmap { ... };     // libcamera memory-mapped buffer
+struct ctx_reqinfo { ... };    // libcamera request with buffer index
 ```
 
 ### Enums
@@ -581,6 +583,39 @@ void allocate_ring_buffer(ctx_images *imgs, int count)
         imgs->image_ring[i].image_norm = new unsigned char[frame_size];
     }
 }
+```
+
+### libcamera Multi-Buffer Pool (Pi 5)
+```cpp
+// Memory-mapped buffer structure
+struct ctx_imgmap {
+    uint8_t *buf;
+    int     bufsz;
+};
+
+// Request with buffer index tracking
+struct ctx_reqinfo {
+    libcamera::Request *request;
+    int buffer_idx;
+};
+
+// Pool initialization (in start_req)
+for (int i = 0; i < buffer_count; i++) {
+    // Create request for each buffer
+    std::unique_ptr<Request> request = camera->createRequest((uint64_t)i);
+    request->addBuffer(stream, buffers[i].get());
+
+    // Map memory for each buffer
+    const FrameBuffer::Plane &plane = buffers[i]->planes()[0];
+    membuf_pool[i].buf = (uint8_t*)mmap(NULL, plane.length,
+        PROT_READ, MAP_SHARED, plane.fd.get(), plane.offset);
+    membuf_pool[i].bufsz = plane.length;
+}
+
+// Frame retrieval with correct buffer
+ctx_reqinfo req_info = req_queue.front();
+req_queue.pop();
+memcpy(dest, membuf_pool[req_info.buffer_idx].buf, size);
 ```
 
 ---
