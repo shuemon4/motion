@@ -41,6 +41,7 @@ motion_SOURCES = \
 	camera.hpp         camera.cpp \
 	movie.hpp          movie.cpp \
 	netcam.hpp         netcam.cpp \
+	parm_registry.hpp  parm_registry.cpp \
 	picture.hpp        picture.cpp \
 	rotate.hpp         rotate.cpp \
 	sound.hpp          sound.cpp \
