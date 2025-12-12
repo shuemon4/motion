@@ -33,6 +33,8 @@ Remove the depreceated parameters from old Motion.
 #include "camera.hpp"
 #include "sound.hpp"
 #include "conf.hpp"
+#include "parm_registry.hpp"
+#include "conf_file.hpp"
 
 /*Configuration parameters */
 ctx_parm config_parms[] = {
@@ -3537,34 +3539,24 @@ void cls_config::edit_cat(std::string parm_nm, std::string &parm_val, enum PARM_
 
 void cls_config::defaults()
 {
-    int indx;
     std::string dflt = "";
 
-    indx = 0;
-    while (config_parms[indx].parm_name != "") {
-        edit_cat(config_parms[indx].parm_name, dflt
-            , PARM_ACT_DFLT, config_parms[indx].parm_cat);
-        indx++;
+    /* Use registry for iteration (Phase 3 optimization) */
+    const auto &all_parms = ctx_parm_registry::instance().all();
+    for (const auto &parm : all_parms) {
+        edit_cat(parm.parm_name, dflt, PARM_ACT_DFLT, parm.parm_cat);
     }
-
 }
 
 int cls_config::edit_set_active(std::string parm_nm, std::string parm_val)
 {
-    int indx;
-    enum PARM_CAT pcat;
-
-    indx = 0;
-    while (config_parms[indx].parm_name != "") {
-        if (parm_nm ==  config_parms[indx].parm_name) {
-            pcat = config_parms[indx].parm_cat;
-            edit_cat(parm_nm, parm_val, PARM_ACT_SET, pcat);
-            return 0;
-        }
-        indx++;
+    /* O(1) lookup via parameter registry (Phase 3 optimization) */
+    const ctx_parm_ext *parm = ctx_parm_registry::instance().find(parm_nm);
+    if (parm != nullptr) {
+        edit_cat(parm_nm, parm_val, PARM_ACT_SET, parm->parm_cat);
+        return 0;
     }
     return -1;
-
 }
 
 void cls_config::edit_depr_vid(std::string parm_nm, std::string newname, std::string parm_val)
@@ -3856,21 +3848,19 @@ int cls_config::get_next_devid()
 void cls_config::camera_add(std::string fname, bool srcdir)
 {
     struct stat statbuf;
-    int indx;
-    std::string parm_val, parm_nm;
+    std::string parm_val;
     cls_camera *cam_cls;
 
     cam_cls = new cls_camera(app);
     cam_cls->conf_src = new cls_config(app);
 
-    indx = 0;
-    while (config_parms[indx].parm_name != "") {
-        parm_nm =config_parms[indx].parm_name;
-        if (parm_nm != "device_id") {
-            app->conf_src->edit_get(parm_nm, parm_val, config_parms[indx].parm_cat);
-            cam_cls->conf_src->edit_set(parm_nm, parm_val);
+    /* Use registry for iteration (Phase 3 optimization) */
+    const auto &all_parms = ctx_parm_registry::instance().all();
+    for (const auto &parm : all_parms) {
+        if (parm.parm_name != "device_id") {
+            app->conf_src->edit_get(parm.parm_name, parm_val, parm.parm_cat);
+            cam_cls->conf_src->edit_set(parm.parm_name, parm_val);
         }
-        indx++;
     }
 
     cam_cls->conf_src->from_conf_dir = srcdir;
@@ -3932,21 +3922,19 @@ void cls_config::sound_filenm()
 void cls_config::sound_add(std::string fname, bool srcdir)
 {
     struct stat statbuf;
-    int indx;
-    std::string parm_val, parm_nm;
+    std::string parm_val;
     cls_sound *snd_cls;
 
     snd_cls = new cls_sound(app);
     snd_cls->conf_src = new cls_config(app);
 
-    indx = 0;
-    while (config_parms[indx].parm_name != "") {
-        parm_nm =config_parms[indx].parm_name;
-        if (parm_nm != "device_id") {
-            app->conf_src->edit_get(parm_nm, parm_val, config_parms[indx].parm_cat);
-            snd_cls->conf_src->edit_set(parm_nm, parm_val);
+    /* Use registry for iteration (Phase 3 optimization) */
+    const auto &all_parms = ctx_parm_registry::instance().all();
+    for (const auto &parm : all_parms) {
+        if (parm.parm_name != "device_id") {
+            app->conf_src->edit_get(parm.parm_name, parm_val, parm.parm_cat);
+            snd_cls->conf_src->edit_set(parm.parm_name, parm_val);
         }
-        indx++;
     }
 
     snd_cls->conf_src->from_conf_dir = srcdir;
@@ -4006,64 +3994,9 @@ void cls_config::config_dir_parm(std::string confdir)
 
 void cls_config::process()
 {
-    size_t stpos;
-    std::string line, parm_nm, parm_vl;
-    std::ifstream ifs;
-
-    ifs.open(conf_filename);
-        if (ifs.is_open() == false) {
-            MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
-                , _("params_file not found: %s")
-                , conf_filename.c_str());
-            return;
-        }
-
-        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
-            , _("Processing config file %s")
-            , conf_filename.c_str());
-
-        while (std::getline(ifs, line)) {
-            mytrim(line);
-            stpos = line.find(" ");
-            if (line.find('\t') != std::string::npos) {
-                if (line.find('\t') < stpos) {
-                    stpos =line.find('\t');
-                }
-            }
-            if (stpos > line.find("=")) {
-                stpos = line.find("=");
-            }
-            if ((stpos != line.length()-1) &&
-                (stpos != 0) &&
-                (line.substr(0, 1) != ";") &&
-                (line.substr(0, 1) != "#")) {
-                parm_nm = line.substr(0, stpos);
-                if (stpos != std::string::npos) {
-                    parm_vl = line.substr(stpos+1, line.length()-stpos);
-                } else {
-                    parm_vl = "";
-                }
-                myunquote(parm_nm);
-                myunquote(parm_vl);
-                if ((parm_nm == "camera") && (app->conf_src == this)) {
-                    camera_add(parm_vl, false);
-                } else if ((parm_nm == "sound") && (app->conf_src == this)) {
-                    sound_add(parm_vl, false);
-                } else if ((parm_nm == "config_dir") && (app->conf_src == this)){
-                    config_dir_parm(parm_vl);
-                } else if ((parm_nm != "camera") && (parm_nm != "sound") &&
-                    (parm_nm != "config_dir")) {
-                   edit_set(parm_nm, parm_vl);
-                }
-            } else if ((line != "") &&
-                (line.substr(0, 1) != ";") &&
-                (line.substr(0, 1) != "#") ) {
-                MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
-                , _("Unable to parse line: %s"), line.c_str());
-            }
-        }
-    ifs.close();
-
+    /* Phase 4: Delegate file I/O to cls_config_file */
+    cls_config_file file_handler(app, this);
+    file_handler.process();
 }
 
 void cls_config::parms_log_parm(std::string parm_nm, std::string parm_vl)
@@ -4094,93 +4027,9 @@ void cls_config::parms_log_parm(std::string parm_nm, std::string parm_vl)
 
 void cls_config::parms_log()
 {
-    int i, indx;
-    std::string parm_vl, parm_main, parm_nm;
-    std::list<std::string> parm_array;
-    std::list<std::string>::iterator it;
-    enum PARM_CAT parm_ct;
-    enum PARM_TYP parm_typ;
-
-    MOTION_LOG(INF, TYPE_ALL, NO_ERRNO
-        ,_("Logging configuration parameters from all files"));
-
-    MOTION_SHT(INF, TYPE_ALL, NO_ERRNO
-        , _("Config file: %s"), app->conf_src->conf_filename.c_str());
-
-    i = 0;
-    while (config_parms[i].parm_name != "") {
-        parm_nm=config_parms[i].parm_name;
-        parm_ct=config_parms[i].parm_cat;
-        parm_typ=config_parms[i].parm_type;
-
-        if ((parm_nm != "camera") && (parm_nm != "sound") &&
-            (parm_nm != "config_dir") && (parm_nm != "conf_filename") &&
-            (parm_typ != PARM_TYP_ARRAY)) {
-            app->conf_src->edit_get(parm_nm,parm_vl, parm_ct);
-            parms_log_parm(parm_nm, parm_vl);
-        }
-        if (parm_typ == PARM_TYP_ARRAY) {
-            app->conf_src->edit_get(parm_nm, parm_array, parm_ct);
-            for (it = parm_array.begin(); it != parm_array.end(); it++) {
-                parms_log_parm(parm_nm, it->c_str());
-            }
-        }
-        i++;
-    }
-
-    for (indx=0; indx<app->cam_cnt; indx++) {
-        MOTION_SHT(INF, TYPE_ALL, NO_ERRNO
-            , _("Camera config file: %s")
-            , app->cam_list[indx]->conf_src->conf_filename.c_str());
-        i = 0;
-        while (config_parms[i].parm_name != "") {
-            parm_nm=config_parms[i].parm_name;
-            parm_ct=config_parms[i].parm_cat;
-            parm_typ=config_parms[i].parm_type;
-            app->conf_src->edit_get(parm_nm, parm_main, parm_ct);
-
-            app->cam_list[indx]->conf_src->edit_get(parm_nm, parm_vl, parm_ct);
-            if ((parm_nm != "camera") && (parm_nm != "sound") &&
-                (parm_nm != "config_dir") && (parm_nm != "conf_filename") &&
-                (parm_main != parm_vl) && (parm_typ != PARM_TYP_ARRAY) ) {
-                parms_log_parm(parm_nm, parm_vl);
-            }
-            if (parm_typ == PARM_TYP_ARRAY) {
-                app->cam_list[indx]->conf_src->edit_get(parm_nm, parm_array, parm_ct);
-                for (it = parm_array.begin(); it != parm_array.end(); it++) {
-                    parms_log_parm(parm_nm, it->c_str());
-                }
-            }
-            i++;
-        }
-    }
-
-    for (indx=0; indx<app->snd_cnt; indx++) {
-        MOTION_SHT(INF, TYPE_ALL, NO_ERRNO
-            , _("Sound config file: %s")
-            , app->snd_list[indx]->conf_src->conf_filename.c_str());
-        i = 0;
-        while (config_parms[i].parm_name != "") {
-            parm_nm=config_parms[i].parm_name;
-            parm_ct=config_parms[i].parm_cat;
-            parm_typ=config_parms[i].parm_type;
-            app->conf_src->edit_get(parm_nm, parm_main, parm_ct);
-            app->snd_list[indx]->conf_src->edit_get(parm_nm, parm_vl, parm_ct);
-            if ((parm_nm != "camera") && (parm_nm != "sound") &&
-                (parm_nm != "config_dir") && (parm_nm != "conf_filename") &&
-                (parm_main != parm_vl) && (parm_typ != PARM_TYP_ARRAY) ) {
-                parms_log_parm(parm_nm, parm_vl);
-            }
-            if (parm_typ == PARM_TYP_ARRAY) {
-                app->snd_list[indx]->conf_src->edit_get(parm_nm, parm_array, parm_ct);
-                for (it = parm_array.begin(); it != parm_array.end(); it++) {
-                    parms_log_parm(parm_nm, it->c_str());
-                }
-            }
-            i++;
-        }
-    }
-
+    /* Phase 4: Delegate file I/O to cls_config_file */
+    cls_config_file file_handler(app, this);
+    file_handler.parms_log();
 }
 
 void cls_config::parms_write_parms(FILE *conffile, std::string parm_nm
@@ -4407,41 +4256,33 @@ void cls_config::parms_write_snd()
 
 void cls_config::parms_write()
 {
-    parms_write_app();
-    parms_write_cam();
-    parms_write_snd();
+    /* Phase 4: Delegate file I/O to cls_config_file */
+    cls_config_file file_handler(app, this);
+    file_handler.parms_write();
 }
 
 void cls_config::parms_copy(cls_config *src)
 {
-    int indx;
-    std::string parm_nm, parm_val;
+    std::string parm_val;
 
-    indx = 0;
-    while (config_parms[indx].parm_name != "") {
-        parm_nm =config_parms[indx].parm_name;
-        src->edit_get(parm_nm, parm_val, config_parms[indx].parm_cat);
-        edit_set(parm_nm, parm_val);
-        indx++;
+    /* Use registry for iteration (Phase 3 optimization) */
+    const auto &all_parms = ctx_parm_registry::instance().all();
+    for (const auto &parm : all_parms) {
+        src->edit_get(parm.parm_name, parm_val, parm.parm_cat);
+        edit_set(parm.parm_name, parm_val);
     }
-
 }
 
 void cls_config::parms_copy(cls_config *src, PARM_CAT p_cat)
 {
-    int indx;
-    std::string parm_nm, parm_val;
+    std::string parm_val;
 
-    indx = 0;
-    while (config_parms[indx].parm_name != "") {
-        if (config_parms[indx].parm_cat == p_cat) {
-            parm_nm =config_parms[indx].parm_name;
-            src->edit_get(parm_nm, parm_val, p_cat);
-            edit_set(parm_nm, parm_val);
-        }
-        indx++;
+    /* Use registry for category iteration (Phase 3 optimization) */
+    const auto &cat_parms = ctx_parm_registry::instance().by_category(p_cat);
+    for (const auto *parm : cat_parms) {
+        src->edit_get(parm->parm_name, parm_val, p_cat);
+        edit_set(parm->parm_name, parm_val);
     }
-
 }
 
 /*
@@ -4472,91 +4313,9 @@ void cls_config::copy_snd(const cls_config *src)
 
 void cls_config::init()
 {
-    std::string filename;
-    char path[PATH_MAX];
-    struct stat statbuf;
-    int indx;
-
-    defaults();
-
-    cmdline();
-
-    filename = "";
-    if (app->conf_src->conf_filename != "") {
-        filename = app->conf_src->conf_filename;
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename="";
-        }
-    }
-
-    if (filename == "") {
-        if (getcwd(path, sizeof(path)) == NULL) {
-            MOTION_LOG(ERR, TYPE_ALL, SHOW_ERRNO, _("Error getcwd"));
-            exit(-1);
-        }
-        filename = path + std::string("/motion.conf");
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
-    }
-
-    if (filename == "") {
-        filename = std::string(getenv("HOME")) + std::string("/.motion/motion.conf");
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
-    }
-
-    if (filename == "") {
-        filename = std::string( configdir ) + std::string("/motion.conf");
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
-    }
-
-    if (filename == "") {
-        filename = std::string( sysconfdir ) + std::string("/motion.conf");
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
-        if (filename != "") {
-            MOTION_LOG(WRN, TYPE_ALL, SHOW_ERRNO
-                ,_("The configuration file location '%s' is deprecated.")
-                , sysconfdir );
-            MOTION_LOG(WRN, TYPE_ALL, SHOW_ERRNO
-                ,_("The new default configuration file location is '%s'")
-                , configdir );
-        }
-    }
-
-    if (filename == "") {
-        MOTION_LOG(ALR, TYPE_ALL, SHOW_ERRNO
-            ,_("Could not open configuration file"));
-        exit(-1);
-    }
-
-    edit_set("conf_filename", filename);
-
-    app->conf_src->process();
-
-    if ((app->cam_cnt == 0) && (app->snd_cnt == 0)) {
-        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
-            , _("No camera or sound configuration files specified."));
-                MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
-            , _("Adding a camera configuration file."));
-        app->conf_src->camera_add("", false);
-    }
-
-    cmdline();
-
-    for (indx=0; indx<app->cam_cnt; indx++) {
-        app->cam_list[indx]->threadnr = indx;
-    }
-
-    for (indx=0; indx<app->snd_cnt; indx++) {
-        app->snd_list[indx]->threadnr = (indx + app->cam_cnt);
-    }
-
+    /* Phase 4: Delegate file I/O to cls_config_file */
+    cls_config_file file_handler(app, this);
+    file_handler.init();
 }
 
 cls_config::cls_config(cls_motapp *p_app)

@@ -783,3 +783,110 @@ Found 8 `parms_copy()` call sites across 4 files:
 **Sub-Agent Verification**: N/A (analysis-only phase)
 
 ---
+
+### Phase 3: Edit Handler Consolidation
+**Completed**: 2025-12-11
+**Implemented By**: Claude Code session
+
+**Files Modified**:
+- `src/conf.cpp`:
+  - Added `#include "parm_registry.hpp"` for registry access
+  - Modified `edit_set_active()` to use O(1) registry lookup instead of O(n) array iteration
+  - Modified `defaults()` to iterate via registry `all()` method
+  - Modified `camera_add()` to iterate via registry `all()` method
+  - Modified `sound_add()` to iterate via registry `all()` method
+  - Modified `parms_copy(cls_config *src)` to iterate via registry `all()` method
+  - Modified `parms_copy(cls_config *src, PARM_CAT p_cat)` to use registry `by_category()` method
+
+**Key Implementation Details**:
+- Primary goal achieved: `edit_set_active()` now uses O(1) hash map lookup via `ctx_parm_registry::instance().find()`
+- All config_parms[] iterations replaced with modern C++ range-based for loops using registry
+- `parms_copy()` with category filter now uses pre-built category index (O(1) lookup per category)
+- Individual edit_catXX() dispatch functions retained - they contain custom validation logic
+- Backward compatibility preserved - all existing APIs unchanged
+
+**Deviation from Plan**:
+- Plan suggested consolidating 182 individual `edit_XXX()` functions into 4 type-based handlers
+- Implementation retained individual handlers because many have custom validation logic
+- The O(1) lookup optimization (primary goal) was achieved without breaking existing handlers
+
+**Build Verification**:
+- [x] `make -j4` succeeds on Pi 5
+- [x] No new compiler warnings
+- [x] Binary runs and shows version info
+
+**Sub-Agent Verification**:
+- [x] Verification sub-agent spawned
+- [x] Code implementation verified (not just file existence)
+- [x] No placeholders, mocks, or empty functions
+- [x] Backward compatibility confirmed
+
+**Verification Notes**:
+Quality-engineer sub-agent verified Phase 3 implementation - **PASS**
+
+Key findings:
+1. ✅ `edit_set_active()` uses O(1) hash map lookup via `ctx_parm_registry::instance().find()`
+2. ✅ `defaults()`, `camera_add()`, `sound_add()` use registry `all()` iteration
+3. ✅ `parms_copy(cls_config*, PARM_CAT)` uses registry `by_category()` method
+4. ✅ All implementations are complete - no placeholders, mocks, or empty functions
+5. ✅ Modern C++11 patterns used (range-based for loops, auto, const correctness)
+6. ✅ Individual edit handlers retained (valid deviation - contain custom validation logic)
+7. ✅ Remaining `while (config_parms[])` patterns are acceptable (registry init, deprecated handling, file I/O)
+8. ✅ Build verified on Pi 5 - no errors or warnings
+
+---
+
+### Phase 4: File I/O Separation
+**Completed**: 2025-12-11
+**Implemented By**: Claude Code session
+
+**Files Created**:
+- `src/conf_file.hpp`: New class declaration for `cls_config_file`
+- `src/conf_file.cpp`: Implementation of file I/O operations (~550 lines)
+
+**Files Modified**:
+- `src/conf.cpp`:
+  - Added `#include "conf_file.hpp"`
+  - `init()` now delegates to `cls_config_file::init()`
+  - `process()` now delegates to `cls_config_file::process()`
+  - `parms_log()` now delegates to `cls_config_file::parms_log()`
+  - `parms_write()` now delegates to `cls_config_file::parms_write()`
+- `src/Makefile.am`: Added `conf_file.hpp` and `conf_file.cpp` to sources
+
+**Key Implementation Details**:
+- New `cls_config_file` class handles all file I/O operations
+- Constructor takes `cls_motapp*` and `cls_config*` pointers
+- Methods: `init()`, `process()`, `cmdline()`, `parms_log()`, `parms_write()`
+- Helper methods: `log_parm()`, `write_parms()`, `write_app()`, `write_cam()`, `write_snd()`
+- Original `cls_config` methods now delegate via `cls_config_file file_handler(app, this)`
+- `cls_config` focused on parameter storage and editing, `cls_config_file` on I/O
+
+**Build Verification**:
+- [x] `make -j4` succeeds on Pi 5
+- [x] No new compiler warnings
+- [x] Binary runs and shows version info (15.0 MB)
+
+**Sub-Agent Verification**:
+- [x] Verification sub-agent spawned
+- [x] Code implementation verified (not just file existence)
+- [x] No placeholders, mocks, or empty functions
+- [x] Separation of concerns confirmed
+
+**Verification Notes**:
+Quality-engineer sub-agent verified Phase 4 implementation - **PASS**
+
+Key findings:
+1. ✅ `conf_file.hpp` - Complete class declaration with all required methods
+2. ✅ `conf_file.cpp` - All 9 methods have production-quality implementations:
+   - `init()` - Full file path searching logic (~100 lines)
+   - `process()` - Complete line parsing with config_dir handling (~90 lines)
+   - `cmdline()` - Full getopt parsing for all options (~40 lines)
+   - `parms_log()` - Comprehensive logging with redaction (~90 lines)
+   - `parms_write()`, `write_app()`, `write_cam()`, `write_snd()` - Complete file writing
+3. ✅ `conf.cpp` - All 4 methods delegate correctly to `cls_config_file`
+4. ✅ `Makefile.am` - Build system correctly updated
+5. ✅ No placeholders, mocks, or stubs found
+6. ✅ Clean separation of concerns: cls_config (storage/editing) vs cls_config_file (I/O)
+7. ✅ Build verified on Pi 5 - 15.0 MB binary
+
+---

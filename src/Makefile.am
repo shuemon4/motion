@@ -30,6 +30,7 @@ motion_SOURCES = \
 	alg.hpp            alg.cpp \
 	alg_sec.hpp        alg_sec.cpp \
 	conf.hpp           conf.cpp \
+	conf_file.hpp      conf_file.cpp \
 	dbse.hpp           dbse.cpp \
 	draw.hpp           draw.cpp \
 	jpegutils.hpp      jpegutils.cpp \
