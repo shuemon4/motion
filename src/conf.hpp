@@ -20,6 +20,8 @@
 #ifndef _INCLUDE_CONF_HPP_
 #define _INCLUDE_CONF_HPP_
 
+#include "parm_structs.hpp"
+
     /* Categories for he edits and display on web interface*/
     enum PARM_CAT{
         PARM_CAT_00     /* system */
@@ -90,202 +92,233 @@
             cls_config(cls_motapp *p_app);
             ~cls_config();
 
-            /* Overall system configuration parameters */
+            /* ================================================================
+             * Scoped Parameter Structures
+             *
+             * These hold the actual parameter values, grouped by scope:
+             * - parm_app: Application-level (daemon, webcontrol, database)
+             * - parm_cam: Camera devices (detection, capture, output)
+             * - parm_snd: Sound devices (sound alerts)
+             * ================================================================ */
+            ctx_parm_app    parm_app;
+            ctx_parm_cam    parm_cam;
+            ctx_parm_snd    parm_snd;
+
+            /* ================================================================
+             * Configuration File Tracking (not in scoped structs)
+             * ================================================================ */
             std::string     conf_filename;
             bool            from_conf_dir;
 
-            /* Overall application parameters */
-            bool            daemon;
-            std::string     pid_file;
-            std::string     log_file;
-            std::string     log_type_str;
-            int             log_level;
-            int             log_fflevel;
-            int             log_type;
-            bool            native_language;
+            /* ================================================================
+             * Backward Compatibility Reference Aliases
+             *
+             * These reference aliases redirect the existing flat member access
+             * pattern (->cfg->threshold) to the scoped structs. This preserves
+             * binary compatibility with the 469 direct access sites in 28 files.
+             *
+             * DO NOT add new parameters here - add them to the scoped structs.
+             * ================================================================ */
 
-            std::string     device_name;
-            int             device_id;
-            std::string     config_dir;
-            std::string     target_dir;
-            int             watchdog_tmo;
-            int             watchdog_kill;
-            int             device_tmo;
-            std::string     pause;
-            std::string     schedule_params;
-            std::string     cleandir_params;
+            /* Application parameters (-> parm_app) */
+            bool&           daemon                  = parm_app.daemon;
+            std::string&    pid_file                = parm_app.pid_file;
+            std::string&    log_file                = parm_app.log_file;
+            std::string&    log_type_str            = parm_app.log_type_str;
+            int&            log_level               = parm_app.log_level;
+            int&            log_fflevel             = parm_app.log_fflevel;
+            int&            log_type                = parm_app.log_type;
+            bool&           native_language         = parm_app.native_language;
 
-            /* Capture device configuration parameters */
-            std::string     v4l2_device;
-            std::string     v4l2_params;
+            /* Camera device parameters (-> parm_cam) */
+            std::string&    device_name             = parm_cam.device_name;
+            int&            device_id               = parm_cam.device_id;
+            std::string&    config_dir              = parm_cam.config_dir;
+            std::string&    target_dir              = parm_cam.target_dir;
+            int&            watchdog_tmo            = parm_cam.watchdog_tmo;
+            int&            watchdog_kill           = parm_cam.watchdog_kill;
+            int&            device_tmo              = parm_cam.device_tmo;
+            std::string&    pause                   = parm_cam.pause;
+            std::string&    schedule_params         = parm_cam.schedule_params;
+            std::string&    cleandir_params         = parm_cam.cleandir_params;
 
-            std::string     netcam_url;
-            std::string     netcam_params;
-            std::string     netcam_high_url;
-            std::string     netcam_high_params;
-            std::string     netcam_userpass;
+            /* Source parameters (-> parm_cam) */
+            std::string&    v4l2_device             = parm_cam.v4l2_device;
+            std::string&    v4l2_params             = parm_cam.v4l2_params;
+            std::string&    netcam_url              = parm_cam.netcam_url;
+            std::string&    netcam_params           = parm_cam.netcam_params;
+            std::string&    netcam_high_url         = parm_cam.netcam_high_url;
+            std::string&    netcam_high_params      = parm_cam.netcam_high_params;
+            std::string&    netcam_userpass         = parm_cam.netcam_userpass;
+            std::string&    libcam_device           = parm_cam.libcam_device;
+            std::string&    libcam_params           = parm_cam.libcam_params;
+            int&            libcam_buffer_count     = parm_cam.libcam_buffer_count;
 
-            std::string     libcam_device;
-            std::string     libcam_params;
-            int             libcam_buffer_count;
+            /* Image parameters (-> parm_cam) */
+            int&            width                   = parm_cam.width;
+            int&            height                  = parm_cam.height;
+            int&            framerate               = parm_cam.framerate;
+            int&            rotate                  = parm_cam.rotate;
+            std::string&    flip_axis               = parm_cam.flip_axis;
 
-            /* Image processing configuration parameters */
-            int             width;
-            int             height;
-            int             framerate;
-            int             rotate;
-            std::string     flip_axis;
-            std::string     locate_motion_mode;
-            std::string     locate_motion_style;
-            std::string     text_left;
-            std::string     text_right;
-            bool            text_changes;
-            int             text_scale;
-            std::string     text_event;
+            /* Overlay parameters (-> parm_cam) */
+            std::string&    locate_motion_mode      = parm_cam.locate_motion_mode;
+            std::string&    locate_motion_style     = parm_cam.locate_motion_style;
+            std::string&    text_left               = parm_cam.text_left;
+            std::string&    text_right              = parm_cam.text_right;
+            bool&           text_changes            = parm_cam.text_changes;
+            int&            text_scale              = parm_cam.text_scale;
+            std::string&    text_event              = parm_cam.text_event;
 
-            /* Motion detection configuration parameters */
-            bool            emulate_motion;
-            int             threshold;
-            int             threshold_maximum;
-            int             threshold_sdevx;
-            int             threshold_sdevy;
-            int             threshold_sdevxy;
-            int             threshold_ratio;
-            int             threshold_ratio_change;
-            bool            threshold_tune;
-            std::string     secondary_method;
-            std::string     secondary_params;
-            int             noise_level;
-            bool            noise_tune;
-            std::string     despeckle_filter;
-            std::string     area_detect;
-            std::string     mask_file;
-            std::string     mask_privacy;
-            int             smart_mask_speed;
-            int             lightswitch_percent;
-            int             lightswitch_frames;
-            int             minimum_motion_frames;
-            int             static_object_time;
-            int             event_gap;
-            int             pre_capture;
-            int             post_capture;
+            /* Detection method parameters (-> parm_cam) - HOT PATH */
+            bool&           emulate_motion          = parm_cam.emulate_motion;
+            int&            threshold               = parm_cam.threshold;
+            int&            threshold_maximum       = parm_cam.threshold_maximum;
+            int&            threshold_sdevx         = parm_cam.threshold_sdevx;
+            int&            threshold_sdevy         = parm_cam.threshold_sdevy;
+            int&            threshold_sdevxy        = parm_cam.threshold_sdevxy;
+            int&            threshold_ratio         = parm_cam.threshold_ratio;
+            int&            threshold_ratio_change  = parm_cam.threshold_ratio_change;
+            bool&           threshold_tune          = parm_cam.threshold_tune;
+            std::string&    secondary_method        = parm_cam.secondary_method;
+            std::string&    secondary_params        = parm_cam.secondary_params;
 
-            /* Script execution configuration parameters */
-            std::string     on_event_start;
-            std::string     on_event_end;
-            std::string     on_picture_save;
-            std::string     on_area_detected;
-            std::string     on_motion_detected;
-            std::string     on_movie_start;
-            std::string     on_movie_end;
-            std::string     on_camera_lost;
-            std::string     on_camera_found;
-            std::string     on_secondary_detect;
-            std::string     on_action_user;
-            std::string     on_sound_alert;
+            /* Mask parameters (-> parm_cam) */
+            int&            noise_level             = parm_cam.noise_level;
+            bool&           noise_tune              = parm_cam.noise_tune;
+            std::string&    despeckle_filter        = parm_cam.despeckle_filter;
+            std::string&    area_detect             = parm_cam.area_detect;
+            std::string&    mask_file               = parm_cam.mask_file;
+            std::string&    mask_privacy            = parm_cam.mask_privacy;
+            int&            smart_mask_speed        = parm_cam.smart_mask_speed;
 
-            /* Picture output configuration parameters */
-            std::string     picture_output;
-            std::string     picture_output_motion;
-            std::string     picture_type;
-            int             picture_quality;
-            std::string     picture_exif;
-            std::string     picture_filename;
+            /* Detect parameters (-> parm_cam) - HOT PATH */
+            int&            lightswitch_percent     = parm_cam.lightswitch_percent;
+            int&            lightswitch_frames      = parm_cam.lightswitch_frames;
+            int&            minimum_motion_frames   = parm_cam.minimum_motion_frames;
+            int&            event_gap               = parm_cam.event_gap;
+            int&            static_object_time      = parm_cam.static_object_time;
+            int&            post_capture            = parm_cam.post_capture;
+            int&            pre_capture             = parm_cam.pre_capture;
 
-            /* Snapshot configuration parameters */
-            int             snapshot_interval;
-            std::string     snapshot_filename;
+            /* Script parameters (-> parm_cam) */
+            std::string&    on_event_start          = parm_cam.on_event_start;
+            std::string&    on_event_end            = parm_cam.on_event_end;
+            std::string&    on_picture_save         = parm_cam.on_picture_save;
+            std::string&    on_area_detected        = parm_cam.on_area_detected;
+            std::string&    on_motion_detected      = parm_cam.on_motion_detected;
+            std::string&    on_movie_start          = parm_cam.on_movie_start;
+            std::string&    on_movie_end            = parm_cam.on_movie_end;
+            std::string&    on_camera_lost          = parm_cam.on_camera_lost;
+            std::string&    on_camera_found         = parm_cam.on_camera_found;
+            std::string&    on_secondary_detect     = parm_cam.on_secondary_detect;
+            std::string&    on_action_user          = parm_cam.on_action_user;
+            std::string&    on_sound_alert          = parm_cam.on_sound_alert;
 
-            /* Movie output configuration parameters */
-            bool            movie_output;
-            bool            movie_output_motion;
-            int             movie_max_time;
-            int             movie_bps;
-            int             movie_quality;
-            std::string     movie_encoder_preset;
-            std::string     movie_container;
-            bool            movie_passthrough;
-            std::string     movie_filename;
-            std::string     movie_retain;
-            bool            movie_all_frames;
-            bool            movie_extpipe_use;
-            std::string     movie_extpipe;
+            /* Picture output parameters (-> parm_cam) */
+            std::string&    picture_output          = parm_cam.picture_output;
+            std::string&    picture_output_motion   = parm_cam.picture_output_motion;
+            std::string&    picture_type            = parm_cam.picture_type;
+            int&            picture_quality         = parm_cam.picture_quality;
+            std::string&    picture_exif            = parm_cam.picture_exif;
+            std::string&    picture_filename        = parm_cam.picture_filename;
 
-            /* Timelapse movie configuration parameters */
-            int             timelapse_interval;
-            std::string     timelapse_mode;
-            int             timelapse_fps;
-            std::string     timelapse_container;
-            std::string     timelapse_filename;
+            /* Snapshot parameters (-> parm_cam) */
+            int&            snapshot_interval       = parm_cam.snapshot_interval;
+            std::string&    snapshot_filename       = parm_cam.snapshot_filename;
 
-            /* Loopback device configuration parameters */
-            std::string     video_pipe;
-            std::string     video_pipe_motion;
+            /* Movie output parameters (-> parm_cam) */
+            bool&           movie_output            = parm_cam.movie_output;
+            bool&           movie_output_motion     = parm_cam.movie_output_motion;
+            int&            movie_max_time          = parm_cam.movie_max_time;
+            int&            movie_bps               = parm_cam.movie_bps;
+            int&            movie_quality           = parm_cam.movie_quality;
+            std::string&    movie_encoder_preset    = parm_cam.movie_encoder_preset;
+            std::string&    movie_container         = parm_cam.movie_container;
+            bool&           movie_passthrough       = parm_cam.movie_passthrough;
+            std::string&    movie_filename          = parm_cam.movie_filename;
+            std::string&    movie_retain            = parm_cam.movie_retain;
+            bool&           movie_all_frames        = parm_cam.movie_all_frames;
+            bool&           movie_extpipe_use       = parm_cam.movie_extpipe_use;
+            std::string&    movie_extpipe           = parm_cam.movie_extpipe;
 
-            /* Webcontrol configuration parameters */
-            int             webcontrol_port;
-            int             webcontrol_port2;
-            std::string     webcontrol_base_path;
-            bool            webcontrol_ipv6;
-            bool            webcontrol_localhost;
-            int             webcontrol_parms;
-            std::string     webcontrol_interface;
-            std::string     webcontrol_auth_method;
-            std::string     webcontrol_authentication;
-            bool            webcontrol_tls;
-            std::string     webcontrol_cert;
-            std::string     webcontrol_key;
-            std::string     webcontrol_headers;
-            std::string     webcontrol_html;
-            std::string     webcontrol_actions;
-            int             webcontrol_lock_minutes;
-            int             webcontrol_lock_attempts;
-            std::string     webcontrol_lock_script;
+            /* Timelapse parameters (-> parm_cam) */
+            int&            timelapse_interval      = parm_cam.timelapse_interval;
+            std::string&    timelapse_mode          = parm_cam.timelapse_mode;
+            int&            timelapse_fps           = parm_cam.timelapse_fps;
+            std::string&    timelapse_container     = parm_cam.timelapse_container;
+            std::string&    timelapse_filename      = parm_cam.timelapse_filename;
 
-            /* Live stream configuration parameters */
-            int             stream_preview_scale;
-            bool            stream_preview_newline;
-            std::string     stream_preview_params;
-            std::string     stream_preview_method;
-            bool            stream_preview_ptz;
-            int             stream_quality;
-            bool            stream_grey;
-            bool            stream_motion;
-            int             stream_maxrate;
-            int             stream_scan_time;
-            int             stream_scan_scale;
+            /* Pipe parameters (-> parm_cam) */
+            std::string&    video_pipe              = parm_cam.video_pipe;
+            std::string&    video_pipe_motion       = parm_cam.video_pipe_motion;
 
-            /* Database and SQL configuration parameters */
-            std::string     database_type;
-            std::string     database_dbname;
-            std::string     database_host;
-            int             database_port;
-            std::string     database_user;
-            std::string     database_password;
-            int             database_busy_timeout;
+            /* Webcontrol parameters (-> parm_app) */
+            int&            webcontrol_port         = parm_app.webcontrol_port;
+            int&            webcontrol_port2        = parm_app.webcontrol_port2;
+            std::string&    webcontrol_base_path    = parm_app.webcontrol_base_path;
+            bool&           webcontrol_ipv6         = parm_app.webcontrol_ipv6;
+            bool&           webcontrol_localhost    = parm_app.webcontrol_localhost;
+            int&            webcontrol_parms        = parm_app.webcontrol_parms;
+            std::string&    webcontrol_interface    = parm_app.webcontrol_interface;
+            std::string&    webcontrol_auth_method  = parm_app.webcontrol_auth_method;
+            std::string&    webcontrol_authentication = parm_app.webcontrol_authentication;
+            bool&           webcontrol_tls          = parm_app.webcontrol_tls;
+            std::string&    webcontrol_cert         = parm_app.webcontrol_cert;
+            std::string&    webcontrol_key          = parm_app.webcontrol_key;
+            std::string&    webcontrol_headers      = parm_app.webcontrol_headers;
+            std::string&    webcontrol_html         = parm_app.webcontrol_html;
+            std::string&    webcontrol_actions      = parm_app.webcontrol_actions;
+            int&            webcontrol_lock_minutes = parm_app.webcontrol_lock_minutes;
+            int&            webcontrol_lock_attempts = parm_app.webcontrol_lock_attempts;
+            std::string&    webcontrol_lock_script  = parm_app.webcontrol_lock_script;
 
-            std::string     sql_event_start;
-            std::string     sql_event_end;
-            std::string     sql_movie_start;
-            std::string     sql_movie_end;
-            std::string     sql_pic_save;
+            /* Stream parameters (-> parm_cam) */
+            int&            stream_preview_scale    = parm_cam.stream_preview_scale;
+            bool&           stream_preview_newline  = parm_cam.stream_preview_newline;
+            std::string&    stream_preview_params   = parm_cam.stream_preview_params;
+            std::string&    stream_preview_method   = parm_cam.stream_preview_method;
+            bool&           stream_preview_ptz      = parm_cam.stream_preview_ptz;
+            int&            stream_quality          = parm_cam.stream_quality;
+            bool&           stream_grey             = parm_cam.stream_grey;
+            bool&           stream_motion           = parm_cam.stream_motion;
+            int&            stream_maxrate          = parm_cam.stream_maxrate;
+            int&            stream_scan_time        = parm_cam.stream_scan_time;
+            int&            stream_scan_scale       = parm_cam.stream_scan_scale;
 
-            bool            ptz_auto_track;         /* Bool to enable auto tracking */
-            int             ptz_wait;               /* Frames to wait after a PTZ move */
-            std::string     ptz_move_track;         /* Auto tracking command */
-            std::string     ptz_pan_left;           /* Pan left command */
-            std::string     ptz_pan_right;          /* Pan right command */
-            std::string     ptz_tilt_up;            /* Tilt up command */
-            std::string     ptz_tilt_down;          /* Tilt down command */
-            std::string     ptz_zoom_in;            /* Zoom in command */
-            std::string     ptz_zoom_out;           /* Zoom out command */
+            /* Database parameters (-> parm_app) */
+            std::string&    database_type           = parm_app.database_type;
+            std::string&    database_dbname         = parm_app.database_dbname;
+            std::string&    database_host           = parm_app.database_host;
+            int&            database_port           = parm_app.database_port;
+            std::string&    database_user           = parm_app.database_user;
+            std::string&    database_password       = parm_app.database_password;
+            int&            database_busy_timeout   = parm_app.database_busy_timeout;
 
-            /* Sound processing parameters */
-            std::string             snd_device;
-            std::string             snd_params;
-            std::list<std::string>  snd_alerts;
-            std::string             snd_window;
-            bool                    snd_show;
+            /* SQL parameters (-> parm_app) */
+            std::string&    sql_event_start         = parm_app.sql_event_start;
+            std::string&    sql_event_end           = parm_app.sql_event_end;
+            std::string&    sql_movie_start         = parm_app.sql_movie_start;
+            std::string&    sql_movie_end           = parm_app.sql_movie_end;
+            std::string&    sql_pic_save            = parm_app.sql_pic_save;
+
+            /* Tracking/PTZ parameters (-> parm_cam) */
+            bool&           ptz_auto_track          = parm_cam.ptz_auto_track;
+            int&            ptz_wait                = parm_cam.ptz_wait;
+            std::string&    ptz_move_track          = parm_cam.ptz_move_track;
+            std::string&    ptz_pan_left            = parm_cam.ptz_pan_left;
+            std::string&    ptz_pan_right           = parm_cam.ptz_pan_right;
+            std::string&    ptz_tilt_up             = parm_cam.ptz_tilt_up;
+            std::string&    ptz_tilt_down           = parm_cam.ptz_tilt_down;
+            std::string&    ptz_zoom_in             = parm_cam.ptz_zoom_in;
+            std::string&    ptz_zoom_out            = parm_cam.ptz_zoom_out;
+
+            /* Sound parameters (-> parm_snd) */
+            std::string&             snd_device     = parm_snd.snd_device;
+            std::string&             snd_params     = parm_snd.snd_params;
+            std::list<std::string>&  snd_alerts     = parm_snd.snd_alerts;
+            std::string&             snd_window     = parm_snd.snd_window;
+            bool&                    snd_show       = parm_snd.snd_show;
 
             void camera_add(std::string fname, bool srcdir);
             void sound_add(std::string fname, bool srcdir);
@@ -306,6 +339,11 @@
             void parms_write();
             void parms_copy(cls_config *src);
             void parms_copy(cls_config *src, PARM_CAT p_cat);
+
+            /* Scoped copy operations - O(1) direct struct copy */
+            void copy_app(const cls_config *src);
+            void copy_cam(const cls_config *src);
+            void copy_snd(const cls_config *src);
 
         private:
             cls_motapp *app;
