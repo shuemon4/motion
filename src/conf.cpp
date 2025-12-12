@@ -137,6 +137,7 @@ ctx_parm config_parms[] = {
     {"movie_max_time",            PARM_TYP_INT,    PARM_CAT_10, PARM_LEVEL_LIMITED },
     {"movie_bps",                 PARM_TYP_INT,    PARM_CAT_10, PARM_LEVEL_LIMITED },
     {"movie_quality",             PARM_TYP_INT,    PARM_CAT_10, PARM_LEVEL_LIMITED },
+    {"movie_encoder_preset",      PARM_TYP_LIST,   PARM_CAT_10, PARM_LEVEL_LIMITED },
     {"movie_container",           PARM_TYP_STRING, PARM_CAT_10, PARM_LEVEL_LIMITED },
     {"movie_passthrough",         PARM_TYP_BOOL,   PARM_CAT_10, PARM_LEVEL_LIMITED },
     {"movie_filename",            PARM_TYP_STRING, PARM_CAT_10, PARM_LEVEL_LIMITED },
@@ -2067,6 +2068,34 @@ void cls_config::edit_movie_quality(std::string &parm, enum PARM_ACT pact)
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","movie_quality",_("movie_quality"));
 }
 
+void cls_config::edit_movie_encoder_preset(std::string &parm, enum PARM_ACT pact)
+{
+    if (pact == PARM_ACT_DFLT) {
+        movie_encoder_preset = "superfast";
+    } else if (pact == PARM_ACT_SET) {
+        if ((parm == "ultrafast") || (parm == "superfast") ||
+            (parm == "veryfast") || (parm == "faster") ||
+            (parm == "fast") || (parm == "medium") ||
+            (parm == "slow") || (parm == "slower") ||
+            (parm == "veryslow")) {
+            movie_encoder_preset = parm;
+        } else if (parm == "") {
+            movie_encoder_preset = "superfast";
+        } else {
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Invalid movie_encoder_preset %s"), parm.c_str());
+        }
+    } else if (pact == PARM_ACT_GET) {
+        parm = movie_encoder_preset;
+    } else if (pact == PARM_ACT_LIST) {
+        parm = "[";
+        parm = parm + "\"ultrafast\",\"superfast\",\"veryfast\",\"faster\",";
+        parm = parm + "\"fast\",\"medium\",\"slow\",\"slower\",\"veryslow\"";
+        parm = parm + "]";
+    }
+    return;
+    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","movie_encoder_preset",_("movie_encoder_preset"));
+}
+
 void cls_config::edit_movie_container(std::string &parm, enum PARM_ACT pact)
 {
     if (pact == PARM_ACT_DFLT) {
@@ -3347,6 +3376,7 @@ void cls_config::edit_cat10(std::string parm_nm, std::string &parm_val, enum PAR
     } else if (parm_nm == "movie_max_time") {          edit_movie_max_time(parm_val, pact);
     } else if (parm_nm == "movie_bps") {               edit_movie_bps(parm_val, pact);
     } else if (parm_nm == "movie_quality") {           edit_movie_quality(parm_val, pact);
+    } else if (parm_nm == "movie_encoder_preset") {   edit_movie_encoder_preset(parm_val, pact);
     } else if (parm_nm == "movie_container") {         edit_movie_container(parm_val, pact);
     } else if (parm_nm == "movie_passthrough") {       edit_movie_passthrough(parm_val, pact);
     } else if (parm_nm == "movie_filename") {          edit_movie_filename(parm_val, pact);

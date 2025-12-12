@@ -77,6 +77,12 @@ picture_filename %v-%Y%m%d%H%M%S-%q
 movie_output on
 movie_max_time 120
 movie_quality 60
+; Encoder preset controls CPU usage vs compression efficiency for H.264/H.265
+; Options: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
+; Faster presets = lower CPU usage but larger files.
+; Note: ultrafast forces H.264 baseline profile (~30% larger files than superfast with high profile)
+; For Pi 5: use ultrafast if CPU/heat is critical, superfast for better compression
+movie_encoder_preset superfast
 movie_container mkv
 movie_filename %v-%{movienbr}-%Y%m%d%H%M%S
 

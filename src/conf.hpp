@@ -202,6 +202,7 @@
             int             movie_max_time;
             int             movie_bps;
             int             movie_quality;
+            std::string     movie_encoder_preset;
             std::string     movie_container;
             bool            movie_passthrough;
             std::string     movie_filename;
@@ -450,6 +451,7 @@
             void edit_movie_container(std::string &parm, enum PARM_ACT pact);
             void edit_movie_extpipe(std::string &parm, enum PARM_ACT pact);
             void edit_movie_extpipe_use(std::string &parm, enum PARM_ACT pact);
+            void edit_movie_encoder_preset(std::string &parm, enum PARM_ACT pact);
             void edit_movie_filename(std::string &parm, enum PARM_ACT pact);
             void edit_movie_max_time(std::string &parm, enum PARM_ACT pact);
             void edit_movie_output(std::string &parm, enum PARM_ACT pact);

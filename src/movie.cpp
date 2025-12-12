@@ -322,7 +322,7 @@ int cls_movie::set_quality()
             }
             av_opt_set(ctx_codec->priv_data, "crf", crf, 0);
             av_opt_set(ctx_codec->priv_data, "tune", "zerolatency", 0);
-            av_opt_set(ctx_codec->priv_data, "preset", "superfast",0);
+            av_opt_set(ctx_codec->priv_data, "preset", cam->cfg->movie_encoder_preset.c_str(), 0);
         }
     } else {
         /* The selection of 8000 is a subjective number based upon viewing output files */
