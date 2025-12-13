@@ -1,3 +1,19 @@
+Summary of changes for version 5.0.0 are below
+    * Raspberry Pi 5 + Camera Module v3 (IMX708) native support
+    * Change libcamera StreamRole from Viewfinder to VideoRecording for Pi 5 PiSP
+    * Add multi-buffer support for libcamera with configurable buffer count
+    * Add camera filtering to exclude USB cameras from CSI camera detection
+    * Add model-based camera selection for libcamera devices
+    * Add libcam_buffer_count configuration parameter (default: 4)
+    * Major configuration system refactor for improved performance
+    * Add O(1) parameter registry with hash map lookup (parm_registry.hpp/cpp)
+    * Add scoped parameter structs for reduced memory footprint (parm_structs.hpp)
+    * Add O(1) scoped copy operations (copy_app, copy_cam, copy_snd)
+    * Separate file I/O from configuration storage (conf_file.hpp/cpp)
+    * Replace linear array iteration with registry-based lookups in conf.cpp
+    * Integrate O(1) registry lookups into edit_set_active() and parms_copy()
+    * Add movie_encoder_preset config parameter for H.264 encoding
+    * Documentation updates for Pi 5 deployment and architecture
 Summary of changes for version 4.7.0 are below
     * Documentation updates
     * Remove outdated MMAL camera source.

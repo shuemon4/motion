@@ -61,3 +61,8 @@ po/stamp-po
 
 .vscode/
 
+# macOS
+.DS_Store
+
+# Claude Code local settings
+.claude/
