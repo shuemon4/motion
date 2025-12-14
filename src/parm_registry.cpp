@@ -176,3 +176,35 @@ std::vector<const ctx_parm_ext*> ctx_parm_registry::by_scope(int scope) const
 
     return result;
 }
+
+/*
+ * Check if a parameter can be hot-reloaded without restart
+ * Uses the hot_reload flag from config_parms[] array
+ */
+bool is_hot_reloadable(const std::string &parm_name)
+{
+    int indx = 0;
+    while (config_parms[indx].parm_name != "") {
+        if (config_parms[indx].parm_name == parm_name) {
+            return config_parms[indx].hot_reload;
+        }
+        indx++;
+    }
+    return false;  /* Parameter not found */
+}
+
+/*
+ * Get parameter info from the config_parms array
+ * Returns pointer to ctx_parm entry, or nullptr if not found
+ */
+const ctx_parm* get_parm_info(const std::string &parm_name)
+{
+    int indx = 0;
+    while (config_parms[indx].parm_name != "") {
+        if (config_parms[indx].parm_name == parm_name) {
+            return &config_parms[indx];
+        }
+        indx++;
+    }
+    return nullptr;  /* Parameter not found */
+}

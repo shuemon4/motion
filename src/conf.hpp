@@ -67,6 +67,7 @@
         enum PARM_TYP       parm_type;      /* enum of parm_typ for bool,int or string. */
         enum PARM_CAT       parm_cat;       /* enum of parm_cat for grouping. */
         int                 webui_level;    /* Enum to display in webui: 0,1,2,3,99(always to never)*/
+        bool                hot_reload;     /* true if param can be updated without restart */
     };
 
     enum PARM_ACT{

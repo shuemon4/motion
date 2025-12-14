@@ -23,6 +23,10 @@
             cls_webu_json(cls_webu_ans *p_webua);
             ~cls_webu_json();
             void main();
+
+            /* Hot reload API: Set single parameter at runtime */
+            void config_set();
+
         private:
             cls_motapp      *app;
             cls_webu        *webu;
@@ -40,6 +44,13 @@
             void loghistory();
             std::string escstr(std::string invar);
             void parms_item_detail(cls_config *conf, std::string pNm);
+
+            /* Hot reload helpers */
+            bool validate_hot_reload(const std::string &parm_name, int &parm_index);
+            void apply_hot_reload(int parm_index, const std::string &parm_val);
+            void build_response(bool success, const std::string &parm_name,
+                               const std::string &old_val, const std::string &new_val,
+                               bool hot_reload);
     };
 
 #endif /* _INCLUDE_WEBU_JSON_HPP_ */

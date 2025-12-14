@@ -535,6 +535,133 @@ void cls_webu_json::loghistory()
 
 }
 
+/*
+ * Hot Reload API: Build JSON response for config_set
+ */
+void cls_webu_json::build_response(bool success, const std::string &parm_name,
+                                   const std::string &old_val, const std::string &new_val,
+                                   bool hot_reload)
+{
+    webua->resp_page = "{";
+    webua->resp_page += "\"status\":\"" + std::string(success ? "ok" : "error") + "\"";
+    webua->resp_page += ",\"parameter\":\"" + parm_name + "\"";
+    webua->resp_page += ",\"old_value\":\"" + escstr(old_val) + "\"";
+    webua->resp_page += ",\"new_value\":\"" + escstr(new_val) + "\"";
+    webua->resp_page += ",\"hot_reload\":" + std::string(hot_reload ? "true" : "false");
+}
+
+/*
+ * Hot Reload API: Validate parameter exists and is hot-reloadable
+ * Returns true if parameter can be hot-reloaded
+ * Sets parm_index to the index in config_parms[] (-1 if not found)
+ */
+bool cls_webu_json::validate_hot_reload(const std::string &parm_name, int &parm_index)
+{
+    parm_index = 0;
+    while (config_parms[parm_index].parm_name != "") {
+        if (config_parms[parm_index].parm_name == parm_name) {
+            /* Check permission level */
+            if (config_parms[parm_index].webui_level > app->cfg->webcontrol_parms) {
+                return false;
+            }
+            /* Check hot reload flag */
+            return config_parms[parm_index].hot_reload;
+        }
+        parm_index++;
+    }
+    parm_index = -1;  /* Not found */
+    return false;
+}
+
+/*
+ * Hot Reload API: Apply parameter change to config
+ */
+void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val)
+{
+    std::string parm_name = config_parms[parm_index].parm_name;
+
+    if (webua->device_id == 0) {
+        /* Update default config */
+        app->cfg->edit_set(parm_name, parm_val);
+
+        /* Update all running cameras */
+        for (int indx = 0; indx < app->cam_cnt; indx++) {
+            app->cam_list[indx]->cfg->edit_set(parm_name, parm_val);
+        }
+    } else if (webua->cam != nullptr) {
+        /* Update specific camera only */
+        webua->cam->cfg->edit_set(parm_name, parm_val);
+    }
+
+    MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
+        "Hot reload: %s = %s (camera %d)",
+        parm_name.c_str(), parm_val.c_str(), webua->device_id);
+}
+
+/*
+ * Hot Reload API: Handle /config/set endpoint
+ * URL format: /{camera_id}/config/set?{param}={value}
+ *
+ * Returns JSON response indicating success/failure and whether
+ * the parameter was applied immediately (hot_reload=true) or
+ * requires restart (hot_reload=false).
+ */
+void cls_webu_json::config_set()
+{
+    std::string parm_name, parm_val, old_val;
+    int parm_index = -1;
+
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    /* Parse query string for parameter name and value
+     * uri_cmd2 contains "set?threshold=2000" */
+    size_t eq_pos = webua->uri_cmd2.find('=');
+    size_t q_pos = webua->uri_cmd2.find('?');
+
+    if (q_pos == std::string::npos || eq_pos == std::string::npos) {
+        build_response(false, "", "", "", false);
+        webua->resp_page += ",\"error\":\"Invalid query format. Use: /config/set?param=value\"}";
+        return;
+    }
+
+    parm_name = webua->uri_cmd2.substr(q_pos + 1, eq_pos - q_pos - 1);
+    parm_val = webua->uri_cmd2.substr(eq_pos + 1);
+
+    /* URL decode the value */
+    char *decoded = (char*)mymalloc(parm_val.length() + 1);
+    memcpy(decoded, parm_val.c_str(), parm_val.length() + 1);
+    MHD_http_unescape(decoded);
+    parm_val = decoded;
+    myfree(decoded);
+
+    /* Validate parameter exists and check if hot-reloadable */
+    if (!validate_hot_reload(parm_name, parm_index)) {
+        build_response(false, parm_name, "", parm_val, false);
+        if (parm_index >= 0) {
+            webua->resp_page += ",\"error\":\"Parameter requires daemon restart\"}";
+        } else {
+            webua->resp_page += ",\"error\":\"Unknown parameter\"}";
+        }
+        return;
+    }
+
+    /* Get old value before updating */
+    cls_config *cfg;
+    if (webua->cam != nullptr) {
+        cfg = webua->cam->cfg;
+    } else {
+        cfg = app->cfg;
+    }
+    cfg->edit_get(parm_name, old_val, config_parms[parm_index].parm_cat);
+
+    /* Apply the hot reload */
+    apply_hot_reload(parm_index, parm_val);
+
+    /* Build success response */
+    build_response(true, parm_name, old_val, parm_val, true);
+    webua->resp_page += "}";
+}
+
 void cls_webu_json::main()
 {
     pthread_mutex_lock(&app->mutex_post);

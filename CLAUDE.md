@@ -15,9 +15,10 @@ Updating `cls_libcam` for native Pi 5 + Camera v3 support. Core motion detection
 ## Project Rules
 
 1. **All plans MUST be documented in `doc/plans/`**
-2. **Do not guess** - ask questions and/or research for answers
-3. **Preserve `cls_alg`** - the motion detection algorithm works; don't modify unless explicitly asked
-4. **Evidence over assumptions** - verify changes work on actual hardware when possible
+2. **Use scratchpads for working memory** - create and use files in `doc/scratchpads/` for notes, research findings, and intermediate work
+3. **Do not guess** - ask questions and/or research for answers
+4. **Preserve `cls_alg`** - the motion detection algorithm works; don't modify unless explicitly asked
+5. **Evidence over assumptions** - verify changes work on actual hardware when possible
 
 ## Quick Navigation
 

@@ -792,6 +792,19 @@ void cls_webu_ans::answer_get()
         gzip_encode = false;
         webu_file->main();
 
+    } else if (uri_cmd1 == "config") {
+        /* Hot reload API: /config/set?param=value */
+        if (webu_json == nullptr) {
+            webu_json = new cls_webu_json(this);
+        }
+        if (uri_cmd2.substr(0, 3) == "set") {
+            webu_json->config_set();
+            mhd_send();
+        } else {
+            /* Fallback: treat /config like /config.json */
+            webu_json->main();
+        }
+
     } else if ((uri_cmd1 == "config.json") || (uri_cmd1 == "log") ||
         (uri_cmd1 == "movies.json") || (uri_cmd1 == "status.json")) {
         if (webu_json == nullptr) {

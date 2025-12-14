@@ -63,6 +63,7 @@ struct ctx_parm_ext {
  * - Iteration by category (for web UI display)
  * - Iteration by scope (for device initialization)
  * - Full list access (for serialization)
+ * - Hot reload status check for runtime updates
  *
  * Usage:
  *   const ctx_parm_ext *p = ctx_parm_registry::instance().find("threshold");
@@ -70,6 +71,19 @@ struct ctx_parm_ext {
  *       // Use parameter definition
  *   }
  */
+
+/*
+ * Check if a parameter can be hot-reloaded without restart
+ * Returns true if the parameter exists and is hot-reloadable
+ * Returns false if the parameter doesn't exist or requires restart
+ */
+bool is_hot_reloadable(const std::string &parm_name);
+
+/*
+ * Get parameter info from the config_parms array
+ * Returns pointer to ctx_parm entry, or nullptr if not found
+ */
+const ctx_parm* get_parm_info(const std::string &parm_name);
 class ctx_parm_registry {
 public:
     /*
