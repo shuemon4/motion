@@ -42,9 +42,9 @@
 
         /* Pending runtime control updates (hot-reload brightness/contrast) */
         struct ctx_pending_controls {
-            float brightness;
-            float contrast;
-            std::atomic<bool> dirty;
+            float brightness = 0.0f;
+            float contrast = 1.0f;
+            std::atomic<bool> dirty{false};  /* Must use brace initialization for atomics */
         };
 
         class cls_libcam {
