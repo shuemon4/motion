@@ -167,10 +167,35 @@ top -p $(pidof motion)
 ### Validation Status
 ✅ Code compiles
 ✅ Installs successfully
-⏳ Runtime testing pending (requires motion daemon restart)
+✅ Runtime testing PASSED on Pi 5 + Camera v3
+✅ Camera initialization successful (fixed atomic init bug)
+✅ Hot-reload brightness/contrast working
+✅ CPU usage stable (6.7%)
+
+### Critical Fix Applied (2025-12-15)
+**Issue**: Motion crashed with SIGABRT during initialization due to uninitialized `std::atomic<bool>` in `ctx_pending_controls`.
+
+**Solution**: Added default member initializers to struct in `src/libcam.hpp`:
+```cpp
+struct ctx_pending_controls {
+    float brightness = 0.0f;
+    float contrast = 1.0f;
+    std::atomic<bool> dirty{false};  // Brace init required for atomics
+};
+```
+
+**Result**: Camera thread now starts successfully, hot-reload functionality confirmed working.
+
+### Testing Results (2025-12-15)
+✅ **Brightness Hot-Reload**: `curl "http://localhost:7999/1/config/set?libcam_brightness=0.3"` → `hot_reload:true`
+✅ **Contrast Hot-Reload**: `curl "http://localhost:7999/1/config/set?libcam_contrast=1.8"` → `hot_reload:true`
+✅ **Camera Status**: Detection status = PAUSE (camera initialized)
+✅ **Camera Thread**: `cl01:Camera1` thread running with 5 libcamera worker threads
+✅ **CPU Usage**: 6.7% (stable, no spikes during parameter changes)
+✅ **MotionEye**: Web interface accessible, camera listed
 
 ### Next Steps
-1. Restart motion daemon: `sudo systemctl restart motion`
-2. Execute testing commands above
-3. Integrate with MotionEye UI sliders
-4. Validate 24+ hour stability with periodic adjustments
+1. ~~Restart motion daemon~~ ✅ DONE
+2. ~~Execute testing commands~~ ✅ DONE
+3. Integrate with MotionEye UI sliders (future work)
+4. Validate 24+ hour stability with periodic adjustments (deferred per user request)
