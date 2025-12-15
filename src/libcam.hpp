@@ -22,6 +22,7 @@
         #include <queue>
         #include <vector>
         #include <algorithm>
+        #include <atomic>
         #include <sys/mman.h>
         #include <libcamera/libcamera.h>
 
@@ -39,12 +40,21 @@
             int buffer_idx;
         };
 
+        /* Pending runtime control updates (hot-reload brightness/contrast) */
+        struct ctx_pending_controls {
+            float brightness;
+            float contrast;
+            std::atomic<bool> dirty;
+        };
+
         class cls_libcam {
             public:
                 cls_libcam(cls_camera *p_cam);
                 ~cls_libcam();
                 int next(ctx_image_data *img_data);
                 void noimage();
+                void set_brightness(float value);
+                void set_contrast(float value);
             private:
                 cls_camera  *cam;
                 ctx_params  *params;
@@ -59,6 +69,7 @@
                 libcamera::ControlList             controls;
                 ctx_imgmap                         membuf;         /* Legacy single buffer (kept for compatibility) */
                 std::vector<ctx_imgmap>            membuf_pool;    /* NEW: Multi-buffer pool */
+                ctx_pending_controls               pending_ctrls;  /* Hot-reload brightness/contrast */
                 bool    started_cam;
                 bool    started_mgr;
                 bool    started_aqr;
@@ -81,6 +92,7 @@
                 void config_control_item(std::string pname, std::string pvalue);
                 void req_complete(libcamera::Request *request);
                 int req_add(libcamera::Request *request);
+                void apply_pending_controls();
 
                 /* NEW: Pi 5 camera filtering and selection */
                 std::vector<std::shared_ptr<libcamera::Camera>> get_pi_cameras();

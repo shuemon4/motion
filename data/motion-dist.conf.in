@@ -26,6 +26,8 @@ target_dir @localstatedir@/lib/@PACKAGE_NAME@/media
 ;*************************************************
 ;v4l2_device /dev/video0
 ;netcam_url
+;libcam_brightness 0.0
+;libcam_contrast 1.0
 
 ;*************************************************
 ;*****   Image

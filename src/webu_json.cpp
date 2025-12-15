@@ -587,10 +587,24 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
         /* Update all running cameras */
         for (int indx = 0; indx < app->cam_cnt; indx++) {
             app->cam_list[indx]->cfg->edit_set(parm_name, parm_val);
+
+            /* Apply libcam brightness/contrast changes immediately */
+            if (parm_name == "libcam_brightness") {
+                app->cam_list[indx]->set_libcam_brightness(atof(parm_val.c_str()));
+            } else if (parm_name == "libcam_contrast") {
+                app->cam_list[indx]->set_libcam_contrast(atof(parm_val.c_str()));
+            }
         }
     } else if (webua->cam != nullptr) {
         /* Update specific camera only */
         webua->cam->cfg->edit_set(parm_name, parm_val);
+
+        /* Apply libcam brightness/contrast changes immediately */
+        if (parm_name == "libcam_brightness") {
+            webua->cam->set_libcam_brightness(atof(parm_val.c_str()));
+        } else if (parm_name == "libcam_contrast") {
+            webua->cam->set_libcam_contrast(atof(parm_val.c_str()));
+        }
     }
 
     MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,

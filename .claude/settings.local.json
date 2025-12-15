@@ -8,7 +8,12 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(git:*)",
       "Bash(ssh:*)",
-      "Bash(scp:*)"
+      "Bash(scp:*)",
+      "Bash(make clean:*)",
+      "Bash(autoreconf:*)",
+      "Bash(rsync:*)",
+      "Bash(make:*)",
+      "Bash(/Users/tshuey/Documents/GitHub/motion/ admin@192.168.1.176:~/motion/)"
     ],
     "deny": [],
     "ask": []

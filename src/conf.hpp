@@ -420,6 +420,8 @@
             void edit_libcam_device(std::string &parm, enum PARM_ACT pact);
             void edit_libcam_params(std::string &parm, enum PARM_ACT pact);
             void edit_libcam_buffer_count(std::string &parm, enum PARM_ACT pact);
+            void edit_libcam_brightness(std::string &parm, enum PARM_ACT pact);
+            void edit_libcam_contrast(std::string &parm, enum PARM_ACT pact);
 
             void edit_width(std::string &parm, enum PARM_ACT pact);
             void edit_height(std::string &parm, enum PARM_ACT pact);

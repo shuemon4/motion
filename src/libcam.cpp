@@ -541,6 +541,10 @@ void cls_libcam::config_controls()
             ,params->params_array[indx].param_value);
     }
 
+    /* Apply initial brightness/contrast from config */
+    controls.set(controls::Brightness, cam->cfg->parm_cam.libcam_brightness);
+    controls.set(controls::Contrast, cam->cfg->parm_cam.libcam_contrast);
+
     retcd = config->validate();
     if (retcd == CameraConfiguration::Adjusted) {
         MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO
@@ -703,6 +707,18 @@ int cls_libcam::start_config()
 int cls_libcam::req_add(Request *request)
 {
     int retcd;
+
+    /* Apply pending brightness/contrast controls if changed */
+    if (pending_ctrls.dirty.load()) {
+        ControlList &req_controls = request->controls();
+        req_controls.set(controls::Brightness, pending_ctrls.brightness);
+        req_controls.set(controls::Contrast, pending_ctrls.contrast);
+        pending_ctrls.dirty.store(false);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Applied controls to request: brightness=%.2f, contrast=%.2f"
+            , pending_ctrls.brightness, pending_ctrls.contrast);
+    }
+
     retcd = camera->queueRequest(request);
     return retcd;
 }
@@ -956,6 +972,46 @@ void cls_libcam::libcam_stop()
 
 #endif
 
+void cls_libcam::set_brightness(float value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.brightness = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: brightness set to %.2f", value);
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::set_contrast(float value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.contrast = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: contrast set to %.2f", value);
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::apply_pending_controls()
+{
+    #ifdef HAVE_LIBCAM
+        /* Note: libcamera 0.5.2 doesn't have Camera::setControls().
+         * Controls are applied via requests. For now, we'll apply them
+         * on the next queued request in req_add(). The dirty flag signals
+         * that controls should be updated on next request.
+         */
+        if (pending_ctrls.dirty.load()) {
+            MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO
+                , "Brightness/Contrast update pending: brightness=%.2f, contrast=%.2f"
+                , pending_ctrls.brightness, pending_ctrls.contrast);
+        }
+    #endif
+}
+
 void cls_libcam::noimage()
 {
     #ifdef HAVE_LIBCAM
@@ -1037,6 +1093,9 @@ int cls_libcam::next(ctx_image_data *img_data)
             cam->rotate->process(img_data);
             reconnect_count = 0;
 
+            /* Apply any pending hot-reload control changes */
+            apply_pending_controls();
+
             return CAPTURE_SUCCESS;
 
         } else {
@@ -1055,6 +1114,10 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
         MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO,_("Opening libcam"));
         params = nullptr;
         reconnect_count = 0;
+        /* Initialize pending controls with config values */
+        pending_ctrls.brightness = cam->cfg->parm_cam.libcam_brightness;
+        pending_ctrls.contrast = cam->cfg->parm_cam.libcam_contrast;
+        pending_ctrls.dirty.store(false);
         cam->watchdog = cam->cfg->watchdog_tmo * 3; /* 3 is arbitrary multiplier to give startup more time*/
         if (libcam_start() < 0) {
             MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO,_("libcam failed to open"));

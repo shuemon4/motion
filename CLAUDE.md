@@ -89,6 +89,60 @@ make -j4
   --without-pgsql
 ```
 
+## Testing on Raspberry Pi 5
+
+### Before Running Tests
+
+**IMPORTANT: Always ask the user if the Pi 5 is powered on before attempting to connect or run tests.**
+
+### SSH Connection
+
+Connect to the test Pi 5:
+```bash
+ssh admin@192.168.1.176
+```
+
+The SSH key has been configured for passwordless access from the development Mac.
+
+### Deployment Workflow
+
+1. **Sync code to Pi:**
+   ```bash
+   rsync -avz --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' --exclude='.venv' /Users/tshuey/Documents/GitHub/motioneye/ admin@192.168.1.176:~/motioneye/
+   ```
+
+2. **Install on Pi:**
+   ```bash
+   ssh admin@192.168.1.176 "cd ~/motioneye && sudo pip3 install . --break-system-packages"
+   ```
+
+3. **Restart service:**
+   ```bash
+   ssh admin@192.168.1.176 "sudo systemctl restart motioneye"
+   ```
+
+4. **Check logs:**
+   ```bash
+   ssh admin@192.168.1.176 "sudo journalctl -u motioneye -n 50 --no-pager"
+   ```
+
+### Verify Camera Streaming
+
+Test Motion stream directly:
+```bash
+ssh admin@192.168.1.176 "curl -s --max-time 3 'http://localhost:7999/1/mjpg/stream' -o /tmp/test.dat && file /tmp/test.dat"
+```
+
+Access MotionEye web interface: `http://192.168.1.176:8765/`
+
+### Common Issues
+
+- **Port conflicts**: Kill orphaned motion processes with `sudo pkill -9 motion`
+- **Permission errors**: Ensure `/etc/motioneye` is owned by `motion:motion`
+- **Camera not detected**: Verify with `rpicam-hello --list-cameras`
+
+---
+
 ## Deploying to Pi
 
 ### Transfer Code to Pi
@@ -105,23 +159,6 @@ git checkout your-branch
 ```bash
 # From Windows
 scp -r "C:\Users\Trent\Documents\GitHub\motion" pi@RPI_IP:~/
-```
-
-### Fix Windows Transfer Issues
-
-When transferring from Windows, fix line endings and permissions before building:
-
-```bash
-# Install dos2unix if needed
-sudo apt install dos2unix
-
-# Fix Windows line endings (CRLF → LF)
-find ~/motion -type f \( -name "*.sh" -o -name "configure*" -o -name "Makefile*" \) -exec dos2unix {} \;
-dos2unix ~/motion/scripts/*
-
-# Fix executable permissions (lost when transferring from Windows)
-chmod +x ~/motion/scripts/*
-chmod +x ~/motion/configure
 ```
 
 ### Build on Pi

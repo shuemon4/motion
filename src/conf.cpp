@@ -76,6 +76,8 @@ ctx_parm config_parms[] = {
     {"libcam_device",             PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, false},
     {"libcam_params",             PARM_TYP_PARAMS, PARM_CAT_02, PARM_LEVEL_ADVANCED, false},
     {"libcam_buffer_count",       PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, false},
+    {"libcam_brightness",         PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_contrast",           PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
 
     /* Category 03 - Image parameters - NOT hot reloadable (buffer realloc) */
     {"width",                     PARM_TYP_INT,    PARM_CAT_03, PARM_LEVEL_LIMITED,  false},
@@ -1009,6 +1011,46 @@ void cls_config::edit_libcam_buffer_count(std::string &parm, enum PARM_ACT pact)
     }
     return;
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","libcam_buffer_count",_("libcam_buffer_count"));
+}
+
+void cls_config::edit_libcam_brightness(std::string &parm, enum PARM_ACT pact)
+{
+    float parm_in;
+    if (pact == PARM_ACT_DFLT) {
+        parm_cam.libcam_brightness = 0.0;
+    } else if (pact == PARM_ACT_SET) {
+        parm_in = atof(parm.c_str());
+        if ((parm_in < -1.0) || (parm_in > 1.0)) {
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+                , _("Invalid libcam_brightness %.2f (range -1.0 to 1.0)"), parm_in);
+        } else {
+            parm_cam.libcam_brightness = parm_in;
+        }
+    } else if (pact == PARM_ACT_GET) {
+        parm = std::to_string(parm_cam.libcam_brightness);
+    }
+    return;
+    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","libcam_brightness",_("libcam_brightness"));
+}
+
+void cls_config::edit_libcam_contrast(std::string &parm, enum PARM_ACT pact)
+{
+    float parm_in;
+    if (pact == PARM_ACT_DFLT) {
+        parm_cam.libcam_contrast = 1.0;
+    } else if (pact == PARM_ACT_SET) {
+        parm_in = atof(parm.c_str());
+        if ((parm_in < 0.0) || (parm_in > 32.0)) {
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+                , _("Invalid libcam_contrast %.2f (range 0.0 to 32.0)"), parm_in);
+        } else {
+            parm_cam.libcam_contrast = parm_in;
+        }
+    } else if (pact == PARM_ACT_GET) {
+        parm = std::to_string(parm_cam.libcam_contrast);
+    }
+    return;
+    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","libcam_contrast",_("libcam_contrast"));
 }
 
 void cls_config::edit_width(std::string &parm, enum PARM_ACT pact)
@@ -3292,6 +3334,8 @@ void cls_config::edit_cat02(std::string parm_nm, std::string &parm_val, enum PAR
     } else if (parm_nm == "libcam_device") {         edit_libcam_device(parm_val, pact);
     } else if (parm_nm == "libcam_params") {         edit_libcam_params(parm_val, pact);
     } else if (parm_nm == "libcam_buffer_count") {   edit_libcam_buffer_count(parm_val, pact);
+    } else if (parm_nm == "libcam_brightness") {     edit_libcam_brightness(parm_val, pact);
+    } else if (parm_nm == "libcam_contrast") {       edit_libcam_contrast(parm_val, pact);
     }
 
 }

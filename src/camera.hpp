@@ -203,6 +203,10 @@ class cls_camera {
         enum CAMERA_TYPE        camera_type;
         struct timespec         connectionlosttime;
 
+        /* Hot-reload libcam brightness/contrast controls */
+        void set_libcam_brightness(float value);
+        void set_libcam_contrast(float value);
+
     private:
         cls_movie       *movie_norm;
         cls_movie       *movie_motion;

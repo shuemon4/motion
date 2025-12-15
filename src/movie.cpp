@@ -143,20 +143,6 @@ int cls_movie::get_oformat()
         oc->video_codec_id = AV_CODEC_ID_H264;
     }
 
-    if (container == "flv") {
-        oc->oformat = av_guess_format("flv", nullptr, nullptr);
-        full_nm += ".flv";
-        file_nm += ".flv";
-        oc->video_codec_id = AV_CODEC_ID_FLV1;
-    }
-
-    if (container == "ogg") {
-        oc->oformat = av_guess_format("ogg", nullptr, nullptr);
-        full_nm += ".ogg";
-        file_nm += ".ogg";
-        oc->video_codec_id = AV_CODEC_ID_THEORA;
-    }
-
     if (container == "webm") {
         oc->oformat = av_guess_format("webm", nullptr, nullptr);
         full_nm += ".webm";
@@ -406,8 +392,7 @@ int cls_movie::set_codec()
     **  then let the PTS display the frames correctly.
     */
     if ((tlapse == TIMELAPSE_NONE) && (fps <= 5)) {
-        if ((container == "flv") ||
-            (container == "mp4") ||
+        if ((container == "mp4") ||
             (container == "hevc")) {
             MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
                 , "Low fps. Encoding %d frames into a %d frames container."
@@ -1409,27 +1394,19 @@ void cls_movie::init_container()
 
     if (cam->cfg->movie_container == "test") {
         MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO, "Running test of the various output formats.");
-        codenbr = cam->event_curr_nbr % 10;
+        codenbr = cam->event_curr_nbr % 6;
         if (codenbr == 1) {
-            container = "flv";
+            container = "mov";
         } else if (codenbr == 2) {
-            container = "ogg";
+            container = "webm";
         } else if (codenbr == 3) {
-            container = "webm";
-        } else if (codenbr == 4) {
             container = "mp4";
+        } else if (codenbr == 4) {
+            container = "mkv";
         } else if (codenbr == 5) {
-            container = "mkv";
-        } else if (codenbr == 6) {
             container = "hevc";
-        } else if (codenbr == 7) {
-            container = "flv";
-        } else if (codenbr == 8) {
-            container = "ogg";
-        } else if (codenbr == 9) {
-            container = "webm";
-        } else                   {
-            container = "mkv";
+        } else {
+            container = "mp4";
         }
     } else {
         container = cam->cfg->movie_container;

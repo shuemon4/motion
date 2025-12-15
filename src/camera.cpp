@@ -2083,3 +2083,17 @@ cls_camera::~cls_camera()
     pthread_mutex_destroy(&stream.mutex);
     device_status = STATUS_CLOSED;
 }
+
+void cls_camera::set_libcam_brightness(float value)
+{
+    if (libcam != nullptr) {
+        libcam->set_brightness(value);
+    }
+}
+
+void cls_camera::set_libcam_contrast(float value)
+{
+    if (libcam != nullptr) {
+        libcam->set_contrast(value);
+    }
+}
