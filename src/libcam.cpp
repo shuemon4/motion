@@ -29,6 +29,16 @@
 
 using namespace libcamera;
 
+/* Convert ISO value (100-6400) to AnalogueGain multiplier
+ * ISO 100 = gain 1.0, ISO 800 = gain 8.0, ISO 1600 = gain 16.0
+ * Note: IMX708 (Pi Camera v3) max analog gain is 16.0 (ISO 1600).
+ * Values above ISO 1600 trigger digital gain which adds significant noise
+ * and may require reduced framerate (< 10 fps) for stable operation.
+ */
+static float iso_to_gain(float iso) {
+    return iso / 100.0f;
+}
+
 void cls_libcam::log_orientation()
 {
     #if (LIBCAMVER >= 2000)
@@ -541,9 +551,10 @@ void cls_libcam::config_controls()
             ,params->params_array[indx].param_value);
     }
 
-    /* Apply initial brightness/contrast from config */
+    /* Apply initial brightness/contrast/ISO from config */
     controls.set(controls::Brightness, cam->cfg->parm_cam.libcam_brightness);
     controls.set(controls::Contrast, cam->cfg->parm_cam.libcam_contrast);
+    controls.set(controls::AnalogueGain, iso_to_gain(cam->cfg->parm_cam.libcam_iso));
 
     retcd = config->validate();
     if (retcd == CameraConfiguration::Adjusted) {
@@ -708,15 +719,17 @@ int cls_libcam::req_add(Request *request)
 {
     int retcd;
 
-    /* Apply pending brightness/contrast controls if changed */
+    /* Apply pending brightness/contrast/ISO controls if changed */
     if (pending_ctrls.dirty.load()) {
         ControlList &req_controls = request->controls();
         req_controls.set(controls::Brightness, pending_ctrls.brightness);
         req_controls.set(controls::Contrast, pending_ctrls.contrast);
+        req_controls.set(controls::AnalogueGain, iso_to_gain(pending_ctrls.iso));
         pending_ctrls.dirty.store(false);
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            , "Applied controls to request: brightness=%.2f, contrast=%.2f"
-            , pending_ctrls.brightness, pending_ctrls.contrast);
+            , "Applied controls to request: brightness=%.2f, contrast=%.2f, iso=%.0f (gain=%.2f)"
+            , pending_ctrls.brightness, pending_ctrls.contrast
+            , pending_ctrls.iso, iso_to_gain(pending_ctrls.iso));
     }
 
     retcd = camera->queueRequest(request);
@@ -996,6 +1009,18 @@ void cls_libcam::set_contrast(float value)
     #endif
 }
 
+void cls_libcam::set_iso(float value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.iso = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: ISO set to %.0f (gain=%.2f)", value, iso_to_gain(value));
+    #else
+        (void)value;
+    #endif
+}
+
 void cls_libcam::apply_pending_controls()
 {
     #ifdef HAVE_LIBCAM
@@ -1006,8 +1031,8 @@ void cls_libcam::apply_pending_controls()
          */
         if (pending_ctrls.dirty.load()) {
             MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO
-                , "Brightness/Contrast update pending: brightness=%.2f, contrast=%.2f"
-                , pending_ctrls.brightness, pending_ctrls.contrast);
+                , "Brightness/Contrast/ISO update pending: brightness=%.2f, contrast=%.2f, iso=%.0f"
+                , pending_ctrls.brightness, pending_ctrls.contrast, pending_ctrls.iso);
         }
     #endif
 }
@@ -1117,6 +1142,7 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
         /* Initialize pending controls with config values */
         pending_ctrls.brightness = cam->cfg->parm_cam.libcam_brightness;
         pending_ctrls.contrast = cam->cfg->parm_cam.libcam_contrast;
+        pending_ctrls.iso = cam->cfg->parm_cam.libcam_iso;
         pending_ctrls.dirty.store(false);
         cam->watchdog = cam->cfg->watchdog_tmo * 3; /* 3 is arbitrary multiplier to give startup more time*/
         if (libcam_start() < 0) {

@@ -13,7 +13,8 @@
       "Bash(autoreconf:*)",
       "Bash(rsync:*)",
       "Bash(make:*)",
-      "Bash(/Users/tshuey/Documents/GitHub/motion/ admin@192.168.1.176:~/motion/)"
+      "Bash(/Users/tshuey/Documents/GitHub/motion/ admin@192.168.1.176:~/motion/)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

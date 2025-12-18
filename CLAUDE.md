@@ -232,7 +232,7 @@ See `doc/scratchpads/pi5-camv3-implementation.md` for detailed implementation pl
 5. 24+ hour stability
 
 ## Documentation Structure
-
+- Not up-to-date
 ```
 doc/
 ├── project/           # AI agent reference docs

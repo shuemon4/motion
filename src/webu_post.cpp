@@ -622,14 +622,6 @@ void cls_webu_post::config()
             mystrne(post_info[indx].key_nm, "camid")) {
 
             tmpname = post_info[indx].key_nm;
-            indx2=0;
-            while (config_parms_depr[indx2].parm_name != "") {
-                if (config_parms_depr[indx2].parm_name == tmpname) {
-                    tmpname = config_parms_depr[indx2].newname;
-                    break;
-                }
-                indx2++;
-            }
 
             /* Ignore any requests for parms above webcontrol_parms level. */
             indx2=0;

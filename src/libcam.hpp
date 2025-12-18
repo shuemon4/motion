@@ -40,10 +40,11 @@
             int buffer_idx;
         };
 
-        /* Pending runtime control updates (hot-reload brightness/contrast) */
+        /* Pending runtime control updates (hot-reload brightness/contrast/ISO) */
         struct ctx_pending_controls {
             float brightness = 0.0f;
             float contrast = 1.0f;
+            float iso = 100.0f;  // ISO 100-6400 (converted to AnalogueGain)
             std::atomic<bool> dirty{false};  /* Must use brace initialization for atomics */
         };
 
@@ -55,6 +56,7 @@
                 void noimage();
                 void set_brightness(float value);
                 void set_contrast(float value);
+                void set_iso(float value);
             private:
                 cls_camera  *cam;
                 ctx_params  *params;

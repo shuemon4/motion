@@ -77,16 +77,7 @@
         , PARM_ACT_LIST
     };
 
-    /** Deprecated parameters in the config file  */
-    struct ctx_parm_depr{
-        const std::string   parm_name;     /* Name of the deprecated option */
-        const std::string   last_version;  /* Last version this option was used in */
-        const std::string   info;          /* Short text on why it was deprecated (removed, replaced with, etc) */
-        const std::string   newname;       /* Name of the new parameter */
-    };
-
     extern struct ctx_parm config_parms[];
-    extern struct ctx_parm_depr config_parms_depr[];
 
     class cls_config {
         public:
@@ -360,13 +351,18 @@
             void parms_write_snd();
 
             int edit_set_active(std::string parm_nm, std::string parm_val);
-            int edit_set_depr(std::string &parm_nm, std::string &parm_val);
-            void edit_depr_tdbl(std::string newname, std::string &parm_val);
-            void edit_depr_vid(std::string parm_nm, std::string newname, std::string parm_val);
-            void edit_depr_web(std::string newname, std::string &parm_val);
-            void edit_config_dir(std::string &parm, enum PARM_ACT pact);
             void edit_get_bool(std::string &parm_dest, bool &parm_in);
             void edit_set_bool(bool &parm_dest, std::string &parm_in);
+
+            /* Generic handlers for type-based parameter editing */
+            void edit_generic_bool(bool& target, std::string& parm, enum PARM_ACT pact, bool default_val);
+            void edit_generic_int(int& target, std::string& parm, enum PARM_ACT pact, int default_val, int min_val, int max_val);
+            void edit_generic_float(float& target, std::string& parm, enum PARM_ACT pact, float default_val, float min_val, float max_val);
+            void edit_generic_string(std::string& target, std::string& parm, enum PARM_ACT pact, const std::string& default_val);
+            void edit_generic_list(std::string& target, std::string& parm, enum PARM_ACT pact, const std::string& default_val, const std::vector<std::string>& valid_values);
+
+            /* Centralized parameter dispatch function */
+            void dispatch_edit(const std::string& name, std::string& parm, enum PARM_ACT pact);
 
             void edit_cat(std::string parm_nm, std::list<std::string> &parm_val, enum PARM_ACT pact, enum PARM_CAT pcat);
             void edit_cat(std::string parm_nm, std::string &parm_val, enum PARM_ACT pact, enum PARM_CAT pcat);
@@ -391,186 +387,34 @@
             void edit_cat18(std::string parm_nm, std::string &parm_val, enum PARM_ACT pact);
             void edit_cat18(std::string parm_nm,std::list<std::string> &parm_val, enum PARM_ACT pact);
 
-            void edit_daemon(std::string &parm, enum PARM_ACT pact);
-            void edit_conf_filename(std::string &parm, enum PARM_ACT pact);
-            void edit_pid_file(std::string &parm, int pact);
             void edit_log_file(std::string &parm, enum PARM_ACT pact);
-            void edit_log_level(std::string &parm, enum PARM_ACT pact);
-            void edit_log_fflevel(std::string &parm, enum PARM_ACT pact);
-            void edit_log_type(std::string &parm, enum PARM_ACT pact);
-            void edit_native_language(std::string &parm, enum PARM_ACT pact);
 
-            void edit_device_name(std::string &parm, enum PARM_ACT pact);
             void edit_device_id(std::string &parm, enum PARM_ACT pact);
-            void edit_device_tmo(std::string &parm, enum PARM_ACT pact);
             void edit_pause(std::string &parm, enum PARM_ACT pact);
-            void edit_schedule_params(std::string &parm, enum PARM_ACT pact);
-            void edit_cleandir_params(std::string &parm, enum PARM_ACT pact);
             void edit_target_dir(std::string &parm, enum PARM_ACT pact);
-            void edit_watchdog_kill(std::string &parm, enum PARM_ACT pact);
-            void edit_watchdog_tmo(std::string &parm, enum PARM_ACT pact);
 
-            void edit_v4l2_device(std::string &parm, enum PARM_ACT pact);
-            void edit_v4l2_params(std::string &parm, enum PARM_ACT pact);
-            void edit_netcam_high_params(std::string &parm, enum PARM_ACT pact);
-            void edit_netcam_high_url(std::string &parm, enum PARM_ACT pact);
-            void edit_netcam_params(std::string &parm, enum PARM_ACT pact);
-            void edit_netcam_url(std::string &parm, enum PARM_ACT pact);
-            void edit_netcam_userpass(std::string &parm, enum PARM_ACT pact);
-            void edit_libcam_device(std::string &parm, enum PARM_ACT pact);
-            void edit_libcam_params(std::string &parm, enum PARM_ACT pact);
-            void edit_libcam_buffer_count(std::string &parm, enum PARM_ACT pact);
-            void edit_libcam_brightness(std::string &parm, enum PARM_ACT pact);
-            void edit_libcam_contrast(std::string &parm, enum PARM_ACT pact);
 
-            void edit_width(std::string &parm, enum PARM_ACT pact);
-            void edit_height(std::string &parm, enum PARM_ACT pact);
-            void edit_framerate(std::string &parm, enum PARM_ACT pact);
-            void edit_rotate(std::string &parm, enum PARM_ACT pact);
-            void edit_flip_axis(std::string &parm, enum PARM_ACT pact);
 
-            void edit_locate_motion_mode(std::string &parm, enum PARM_ACT pact);
-            void edit_locate_motion_style(std::string &parm, enum PARM_ACT pact);
             void edit_text_changes(std::string &parm, enum PARM_ACT pact);
-            void edit_text_event(std::string &parm, enum PARM_ACT pact);
-            void edit_text_left(std::string &parm, enum PARM_ACT pact);
-            void edit_text_right(std::string &parm, enum PARM_ACT pact);
-            void edit_text_scale(std::string &parm, enum PARM_ACT pact);
 
-            void edit_emulate_motion(std::string &parm, enum PARM_ACT pact);
-            void edit_threshold(std::string &parm, enum PARM_ACT pact);
-            void edit_threshold_maximum(std::string &parm, enum PARM_ACT pact);
-            void edit_threshold_ratio(std::string &parm, enum PARM_ACT pact);
-            void edit_threshold_ratio_change(std::string &parm, enum PARM_ACT pact);
-            void edit_threshold_sdevx(std::string &parm, enum PARM_ACT pact);
-            void edit_threshold_sdevxy(std::string &parm, enum PARM_ACT pact);
-            void edit_threshold_sdevy(std::string &parm, enum PARM_ACT pact);
-            void edit_threshold_tune(std::string &parm, enum PARM_ACT pact);
-            void edit_secondary_method(std::string &parm, enum PARM_ACT pact);
-            void edit_secondary_params(std::string &parm, enum PARM_ACT pact);
 
-            void edit_noise_level(std::string &parm, enum PARM_ACT pact);
-            void edit_noise_tune(std::string &parm, enum PARM_ACT pact);
-            void edit_despeckle_filter(std::string &parm, enum PARM_ACT pact);
-            void edit_area_detect(std::string &parm, enum PARM_ACT pact);
-            void edit_mask_file(std::string &parm, enum PARM_ACT pact);
-            void edit_mask_privacy(std::string &parm, enum PARM_ACT pact);
-            void edit_smart_mask_speed(std::string &parm, enum PARM_ACT pact);
 
-            void edit_lightswitch_frames(std::string &parm, enum PARM_ACT pact);
-            void edit_lightswitch_percent(std::string &parm, enum PARM_ACT pact);
-            void edit_minimum_motion_frames(std::string &parm, enum PARM_ACT pact);
-            void edit_event_gap(std::string &parm, enum PARM_ACT pact);
-            void edit_static_object_time(std::string &parm, enum PARM_ACT pact);
-            void edit_post_capture(std::string &parm, enum PARM_ACT pact);
-            void edit_pre_capture(std::string &parm, enum PARM_ACT pact);
 
-            void edit_on_action_user(std::string &parm, enum PARM_ACT pact);
-            void edit_on_area_detected(std::string &parm, enum PARM_ACT pact);
-            void edit_on_camera_found(std::string &parm, enum PARM_ACT pact);
-            void edit_on_camera_lost(std::string &parm, enum PARM_ACT pact);
-            void edit_on_event_end(std::string &parm, enum PARM_ACT pact);
-            void edit_on_event_start(std::string &parm, enum PARM_ACT pact);
-            void edit_on_motion_detected(std::string &parm, enum PARM_ACT pact);
-            void edit_on_movie_end(std::string &parm, enum PARM_ACT pact);
-            void edit_on_movie_start(std::string &parm, enum PARM_ACT pact);
-            void edit_on_picture_save(std::string &parm, enum PARM_ACT pact);
-            void edit_on_secondary_detect(std::string &parm, enum PARM_ACT pact);
-            void edit_on_sound_alert(std::string &parm, enum PARM_ACT pact);
 
-            void edit_picture_exif(std::string &parm, enum PARM_ACT pact);
             void edit_picture_filename(std::string &parm, enum PARM_ACT pact);
-            void edit_picture_output(std::string &parm, enum PARM_ACT pact);
-            void edit_picture_output_motion(std::string &parm, enum PARM_ACT pact);
-            void edit_picture_quality(std::string &parm, enum PARM_ACT pact);
-            void edit_picture_type(std::string &parm, enum PARM_ACT pact);
             void edit_snapshot_filename(std::string &parm, enum PARM_ACT pact);
-            void edit_snapshot_interval(std::string &parm, enum PARM_ACT pact);
 
-            void edit_movie_all_frames(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_bps(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_container(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_extpipe(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_extpipe_use(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_encoder_preset(std::string &parm, enum PARM_ACT pact);
             void edit_movie_filename(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_max_time(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_output(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_output_motion(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_passthrough(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_quality(std::string &parm, enum PARM_ACT pact);
-            void edit_movie_retain(std::string &parm, enum PARM_ACT pact);
 
-            void edit_timelapse_container(std::string &parm, enum PARM_ACT pact);
             void edit_timelapse_filename(std::string &parm, enum PARM_ACT pact);
-            void edit_timelapse_fps(std::string &parm, enum PARM_ACT pact);
-            void edit_timelapse_interval(std::string &parm, enum PARM_ACT pact);
-            void edit_timelapse_mode(std::string &parm, enum PARM_ACT pact);
-
-            void edit_video_pipe(std::string &parm, enum PARM_ACT pact);
-            void edit_video_pipe_motion(std::string &parm, enum PARM_ACT pact);
-
-            void edit_webcontrol_actions(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_auth_method(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_authentication(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_base_path(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_cert(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_headers(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_html(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_interface(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_ipv6(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_key(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_localhost(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_lock_attempts(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_lock_minutes(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_lock_script(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_parms(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_port(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_port2(std::string &parm, enum PARM_ACT pact);
-            void edit_webcontrol_tls(std::string &parm, enum PARM_ACT pact);
-
-            void edit_stream_grey(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_maxrate(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_motion(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_preview_params(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_preview_method(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_preview_newline(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_preview_ptz(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_preview_scale(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_quality(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_scan_scale(std::string &parm, enum PARM_ACT pact);
-            void edit_stream_scan_time(std::string &parm, enum PARM_ACT pact);
-
-            void edit_database_busy_timeout(std::string &parm, enum PARM_ACT pact);
-            void edit_database_dbname(std::string &parm, enum PARM_ACT pact);
-            void edit_database_host(std::string &parm, enum PARM_ACT pact);
-            void edit_database_password(std::string &parm, enum PARM_ACT pact);
-            void edit_database_port(std::string &parm, enum PARM_ACT pact);
-            void edit_database_type(std::string &parm, enum PARM_ACT pact);
-            void edit_database_user(std::string &parm, enum PARM_ACT pact);
-
-            void edit_sql_event_end(std::string &parm, enum PARM_ACT pact);
-            void edit_sql_event_start(std::string &parm, enum PARM_ACT pact);
-            void edit_sql_movie_end(std::string &parm, enum PARM_ACT pact);
-            void edit_sql_movie_start(std::string &parm, enum PARM_ACT pact);
-            void edit_sql_pic_save(std::string &parm, enum PARM_ACT pact);
-
-            void edit_ptz_auto_track(std::string &parm, enum PARM_ACT pact);
-            void edit_ptz_move_track(std::string &parm, enum PARM_ACT pact);
-            void edit_ptz_pan_left(std::string &parm, enum PARM_ACT pact);
-            void edit_ptz_pan_right(std::string &parm, enum PARM_ACT pact);
-            void edit_ptz_tilt_down(std::string &parm, enum PARM_ACT pact);
-            void edit_ptz_tilt_up(std::string &parm, enum PARM_ACT pact);
-            void edit_ptz_wait(std::string &parm, enum PARM_ACT pact);
-            void edit_ptz_zoom_in(std::string &parm, enum PARM_ACT pact);
-            void edit_ptz_zoom_out(std::string &parm, enum PARM_ACT pact);
-
-            void edit_snd_device(std::string &parm, enum PARM_ACT pact);
-            void edit_snd_params(std::string &parm, enum PARM_ACT pact);
             void edit_snd_alerts(std::list<std::string> &parm, enum PARM_ACT pact);
-            void edit_snd_alerts(std::string &parm, enum PARM_ACT pact);
-            void edit_snd_show(std::string &parm, enum PARM_ACT pact);
-            void edit_snd_window(std::string &parm, enum PARM_ACT pact);
+
+
+
+
+
+
+
 
     };
 

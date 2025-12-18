@@ -139,6 +139,7 @@ struct ctx_parm_cam {
     int             libcam_buffer_count;
     float           libcam_brightness;
     float           libcam_contrast;
+    int             libcam_iso;
 
     /* Image parameters (PARM_CAT_03) */
     int             width;
