@@ -166,7 +166,7 @@ void cls_webu_text::main()
     }
 
     /* CSRF Protection: Require POST for all state-changing operations */
-    if (is_state_changing && webua->cnct_method != WEBUI_METHOD_POST) {
+    if (is_state_changing && webua->get_method() != WEBUI_METHOD_POST) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("State-changing operation requires POST method from %s: %s/%s"),
             webua->clientip.c_str(), webua->uri_cmd1.c_str(), webua->uri_cmd2.c_str());

@@ -51,6 +51,7 @@
             void mhd_send();
             void bad_request();
             bool valid_request();
+            enum WEBUI_METHOD get_method() const { return cnct_method; }
 
             mhdrslt answer_main(struct MHD_Connection *connection, const char *method
                 , const char *upload_data, size_t *upload_data_size);

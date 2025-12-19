@@ -623,6 +623,65 @@ AS_IF([test "${DEVELOPER_FLAGS}" = "yes"], [
     ])
   ])
 
+##############################################################################
+###  Security Hardening Flags
+##############################################################################
+AC_ARG_ENABLE([hardening],
+    AS_HELP_STRING([--disable-hardening],
+    [Disable compiler security hardening flags]),
+    [HARDENING=$enableval],
+    [HARDENING=yes])
+
+AS_IF([test "${HARDENING}" = "yes"], [
+    # Stack protection
+    AX_CHECK_COMPILE_FLAG([-fstack-protector-strong], [
+        TEMP_CPPFLAGS="$TEMP_CPPFLAGS -fstack-protector-strong"
+    ], [
+        AX_CHECK_COMPILE_FLAG([-fstack-protector], [
+            TEMP_CPPFLAGS="$TEMP_CPPFLAGS -fstack-protector"
+        ])
+    ])
+
+    # Stack clash protection (GCC 8+, Clang 11+)
+    AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [
+        TEMP_CPPFLAGS="$TEMP_CPPFLAGS -fstack-clash-protection"
+    ])
+
+    # FORTIFY_SOURCE (requires optimization -O1 or higher)
+    # Check if optimization is enabled before adding FORTIFY_SOURCE
+    AS_IF([echo "$TEMP_CPPFLAGS" | grep -qE '\-O[[1-9]]'], [
+        TEMP_CPPFLAGS="$TEMP_CPPFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2"
+    ], [
+        AC_MSG_WARN([FORTIFY_SOURCE requires optimization (-O1 or higher), skipping])
+    ])
+
+    # Position Independent Executable
+    AX_CHECK_COMPILE_FLAG([-fPIE], [
+        TEMP_CPPFLAGS="$TEMP_CPPFLAGS -fPIE"
+        AX_CHECK_LINK_FLAG([-pie], [
+            TEMP_LDFLAGS="$TEMP_LDFLAGS -pie"
+        ])
+    ])
+
+    # Format string protection (treat as error)
+    AX_CHECK_COMPILE_FLAG([-Wformat -Werror=format-security], [
+        TEMP_CPPFLAGS="$TEMP_CPPFLAGS -Wformat -Werror=format-security"
+    ])
+
+    # Linker hardening
+    AX_CHECK_LINK_FLAG([-Wl,-z,relro], [
+        TEMP_LDFLAGS="$TEMP_LDFLAGS -Wl,-z,relro"
+    ])
+    AX_CHECK_LINK_FLAG([-Wl,-z,now], [
+        TEMP_LDFLAGS="$TEMP_LDFLAGS -Wl,-z,now"
+    ])
+    AX_CHECK_LINK_FLAG([-Wl,-z,noexecstack], [
+        TEMP_LDFLAGS="$TEMP_LDFLAGS -Wl,-z,noexecstack"
+    ])
+
+    AC_MSG_NOTICE([Security hardening flags enabled])
+])
+
 CPPFLAGS="$CPPFLAGS $TEMP_CPPFLAGS"
 LIBS="$LIBS $TEMP_LIBS"
 LDFLAGS="$TEMP_LDFLAGS"

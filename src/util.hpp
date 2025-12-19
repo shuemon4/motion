@@ -81,6 +81,7 @@ struct ctx_params {
     void mystrftime(cls_camera *cam, std::string &rslt
         , std::string usrfmt, std::string fname);
     void mystrftime(cls_sound *snd, std::string &dst, std::string fmt);
+    std::string util_sanitize_shell_chars(const std::string &input);
     void util_exec_command(cls_camera *cam, const char *command, const char *filename);
     void util_exec_command(cls_sound *snd, std::string cmd);
     void util_exec_command(cls_camera *cam, std::string cmd);

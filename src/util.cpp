@@ -253,6 +253,48 @@ int myfclose(FILE* fh)
     return rval;
 }
 
+/**
+ * Sanitize string for safe use in shell commands
+ * Removes shell metacharacters that could be used for command injection
+ *
+ * Dangerous characters: ` $ | ; & > < \n \r ( ) { } [ ] ' " \ * ? #
+ *
+ * Returns: Sanitized string with only safe characters
+ */
+std::string util_sanitize_shell_chars(const std::string &input)
+{
+    /* Whitelist of safe characters for shell substitutions */
+    static const char* SHELL_SAFE_CHARS =
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "0123456789"
+        "._-/:@,+=";  /* Limited safe special chars */
+
+    std::string result;
+    result.reserve(input.length());
+    bool modified = false;
+
+    for (size_t i = 0; i < input.length(); i++) {
+        /* Check if character is in safe set */
+        if (strchr(SHELL_SAFE_CHARS, input[i]) != nullptr) {
+            result += input[i];
+        } else {
+            /* Unsafe character detected - replace with underscore */
+            result += '_';
+            modified = true;
+        }
+    }
+
+    if (modified) {
+        MOTION_LOG(WRN, TYPE_EVENTS, NO_ERRNO,
+            _("Shell metacharacters sanitized in substitution. "
+              "Original: '%s' Sanitized: '%s'"),
+            input.c_str(), result.c_str());
+    }
+
+    return result;
+}
+
 void mystrftime(cls_sound *snd, std::string &dst, std::string fmt)
 {
     char tmp[PATH_MAX];
@@ -277,7 +319,9 @@ void mystrftime(cls_sound *snd, std::string &dst, std::string fmt)
             user_fmt.append(tmp);
             indx++;
         } else if (fmt.substr(indx,2) == "%$") {
-            user_fmt.append(snd->device_name);
+            /* Sanitize device name to prevent command injection */
+            std::string safe_devname = util_sanitize_shell_chars(snd->device_name);
+            user_fmt.append(safe_devname);
             indx++;
         } else if (fmt.substr(indx,strlen("%{ver}")) == "%{ver}") {
             user_fmt.append(VERSION);
@@ -386,16 +430,20 @@ void mystrftime_base(cls_camera *cam
                 sprintf(tmp, "%0*d", wd, cam->imgs.height);
                 user_fmt.append(tmp);
             } else if (tst == "f") {
+                /* Sanitize filename to prevent command injection */
+                std::string safe_fname = util_sanitize_shell_chars(fname);
                 if (wd > 0) {
-                    user_fmt.append(fname.substr(0, wd));
+                    user_fmt.append(safe_fname.substr(0, wd));
                 } else {
-                    user_fmt.append(fname);
+                    user_fmt.append(safe_fname);
                 }
             } else if (tst == "$") {
+                /* Sanitize device name to prevent command injection */
+                std::string safe_devname = util_sanitize_shell_chars(cam->cfg->device_name);
                 if (wd > 0) {
-                    user_fmt.append(cam->cfg->device_name.substr(0, wd));
+                    user_fmt.append(safe_devname.substr(0, wd));
                 } else {
-                    user_fmt.append(cam->cfg->device_name);
+                    user_fmt.append(safe_devname);
                 }
             } else if (fmt.substr(indx,strlen("{host}")) == "{host}") {
                 tst = cam->hostname;
@@ -446,7 +494,9 @@ void mystrftime_base(cls_camera *cam
                 user_fmt.append(tmp);
                 indx += (strlen("{ratio}")-1);
             } else if (fmt.substr(indx,strlen("{action_user}")) == "{action_user}") {
-                user_fmt.append(cam->action_user);
+                /* Sanitize action_user parameter to prevent command injection */
+                std::string safe_action = util_sanitize_shell_chars(cam->action_user);
+                user_fmt.append(safe_action);
                 indx += (strlen("{action_user}")-1);
             } else if (fmt.substr(indx,strlen("{secdetect}")) == "{secdetect}") {
                 if (cam->algsec->detected) {
