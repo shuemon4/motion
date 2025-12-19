@@ -431,6 +431,7 @@ void cls_webu_html::script_send_config()
         "        }\n"
         "      };\n"
 
+        "      formData.append('csrf_token', pCsrfToken);\n"
         "      formData.append('command', 'config');\n"
         "      formData.append('camid', camid);\n\n"
         "      for (jkey in pCfg) {\n"
@@ -472,6 +473,7 @@ void cls_webu_html::script_send_action()
         "        ans = '';\n"
         "      }\n\n"
 
+        "      formData.append('csrf_token', pCsrfToken);\n"
         "      formData.append('command', actval);\n"
         "      formData.append('camid', camid);\n"
         "      formData.append('user', ans);\n\n"
@@ -519,6 +521,7 @@ void cls_webu_html::script_send_reload()
         "        }\n"
         "      };\n"
 
+        "      formData.append('csrf_token', pCsrfToken);\n"
         "      formData.append('command', actval);\n"
         "      formData.append('camid', camid);\n\n"
 
@@ -926,6 +929,9 @@ void cls_webu_html::script_initform()
 
         "      pHostFull = '//' + window.location.hostname;\n"
         "      pHostFull = pHostFull + ':' + window.location.port;\n\n"
+
+        "      /* CSRF protection token */\n"
+        "      pCsrfToken = '" + webu->csrf_token + "';\n\n"
 
         "      xmlhttp.onreadystatechange = function() {\n"
         "        if (this.readyState == 4 && this.status == 200) {\n"

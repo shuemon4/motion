@@ -153,6 +153,30 @@ void cls_webu_text::connection()
 
 void cls_webu_text::main()
 {
+    /* Check if this is a state-changing operation that requires POST method */
+    bool is_state_changing = false;
+
+    if (webua->uri_cmd1 == "detection") {
+        if (webua->uri_cmd2 == "pause" || webua->uri_cmd2 == "start") {
+            is_state_changing = true;
+        }
+    } else if (webua->uri_cmd1 == "action") {
+        /* All action endpoints except status/connection are state-changing */
+        is_state_changing = true;
+    }
+
+    /* CSRF Protection: Require POST for all state-changing operations */
+    if (is_state_changing && webua->cnct_method != WEBUI_METHOD_POST) {
+        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+            _("State-changing operation requires POST method from %s: %s/%s"),
+            webua->clientip.c_str(), webua->uri_cmd1.c_str(), webua->uri_cmd2.c_str());
+        webua->resp_type = WEBUI_RESP_TEXT;
+        webua->resp_page = "HTTP 405: Method Not Allowed\n"
+                          "State-changing operations must use POST method.\n";
+        webua->mhd_send();
+        return;
+    }
+
     pthread_mutex_lock(&app->mutex_post);
         if ((webua->uri_cmd1 == "detection") &&
             (webua->uri_cmd2 == "status")) {

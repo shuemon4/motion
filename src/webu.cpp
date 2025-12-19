@@ -30,6 +30,7 @@
 #include "webu_stream.hpp"
 #include "webu_mpegts.hpp"
 #include "video_v4l2.hpp"
+#include <cstdio>
 
 /* Initialize the MHD answer */
 static void *webu_mhd_init(void *cls, const char *uri, struct MHD_Connection *connection)
@@ -517,11 +518,73 @@ void cls_webu::startup()
     randnbr = (unsigned int)(42000000.0 * rand() / (RAND_MAX + 1.0));
     snprintf(wb_digest_rand, sizeof(wb_digest_rand),"%d",randnbr);
 
+    /* Generate CSRF token for this session */
+    csrf_generate();
+
     start_daemon_port1();
 
     start_daemon_port2();
     cnct_cnt = 0;
 
+}
+
+/* Generate a CSRF token using cryptographically secure random data */
+void cls_webu::csrf_generate()
+{
+    unsigned char random_bytes[32];
+    char hex_token[65];
+
+    /* Use /dev/urandom for cryptographically secure random generation */
+    FILE *urandom = fopen("/dev/urandom", "rb");
+    if (urandom == nullptr) {
+        /* Fallback: use time-based seed with additional entropy */
+        MOTION_LOG(WRN, TYPE_STREAM, NO_ERRNO,
+            _("Cannot open /dev/urandom, using fallback random"));
+        srand((unsigned int)(time(NULL) ^ getpid()));
+        for (int i = 0; i < 32; i++) {
+            random_bytes[i] = (unsigned char)(rand() % 256);
+        }
+    } else {
+        size_t read_cnt = fread(random_bytes, 1, 32, urandom);
+        fclose(urandom);
+        if (read_cnt != 32) {
+            MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+                _("Failed to read sufficient random data for CSRF token"));
+            /* Use partial data with fallback */
+            srand((unsigned int)(time(NULL) ^ getpid()));
+            for (size_t i = read_cnt; i < 32; i++) {
+                random_bytes[i] = (unsigned char)(rand() % 256);
+            }
+        }
+    }
+
+    /* Convert to hex string */
+    for (int i = 0; i < 32; i++) {
+        snprintf(hex_token + (i * 2), 3, "%02x", random_bytes[i]);
+    }
+    hex_token[64] = '\0';
+
+    csrf_token = std::string(hex_token);
+    MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO, _("CSRF token generated"));
+}
+
+/* Validate a CSRF token using constant-time comparison */
+bool cls_webu::csrf_validate(const std::string &token)
+{
+    if (token.empty() || csrf_token.empty()) {
+        return false;
+    }
+
+    /* Constant-time comparison to prevent timing attacks */
+    if (token.length() != csrf_token.length()) {
+        return false;
+    }
+
+    volatile int result = 0;
+    for (size_t i = 0; i < token.length(); i++) {
+        result |= (token[i] ^ csrf_token[i]);
+    }
+    return result == 0;
 }
 
 void cls_webu::shutdown()

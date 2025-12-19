@@ -701,6 +701,23 @@ void cls_webu_ans::mhd_send()
         return;
     }
 
+    /* Add default security headers (can be overridden by user config) */
+    MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
+    MHD_add_response_header(response, "X-Frame-Options", "SAMEORIGIN");
+    MHD_add_response_header(response, "X-XSS-Protection", "1; mode=block");
+    MHD_add_response_header(response, "Referrer-Policy", "strict-origin-when-cross-origin");
+
+    /* Add Content Security Policy for HTML responses */
+    if (resp_type == WEBUI_RESP_HTML) {
+        MHD_add_response_header(response, "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "connect-src 'self'");
+    }
+
+    /* User-configured headers can override defaults */
     if (webu->wb_headers->params_cnt > 0) {
         for (indx=0;indx<webu->wb_headers->params_cnt; indx++) {
             MHD_add_response_header (response
@@ -798,6 +815,17 @@ void cls_webu_ans::answer_get()
             webu_json = new cls_webu_json(this);
         }
         if (uri_cmd2.substr(0, 3) == "set") {
+            /* CSRF Protection: config/set is state-changing, require POST */
+            if (cnct_method != WEBUI_METHOD_POST) {
+                MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+                    _("State-changing operation requires POST method from %s: /config/set"),
+                    clientip.c_str());
+                resp_type = WEBUI_RESP_TEXT;
+                resp_page = "HTTP 405: Method Not Allowed\n"
+                           "Configuration changes must use POST method.\n";
+                mhd_send();
+                return;
+            }
             webu_json->config_set();
             mhd_send();
         } else {

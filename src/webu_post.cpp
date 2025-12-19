@@ -894,6 +894,26 @@ mhdrslt cls_webu_post::processor_start(const char *upload_data, size_t *upload_d
         retcd = MHD_post_process (post_processor, upload_data, *upload_data_size);
         *upload_data_size = 0;
     } else {
+        /* Validate CSRF token before processing any state-changing operations */
+        std::string csrf_token_received = "";
+        for (int indx = 0; indx < post_sz; indx++) {
+            if (mystreq(post_info[indx].key_nm, "csrf_token")) {
+                csrf_token_received = std::string(post_info[indx].key_val);
+                break;
+            }
+        }
+
+        if (!webu->csrf_validate(csrf_token_received)) {
+            MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+                _("CSRF token validation failed from %s"), webua->clientip.c_str());
+            webua->resp_page = "<html><body><h1>403 Forbidden</h1>"
+                "<p>CSRF validation failed. Please reload the page and try again.</p>"
+                "</body></html>";
+            webua->resp_type = WEBUI_RESP_HTML;
+            webua->mhd_send();
+            return MHD_YES;
+        }
+
         pthread_mutex_lock(&app->mutex_post);
             process_actions();
         pthread_mutex_unlock(&app->mutex_post);

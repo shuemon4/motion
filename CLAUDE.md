@@ -246,3 +246,12 @@ doc/
 └── scratchpads/       # Working documents
     └── pi5-camv3-implementation.md
 ```
+
+### Documentation Naming
+
+- **Subdirectories** (`plans/`, `scratchpads/`, `reviews/`, etc.): Use timestamp prefix `YYYYMMDD-hhmm-`
+  - Example: `20251216-2036-Pi5-CamV3-Implementation-Design.md`
+  - Format: Date in YYYYMMDD, time in hhmm (24-hour), then descriptive name
+
+- **Main `doc/` directory files** (project reference docs): No prefix required
+  - Examples: `motion_build.html`, `copyright`, `motion.gif`

@@ -87,6 +87,8 @@
         struct sockaddr_in6     lpbk_ipv6;
     };
 
+    #define CSRF_TOKEN_LENGTH 64    /* 32 bytes hex-encoded */
+
     class cls_webu {
         public:
             cls_webu(cls_motapp *p_app);
@@ -101,8 +103,11 @@
             std::string                 info_tls;
             int                         cnct_cnt;
             bool                        restart;
+            std::string                 csrf_token;     /* CSRF protection token */
             void startup();
             void shutdown();
+            void csrf_generate();
+            bool csrf_validate(const std::string &token);
 
         private:
             ctx_mhdstart    *mhdst;
