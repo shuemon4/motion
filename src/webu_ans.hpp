@@ -70,6 +70,7 @@
             char            *auth_user;     /* Parsed user from config authentication string*/
             char            *auth_pass;     /* Parsed password from config authentication string*/
             bool            authenticated;  /* Boolean for whether authentication has been passed */
+            bool            auth_is_ha1;    /* Boolean for whether auth_pass is HA1 hash (32 hex chars) */
             enum WEBUI_METHOD   cnct_method;    /* Connection method.  Get or Post */
             u_char  *gzip_resp;     /* Response in gzip format */
             ulong    gzip_size;     /* Size of response in gzip format */

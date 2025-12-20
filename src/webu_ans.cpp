@@ -482,8 +482,15 @@ mhdrslt cls_webu_ans::mhd_digest()
     myfree(user);
 
     /* Check the password as well*/
-    retcd = MHD_digest_auth_check(connection, auth_realm
-        , auth_user, auth_pass, 300);
+    if (auth_is_ha1) {
+        /* Use HA1 hash directly for digest authentication */
+        retcd = MHD_digest_auth_check2(connection, auth_realm
+            , auth_user, auth_pass, 300, MHD_DIGEST_ALG_MD5);
+    } else {
+        /* Use plain password (MHD will compute HA1) */
+        retcd = MHD_digest_auth_check(connection, auth_realm
+            , auth_user, auth_pass, 300);
+    }
 
     if (retcd == MHD_NO) {
         failauth_log(false);
@@ -574,12 +581,27 @@ void cls_webu_ans::mhd_auth_parse()
         snprintf(auth_user, (uint)auth_len + 1, "%s"
             ,app->cfg->webcontrol_authentication.c_str());
         snprintf(auth_pass, 2, "%s","");
+        auth_is_ha1 = false;
     } else {
         auth_user = (char*)mymalloc((uint)auth_len - strlen(col_pos) + 1);
         auth_pass =(char*)mymalloc(strlen(col_pos));
         snprintf(auth_user, (uint)auth_len - strlen(col_pos) + 1, "%s"
             ,app->cfg->webcontrol_authentication.c_str());
         snprintf(auth_pass, strlen(col_pos), "%s", col_pos + 1);
+
+        /* Check if password is HA1 hash (32 hex characters) */
+        auth_is_ha1 = false;
+        if (strlen(auth_pass) == 32) {
+            bool is_hex = true;
+            for (int i = 0; i < 32 && is_hex; i++) {
+                is_hex = isxdigit((unsigned char)auth_pass[i]);
+            }
+            if (is_hex) {
+                auth_is_ha1 = true;
+                MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                    _("Detected HA1 hash format for webcontrol authentication"));
+            }
+        }
     }
 }
 

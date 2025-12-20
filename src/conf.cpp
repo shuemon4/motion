@@ -248,6 +248,33 @@ ctx_parm config_parms[] = {
     { "", (enum PARM_TYP)0, (enum PARM_CAT)0, (enum PARM_LEVEL)0, false }
 };
 
+/* Expand environment variables in configuration values
+ * Supports $VAR and ${VAR} syntax
+ * Returns expanded value or empty string if variable not set
+ */
+static std::string conf_expand_env(const std::string& value)
+{
+    if (value.empty() || value[0] != '$') {
+        return value;
+    }
+
+    std::string env_name = value.substr(1);  // Remove '$'
+
+    // Handle ${VAR} syntax
+    if (!env_name.empty() && env_name[0] == '{' && env_name.back() == '}') {
+        env_name = env_name.substr(1, env_name.length() - 2);
+    }
+
+    const char* env_val = getenv(env_name.c_str());
+    if (env_val == nullptr) {
+        MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+            _("Environment variable %s not set"), env_name.c_str());
+        return "";
+    }
+
+    return std::string(env_val);
+}
+
 void cls_config::edit_set_bool(bool &parm_dest, std::string &parm_in)
 {
     if ((parm_in == "1") || (parm_in == "yes") || (parm_in == "on") || (parm_in == "true") ) {
@@ -673,7 +700,13 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "netcam_params") return edit_generic_string(netcam_params, parm, pact, "");
     if (name == "netcam_high_url") return edit_generic_string(netcam_high_url, parm, pact, "");
     if (name == "netcam_high_params") return edit_generic_string(netcam_high_params, parm, pact, "");
-    if (name == "netcam_userpass") return edit_generic_string(netcam_userpass, parm, pact, "");
+    if (name == "netcam_userpass") {
+        /* Apply environment variable expansion for security */
+        if (pact == PARM_ACT_SET || pact == PARM_ACT_DFLT) {
+            parm = conf_expand_env(parm);
+        }
+        return edit_generic_string(netcam_userpass, parm, pact, "");
+    }
     if (name == "libcam_device") return edit_generic_string(libcam_device, parm, pact, "");
     if (name == "libcam_params") return edit_generic_string(libcam_params, parm, pact, "");
     if (name == "schedule_params") return edit_generic_string(schedule_params, parm, pact, "");
@@ -714,7 +747,13 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "database_dbname") return edit_generic_string(database_dbname, parm, pact, "motion");
     if (name == "database_host") return edit_generic_string(database_host, parm, pact, "");
     if (name == "database_user") return edit_generic_string(database_user, parm, pact, "");
-    if (name == "database_password") return edit_generic_string(database_password, parm, pact, "");
+    if (name == "database_password") {
+        /* Apply environment variable expansion for security */
+        if (pact == PARM_ACT_SET || pact == PARM_ACT_DFLT) {
+            parm = conf_expand_env(parm);
+        }
+        return edit_generic_string(database_password, parm, pact, "");
+    }
     if (name == "sql_event_start") return edit_generic_string(sql_event_start, parm, pact, "");
     if (name == "sql_event_end") return edit_generic_string(sql_event_end, parm, pact, "");
     if (name == "sql_movie_start") return edit_generic_string(sql_movie_start, parm, pact, "");
@@ -776,7 +815,13 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "webcontrol_auth_method") return edit_generic_list(webcontrol_auth_method, parm, pact, "none", webcontrol_auth_method_values);
 
     static const std::vector<std::string> webcontrol_authentication_values = {"noauth","user:pass"};
-    if (name == "webcontrol_authentication") return edit_generic_list(webcontrol_authentication, parm, pact, "noauth", webcontrol_authentication_values);
+    if (name == "webcontrol_authentication") {
+        /* Apply environment variable expansion for security */
+        if (pact == PARM_ACT_SET || pact == PARM_ACT_DFLT) {
+            parm = conf_expand_env(parm);
+        }
+        return edit_generic_list(webcontrol_authentication, parm, pact, "noauth", webcontrol_authentication_values);
+    }
 
     static const std::vector<std::string> stream_preview_method_values = {"mjpeg","snapshot"};
     if (name == "stream_preview_method") return edit_generic_list(stream_preview_method, parm, pact, "mjpeg", stream_preview_method_values);
