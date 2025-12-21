@@ -2104,3 +2104,38 @@ void cls_camera::set_libcam_iso(float value)
         libcam->set_iso(value);
     }
 }
+
+void cls_camera::set_libcam_awb_enable(bool value)
+{
+    if (libcam != nullptr) {
+        libcam->set_awb_enable(value);
+    }
+}
+
+void cls_camera::set_libcam_awb_mode(int value)
+{
+    if (libcam != nullptr) {
+        libcam->set_awb_mode(value);
+    }
+}
+
+void cls_camera::set_libcam_awb_locked(bool value)
+{
+    if (libcam != nullptr) {
+        libcam->set_awb_locked(value);
+    }
+}
+
+void cls_camera::set_libcam_colour_temp(int value)
+{
+    if (libcam != nullptr) {
+        libcam->set_colour_temp(value);
+    }
+}
+
+void cls_camera::set_libcam_colour_gains(float red, float blue)
+{
+    if (libcam != nullptr) {
+        libcam->set_colour_gains(red, blue);
+    }
+}

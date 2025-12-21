@@ -40,11 +40,18 @@
             int buffer_idx;
         };
 
-        /* Pending runtime control updates (hot-reload brightness/contrast/ISO) */
+        /* Pending runtime control updates (hot-reload brightness/contrast/ISO/AWB) */
         struct ctx_pending_controls {
             float brightness = 0.0f;
             float contrast = 1.0f;
             float iso = 100.0f;  // ISO 100-6400 (converted to AnalogueGain)
+            // AWB controls
+            bool awb_enable = true;
+            int awb_mode = 0;           // libcamera native: 0=Auto
+            bool awb_locked = false;
+            int colour_temp = 0;        // 0 = disabled
+            float colour_gain_r = 0.0f; // 0 = auto
+            float colour_gain_b = 0.0f; // 0 = auto
             std::atomic<bool> dirty{false};  /* Must use brace initialization for atomics */
         };
 
@@ -57,6 +64,11 @@
                 void set_brightness(float value);
                 void set_contrast(float value);
                 void set_iso(float value);
+                void set_awb_enable(bool value);
+                void set_awb_mode(int value);
+                void set_awb_locked(bool value);
+                void set_colour_temp(int value);
+                void set_colour_gains(float red, float blue);
             private:
                 cls_camera  *cam;
                 ctx_params  *params;

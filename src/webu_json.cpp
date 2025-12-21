@@ -588,26 +588,58 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
         for (int indx = 0; indx < app->cam_cnt; indx++) {
             app->cam_list[indx]->cfg->edit_set(parm_name, parm_val);
 
-            /* Apply libcam brightness/contrast/ISO changes immediately */
+            /* Apply libcam brightness/contrast/ISO/AWB changes immediately */
             if (parm_name == "libcam_brightness") {
                 app->cam_list[indx]->set_libcam_brightness(atof(parm_val.c_str()));
             } else if (parm_name == "libcam_contrast") {
                 app->cam_list[indx]->set_libcam_contrast(atof(parm_val.c_str()));
             } else if (parm_name == "libcam_iso") {
                 app->cam_list[indx]->set_libcam_iso(atof(parm_val.c_str()));
+            } else if (parm_name == "libcam_awb_enable") {
+                app->cam_list[indx]->set_libcam_awb_enable(parm_val == "true" || parm_val == "1");
+            } else if (parm_name == "libcam_awb_mode") {
+                app->cam_list[indx]->set_libcam_awb_mode(atoi(parm_val.c_str()));
+            } else if (parm_name == "libcam_awb_locked") {
+                app->cam_list[indx]->set_libcam_awb_locked(parm_val == "true" || parm_val == "1");
+            } else if (parm_name == "libcam_colour_temp") {
+                app->cam_list[indx]->set_libcam_colour_temp(atoi(parm_val.c_str()));
+            } else if (parm_name == "libcam_colour_gain_r") {
+                float r = atof(parm_val.c_str());
+                float b = app->cam_list[indx]->cfg->parm_cam.libcam_colour_gain_b;
+                app->cam_list[indx]->set_libcam_colour_gains(r, b);
+            } else if (parm_name == "libcam_colour_gain_b") {
+                float r = app->cam_list[indx]->cfg->parm_cam.libcam_colour_gain_r;
+                float b = atof(parm_val.c_str());
+                app->cam_list[indx]->set_libcam_colour_gains(r, b);
             }
         }
     } else if (webua->cam != nullptr) {
         /* Update specific camera only */
         webua->cam->cfg->edit_set(parm_name, parm_val);
 
-        /* Apply libcam brightness/contrast/ISO changes immediately */
+        /* Apply libcam brightness/contrast/ISO/AWB changes immediately */
         if (parm_name == "libcam_brightness") {
             webua->cam->set_libcam_brightness(atof(parm_val.c_str()));
         } else if (parm_name == "libcam_contrast") {
             webua->cam->set_libcam_contrast(atof(parm_val.c_str()));
         } else if (parm_name == "libcam_iso") {
             webua->cam->set_libcam_iso(atof(parm_val.c_str()));
+        } else if (parm_name == "libcam_awb_enable") {
+            webua->cam->set_libcam_awb_enable(parm_val == "true" || parm_val == "1");
+        } else if (parm_name == "libcam_awb_mode") {
+            webua->cam->set_libcam_awb_mode(atoi(parm_val.c_str()));
+        } else if (parm_name == "libcam_awb_locked") {
+            webua->cam->set_libcam_awb_locked(parm_val == "true" || parm_val == "1");
+        } else if (parm_name == "libcam_colour_temp") {
+            webua->cam->set_libcam_colour_temp(atoi(parm_val.c_str()));
+        } else if (parm_name == "libcam_colour_gain_r") {
+            float r = atof(parm_val.c_str());
+            float b = webua->cam->cfg->parm_cam.libcam_colour_gain_r;
+            webua->cam->set_libcam_colour_gains(r, b);
+        } else if (parm_name == "libcam_colour_gain_b") {
+            float r = webua->cam->cfg->parm_cam.libcam_colour_gain_r;
+            float b = atof(parm_val.c_str());
+            webua->cam->set_libcam_colour_gains(r, b);
         }
     }
 

@@ -14,7 +14,11 @@
       "Bash(rsync:*)",
       "Bash(make:*)",
       "Bash(/Users/tshuey/Documents/GitHub/motion/ admin@192.168.1.176:~/motion/)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(brew list:*)",
+      "Bash(./configure:*)",
+      "WebFetch(domain:gitweb.git.savannah.gnu.org)",
+      "Bash(PATH=\"/opt/homebrew/opt/gettext/bin:$PATH\" autoreconf:*)"
     ],
     "deny": [],
     "ask": []

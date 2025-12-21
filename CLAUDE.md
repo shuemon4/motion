@@ -12,6 +12,9 @@
 
 Updating `cls_libcam` for native Pi 5 + Camera v3 support. Core motion detection algorithm (`cls_alg`) is proven and must be preserved.
 
+- Answer directly, avoid unnecessary preambles/postambles
+- Be concise.
+
 ## Project Rules
 
 1. **All plans MUST be documented in `doc/plans/`**

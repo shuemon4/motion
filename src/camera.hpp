@@ -203,10 +203,15 @@ class cls_camera {
         enum CAMERA_TYPE        camera_type;
         struct timespec         connectionlosttime;
 
-        /* Hot-reload libcam brightness/contrast/ISO controls */
+        /* Hot-reload libcam brightness/contrast/ISO/AWB controls */
         void set_libcam_brightness(float value);
         void set_libcam_contrast(float value);
         void set_libcam_iso(float value);
+        void set_libcam_awb_enable(bool value);
+        void set_libcam_awb_mode(int value);
+        void set_libcam_awb_locked(bool value);
+        void set_libcam_colour_temp(int value);
+        void set_libcam_colour_gains(float red, float blue);
 
     private:
         cls_movie       *movie_norm;

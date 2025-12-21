@@ -79,6 +79,12 @@ ctx_parm config_parms[] = {
     {"libcam_brightness",         PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_contrast",           PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_iso",                PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_awb_enable",         PARM_TYP_BOOL,   PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_awb_mode",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_awb_locked",         PARM_TYP_BOOL,   PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_colour_temp",        PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_colour_gain_r",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_colour_gain_b",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
 
     /* Category 03 - Image parameters - NOT hot reloadable (buffer realloc) */
     {"width",                     PARM_TYP_INT,    PARM_CAT_03, PARM_LEVEL_LIMITED,  false},
@@ -686,9 +692,17 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     // FLOATS with ranges - libcam parameters
     if (name == "libcam_brightness") return edit_generic_float(parm_cam.libcam_brightness, parm, pact, 0.0f, -1.0f, 1.0f);
     if (name == "libcam_contrast") return edit_generic_float(parm_cam.libcam_contrast, parm, pact, 1.0f, 0.0f, 32.0f);
+    if (name == "libcam_colour_gain_r") return edit_generic_float(parm_cam.libcam_colour_gain_r, parm, pact, 0.0f, 0.0f, 8.0f);
+    if (name == "libcam_colour_gain_b") return edit_generic_float(parm_cam.libcam_colour_gain_b, parm, pact, 0.0f, 0.0f, 8.0f);
 
     // INTEGERS - libcam ISO parameter
     if (name == "libcam_iso") return edit_generic_int(parm_cam.libcam_iso, parm, pact, 100, 100, 6400);
+    if (name == "libcam_awb_mode") return edit_generic_int(parm_cam.libcam_awb_mode, parm, pact, 0, 0, 7);
+    if (name == "libcam_colour_temp") return edit_generic_int(parm_cam.libcam_colour_temp, parm, pact, 0, 0, 10000);
+
+    // BOOLS - libcam AWB parameters
+    if (name == "libcam_awb_enable") return edit_generic_bool(parm_cam.libcam_awb_enable, parm, pact, true);
+    if (name == "libcam_awb_locked") return edit_generic_bool(parm_cam.libcam_awb_locked, parm, pact, false);
 
     // STRINGS (simple assignment)
     if (name == "conf_filename") return edit_generic_string(conf_filename, parm, pact, "");

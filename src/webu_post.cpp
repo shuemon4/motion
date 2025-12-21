@@ -27,6 +27,7 @@
 #include "webu.hpp"
 #include "webu_ans.hpp"
 #include "webu_html.hpp"
+#include "webu_json.hpp"
 #include "webu_post.hpp"
 
 /**************Callback functions for MHD **********************/
@@ -914,14 +915,26 @@ mhdrslt cls_webu_post::processor_start(const char *upload_data, size_t *upload_d
             return MHD_YES;
         }
 
-        pthread_mutex_lock(&app->mutex_post);
-            process_actions();
-        pthread_mutex_unlock(&app->mutex_post);
-        /* Send updated page back to user */
-        webu_html = new cls_webu_html(webua);
-        webu_html->main();
-        delete webu_html;
-        retcd = MHD_YES;
+        /* Check if this is a hot reload request (POST /config/set?param=value) */
+        if ((webua->uri_cmd1 == "config") &&
+            (webua->uri_cmd2.length() >= 3) &&
+            (webua->uri_cmd2.substr(0, 3) == "set")) {
+            /* Route to JSON hot reload handler instead of full config update */
+            cls_webu_json *webu_json = new cls_webu_json(webua);
+            webu_json->config_set();
+            delete webu_json;
+            webua->mhd_send();
+            retcd = MHD_YES;
+        } else {
+            pthread_mutex_lock(&app->mutex_post);
+                process_actions();
+            pthread_mutex_unlock(&app->mutex_post);
+            /* Send updated page back to user */
+            webu_html = new cls_webu_html(webua);
+            webu_html->main();
+            delete webu_html;
+            retcd = MHD_YES;
+        }
     }
     return retcd;
 }

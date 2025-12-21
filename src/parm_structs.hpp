@@ -140,6 +140,12 @@ struct ctx_parm_cam {
     float           libcam_brightness;
     float           libcam_contrast;
     int             libcam_iso;
+    bool            libcam_awb_enable;
+    int             libcam_awb_mode;
+    bool            libcam_awb_locked;
+    int             libcam_colour_temp;
+    float           libcam_colour_gain_r;
+    float           libcam_colour_gain_b;
 
     /* Image parameters (PARM_CAT_03) */
     int             width;

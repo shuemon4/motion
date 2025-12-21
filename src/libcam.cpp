@@ -719,17 +719,35 @@ int cls_libcam::req_add(Request *request)
 {
     int retcd;
 
-    /* Apply pending brightness/contrast/ISO controls if changed */
+    /* Apply pending brightness/contrast/ISO/AWB controls if changed */
     if (pending_ctrls.dirty.load()) {
         ControlList &req_controls = request->controls();
         req_controls.set(controls::Brightness, pending_ctrls.brightness);
         req_controls.set(controls::Contrast, pending_ctrls.contrast);
         req_controls.set(controls::AnalogueGain, iso_to_gain(pending_ctrls.iso));
+
+        // Apply AWB controls
+        req_controls.set(controls::AwbEnable, pending_ctrls.awb_enable);
+        req_controls.set(controls::AwbMode, pending_ctrls.awb_mode);
+        req_controls.set(controls::AwbLocked, pending_ctrls.awb_locked);
+
+        // Apply manual colour temperature if set (non-zero)
+        if (pending_ctrls.colour_temp > 0) {
+            req_controls.set(controls::ColourTemperature, pending_ctrls.colour_temp);
+        }
+
+        // Apply manual colour gains if set (non-zero)
+        if (pending_ctrls.colour_gain_r > 0.0f || pending_ctrls.colour_gain_b > 0.0f) {
+            float cg[2] = {pending_ctrls.colour_gain_r, pending_ctrls.colour_gain_b};
+            req_controls.set(controls::ColourGains, cg);
+        }
+
         pending_ctrls.dirty.store(false);
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            , "Applied controls to request: brightness=%.2f, contrast=%.2f, iso=%.0f (gain=%.2f)"
+            , "Applied controls to request: brightness=%.2f, contrast=%.2f, iso=%.0f (gain=%.2f), awb_enable=%s, awb_mode=%d"
             , pending_ctrls.brightness, pending_ctrls.contrast
-            , pending_ctrls.iso, iso_to_gain(pending_ctrls.iso));
+            , pending_ctrls.iso, iso_to_gain(pending_ctrls.iso)
+            , pending_ctrls.awb_enable ? "true" : "false", pending_ctrls.awb_mode);
     }
 
     retcd = camera->queueRequest(request);
@@ -1021,6 +1039,67 @@ void cls_libcam::set_iso(float value)
     #endif
 }
 
+void cls_libcam::set_awb_enable(bool value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.awb_enable = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: AWB enable set to %s", value ? "true" : "false");
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::set_awb_mode(int value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.awb_mode = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: AWB mode set to %d", value);
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::set_awb_locked(bool value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.awb_locked = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: AWB locked set to %s", value ? "true" : "false");
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::set_colour_temp(int value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.colour_temp = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: Colour temperature set to %dK", value);
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::set_colour_gains(float red, float blue)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.colour_gain_r = red;
+        pending_ctrls.colour_gain_b = blue;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: Colour gains set to R=%.2f, B=%.2f", red, blue);
+    #else
+        (void)red; (void)blue;
+    #endif
+}
+
 void cls_libcam::apply_pending_controls()
 {
     #ifdef HAVE_LIBCAM
@@ -1143,6 +1222,12 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
         pending_ctrls.brightness = cam->cfg->parm_cam.libcam_brightness;
         pending_ctrls.contrast = cam->cfg->parm_cam.libcam_contrast;
         pending_ctrls.iso = cam->cfg->parm_cam.libcam_iso;
+        pending_ctrls.awb_enable = cam->cfg->parm_cam.libcam_awb_enable;
+        pending_ctrls.awb_mode = cam->cfg->parm_cam.libcam_awb_mode;
+        pending_ctrls.awb_locked = cam->cfg->parm_cam.libcam_awb_locked;
+        pending_ctrls.colour_temp = cam->cfg->parm_cam.libcam_colour_temp;
+        pending_ctrls.colour_gain_r = cam->cfg->parm_cam.libcam_colour_gain_r;
+        pending_ctrls.colour_gain_b = cam->cfg->parm_cam.libcam_colour_gain_b;
         pending_ctrls.dirty.store(false);
         cam->watchdog = cam->cfg->watchdog_tmo * 3; /* 3 is arbitrary multiplier to give startup more time*/
         if (libcam_start() < 0) {
