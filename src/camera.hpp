@@ -217,6 +217,7 @@ class cls_camera {
         void set_libcam_af_range(int value);
         void set_libcam_af_speed(int value);
         void trigger_libcam_af_scan();
+        void cancel_libcam_af_scan();
 
     private:
         cls_movie       *movie_norm;

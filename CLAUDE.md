@@ -22,6 +22,7 @@ Updating `cls_libcam` for native Pi 5 + Camera v3 support. Core motion detection
 3. **Do not guess** - ask questions and/or research for answers
 4. **Preserve `cls_alg`** - the motion detection algorithm works; don't modify unless explicitly asked
 5. **Evidence over assumptions** - verify changes work on actual hardware when possible
+6. **Minimize CPU usage** - the Pi has limited CPU, generates heat, and may run on battery; always consider CPU impact when developing code changes
 
 ## Quick Navigation
 

@@ -2174,3 +2174,10 @@ void cls_camera::trigger_libcam_af_scan()
         libcam->trigger_af_scan();
     }
 }
+
+void cls_camera::cancel_libcam_af_scan()
+{
+    if (libcam != nullptr) {
+        libcam->cancel_af_scan();
+    }
+}

@@ -58,6 +58,7 @@
             int af_range = 0;           // 0=Normal, 1=Macro, 2=Full
             int af_speed = 0;           // 0=Normal, 1=Fast
             bool af_trigger = false;    // Trigger a scan (Auto mode only)
+            bool af_cancel = false;     // Cancel a scan (Auto mode only)
             std::atomic<bool> dirty{false};  /* Must use brace initialization for atomics */
         };
 
@@ -80,6 +81,7 @@
                 void set_af_range(int value);
                 void set_af_speed(int value);
                 void trigger_af_scan();  // For AfTrigger in Auto mode
+                void cancel_af_scan();   // For AfTrigger cancel
             private:
                 cls_camera  *cam;
                 ctx_params  *params;

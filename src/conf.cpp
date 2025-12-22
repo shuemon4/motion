@@ -89,6 +89,7 @@ ctx_parm config_parms[] = {
     {"libcam_lens_position",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_af_range",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_af_speed",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_af_trigger",         PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
 
     /* Category 03 - Image parameters - NOT hot reloadable (buffer realloc) */
     {"width",                     PARM_TYP_INT,    PARM_CAT_03, PARM_LEVEL_LIMITED,  false},

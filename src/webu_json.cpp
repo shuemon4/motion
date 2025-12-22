@@ -619,6 +619,13 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
                 app->cam_list[indx]->set_libcam_af_range(atoi(parm_val.c_str()));
             } else if (parm_name == "libcam_af_speed") {
                 app->cam_list[indx]->set_libcam_af_speed(atoi(parm_val.c_str()));
+            } else if (parm_name == "libcam_af_trigger") {
+                int val = atoi(parm_val.c_str());
+                if (val == 0) {
+                    app->cam_list[indx]->trigger_libcam_af_scan();
+                } else {
+                    app->cam_list[indx]->cancel_libcam_af_scan();
+                }
             }
         }
     } else if (webua->cam != nullptr) {
@@ -656,6 +663,13 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
             webua->cam->set_libcam_af_range(atoi(parm_val.c_str()));
         } else if (parm_name == "libcam_af_speed") {
             webua->cam->set_libcam_af_speed(atoi(parm_val.c_str()));
+        } else if (parm_name == "libcam_af_trigger") {
+            int val = atoi(parm_val.c_str());
+            if (val == 0) {
+                webua->cam->trigger_libcam_af_scan();
+            } else {
+                webua->cam->cancel_libcam_af_scan();
+            }
         }
     }
 

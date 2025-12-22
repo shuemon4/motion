@@ -813,6 +813,12 @@ int cls_libcam::req_add(Request *request)
             pending_ctrls.af_trigger = false;
         }
 
+        // Handle AF cancel (one-shot, then clear)
+        if (pending_ctrls.af_cancel) {
+            req_controls.set(controls::AfTrigger, controls::AfTriggerCancel);
+            pending_ctrls.af_cancel = false;
+        }
+
         pending_ctrls.dirty.store(false);
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Applied controls: brightness=%.2f, contrast=%.2f, iso=%.0f, "
@@ -1265,6 +1271,18 @@ void cls_libcam::trigger_af_scan()
     #endif
 }
 
+void cls_libcam::cancel_af_scan()
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.af_cancel = true;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: AF scan cancelled");
+    #else
+        // No-op when libcam not available
+    #endif
+}
+
 void cls_libcam::apply_pending_controls()
 {
     #ifdef HAVE_LIBCAM
@@ -1398,6 +1416,7 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
         pending_ctrls.af_range = cam->cfg->parm_cam.libcam_af_range;
         pending_ctrls.af_speed = cam->cfg->parm_cam.libcam_af_speed;
         pending_ctrls.af_trigger = false;
+        pending_ctrls.af_cancel = false;
         pending_ctrls.dirty.store(false);
         cam->watchdog = cam->cfg->watchdog_tmo * 3; /* 3 is arbitrary multiplier to give startup more time*/
         if (libcam_start() < 0) {
