@@ -368,9 +368,124 @@ int cls_libcam::start_mgr()
     camera->acquire();
     started_aqr = true;
 
+    /* Discover camera capabilities after acquiring camera */
+    discover_capabilities();
+
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Finished.");
 
     return 0;
+}
+
+/* Discover which controls the camera supports at runtime
+ * This queries the libcamera ControlInfoMap instead of hardcoding camera models
+ */
+void cls_libcam::discover_capabilities()
+{
+    cam_controls = &camera->controls();
+
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "Camera capability discovery: %zu controls available"
+        , cam_controls->size());
+
+    /* Log key capabilities for debugging */
+    if (cam_controls->find(&controls::AfMode) != cam_controls->end()) {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Autofocus (AfMode): SUPPORTED");
+    } else {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Autofocus (AfMode): not available");
+    }
+
+    if (cam_controls->find(&controls::LensPosition) != cam_controls->end()) {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Manual focus (LensPosition): SUPPORTED");
+    } else {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Manual focus (LensPosition): not available");
+    }
+
+    if (cam_controls->find(&controls::AfTrigger) != cam_controls->end()) {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Focus trigger (AfTrigger): SUPPORTED");
+    }
+
+    if (cam_controls->find(&controls::AfRange) != cam_controls->end()) {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Focus range (AfRange): SUPPORTED");
+    }
+
+    if (cam_controls->find(&controls::AfSpeed) != cam_controls->end()) {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Focus speed (AfSpeed): SUPPORTED");
+    }
+
+    if (cam_controls->find(&controls::ExposureTime) != cam_controls->end()) {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Exposure control: SUPPORTED");
+    }
+
+    if (cam_controls->find(&controls::AnalogueGain) != cam_controls->end()) {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Analogue gain (ISO): SUPPORTED");
+    }
+
+    if (cam_controls->find(&controls::AwbEnable) != cam_controls->end()) {
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Auto white balance: SUPPORTED");
+    }
+}
+
+/* Check if a specific control is supported by the camera */
+bool cls_libcam::is_control_supported(const ControlId *id)
+{
+    if (cam_controls == nullptr) {
+        return false;
+    }
+    return cam_controls->find(id) != cam_controls->end();
+}
+
+/* Build a map of control names to supported status for JSON API */
+std::map<std::string, bool> cls_libcam::get_capability_map()
+{
+    std::map<std::string, bool> caps;
+
+    /* Autofocus controls (Pi Camera v3 / IMX708) */
+    caps["AfMode"] = is_control_supported(&controls::AfMode);
+    caps["LensPosition"] = is_control_supported(&controls::LensPosition);
+    caps["AfTrigger"] = is_control_supported(&controls::AfTrigger);
+    caps["AfRange"] = is_control_supported(&controls::AfRange);
+    caps["AfSpeed"] = is_control_supported(&controls::AfSpeed);
+    caps["AfMetering"] = is_control_supported(&controls::AfMetering);
+
+    /* Exposure controls */
+    caps["ExposureTime"] = is_control_supported(&controls::ExposureTime);
+    caps["ExposureValue"] = is_control_supported(&controls::ExposureValue);
+    caps["AnalogueGain"] = is_control_supported(&controls::AnalogueGain);
+    caps["AeEnable"] = is_control_supported(&controls::AeEnable);
+    caps["AeMeteringMode"] = is_control_supported(&controls::AeMeteringMode);
+    caps["AeConstraintMode"] = is_control_supported(&controls::AeConstraintMode);
+    caps["AeExposureMode"] = is_control_supported(&controls::AeExposureMode);
+
+    /* White balance controls */
+    caps["AwbEnable"] = is_control_supported(&controls::AwbEnable);
+    caps["AwbMode"] = is_control_supported(&controls::AwbMode);
+    caps["AwbLocked"] = is_control_supported(&controls::AwbLocked);
+    caps["ColourGains"] = is_control_supported(&controls::ColourGains);
+    caps["ColourTemperature"] = is_control_supported(&controls::ColourTemperature);
+
+    /* Image quality controls */
+    caps["Brightness"] = is_control_supported(&controls::Brightness);
+    caps["Contrast"] = is_control_supported(&controls::Contrast);
+    caps["Saturation"] = is_control_supported(&controls::Saturation);
+    caps["Sharpness"] = is_control_supported(&controls::Sharpness);
+
+    /* Other controls */
+    caps["DigitalGain"] = is_control_supported(&controls::DigitalGain);
+    caps["ScalerCrop"] = is_control_supported(&controls::ScalerCrop);
+
+    return caps;
+}
+
+/* Get list of controls that were ignored because camera doesn't support them */
+std::vector<std::string> cls_libcam::get_ignored_controls()
+{
+    return ignored_controls_;
+}
+
+/* Clear the ignored controls list (call after reporting to API) */
+void cls_libcam::clear_ignored_controls()
+{
+    ignored_controls_.clear();
 }
 
 void cls_libcam::config_control_item(std::string pname, std::string pvalue)
@@ -477,15 +592,39 @@ void cls_libcam::config_control_item(std::string pname, std::string pvalue)
         controls.set(controls::SensorTimestamp, mtoi(pvalue));
     }
     if (pname == "AfMode") {
+        if (!is_control_supported(&controls::AfMode)) {
+            MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+                , "AfMode not supported by this camera (ignored)");
+            ignored_controls_.push_back("libcam_af_mode");
+            return;
+        }
         controls.set(controls::AfMode, mtoi(pvalue));
     }
     if (pname == "AfRange") {
+        if (!is_control_supported(&controls::AfRange)) {
+            MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+                , "AfRange not supported by this camera (ignored)");
+            ignored_controls_.push_back("libcam_af_range");
+            return;
+        }
         controls.set(controls::AfRange, mtoi(pvalue));
     }
     if (pname == "AfSpeed") {
+        if (!is_control_supported(&controls::AfSpeed)) {
+            MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+                , "AfSpeed not supported by this camera (ignored)");
+            ignored_controls_.push_back("libcam_af_speed");
+            return;
+        }
         controls.set(controls::AfSpeed, mtoi(pvalue));
     }
     if (pname == "AfMetering") {
+        if (!is_control_supported(&controls::AfMetering)) {
+            MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+                , "AfMetering not supported by this camera (ignored)");
+            ignored_controls_.push_back("libcam_af_metering");
+            return;
+        }
         controls.set(controls::AfMetering, mtoi(pvalue));
     }
     if (pname == "AfWindows") {
@@ -531,12 +670,30 @@ void cls_libcam::config_control_item(std::string pname, std::string pvalue)
         }
     }
     if (pname == "AfTrigger") {
+        if (!is_control_supported(&controls::AfTrigger)) {
+            MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+                , "AfTrigger not supported by this camera (ignored)");
+            ignored_controls_.push_back("libcam_af_trigger");
+            return;
+        }
         controls.set(controls::AfTrigger, mtoi(pvalue));
     }
     if (pname == "AfPause") {
+        if (!is_control_supported(&controls::AfPause)) {
+            MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+                , "AfPause not supported by this camera (ignored)");
+            ignored_controls_.push_back("libcam_af_pause");
+            return;
+        }
         controls.set(controls::AfPause, mtoi(pvalue));
     }
     if (pname == "LensPosition") {
+        if (!is_control_supported(&controls::LensPosition)) {
+            MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+                , "LensPosition not supported by this camera (ignored)");
+            ignored_controls_.push_back("libcam_lens_position");
+            return;
+        }
         controls.set(controls::LensPosition, mtof(pvalue));
     }
     if (pname == "AfState") {
@@ -601,14 +758,41 @@ void cls_libcam::config_controls()
     controls.set(controls::AwbMode, cam->cfg->parm_cam.libcam_awb_mode);
     controls.set(controls::AwbLocked, cam->cfg->parm_cam.libcam_awb_locked);
 
-    /* Apply AF controls from config */
-    controls.set(controls::AfMode, cam->cfg->parm_cam.libcam_af_mode);
-    controls.set(controls::AfRange, cam->cfg->parm_cam.libcam_af_range);
-    controls.set(controls::AfSpeed, cam->cfg->parm_cam.libcam_af_speed);
+    /* Apply AF controls from config (only if camera supports them) */
+    if (is_control_supported(&controls::AfMode)) {
+        controls.set(controls::AfMode, cam->cfg->parm_cam.libcam_af_mode);
+    } else if (cam->cfg->parm_cam.libcam_af_mode != 0) {
+        /* Only warn if user explicitly set a non-default AF mode */
+        MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+            , "libcam_af_mode ignored: camera does not support autofocus");
+        ignored_controls_.push_back("libcam_af_mode");
+    }
 
-    /* Apply LensPosition only in manual mode */
+    if (is_control_supported(&controls::AfRange)) {
+        controls.set(controls::AfRange, cam->cfg->parm_cam.libcam_af_range);
+    } else if (cam->cfg->parm_cam.libcam_af_range != 0) {
+        MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+            , "libcam_af_range ignored: camera does not support autofocus");
+        ignored_controls_.push_back("libcam_af_range");
+    }
+
+    if (is_control_supported(&controls::AfSpeed)) {
+        controls.set(controls::AfSpeed, cam->cfg->parm_cam.libcam_af_speed);
+    } else if (cam->cfg->parm_cam.libcam_af_speed != 0) {
+        MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+            , "libcam_af_speed ignored: camera does not support autofocus");
+        ignored_controls_.push_back("libcam_af_speed");
+    }
+
+    /* Apply LensPosition only in manual mode and if supported */
     if (cam->cfg->parm_cam.libcam_af_mode == 0) {
-        controls.set(controls::LensPosition, cam->cfg->parm_cam.libcam_lens_position);
+        if (is_control_supported(&controls::LensPosition)) {
+            controls.set(controls::LensPosition, cam->cfg->parm_cam.libcam_lens_position);
+        } else if (cam->cfg->parm_cam.libcam_lens_position > 0.0f) {
+            MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+                , "libcam_lens_position ignored: camera does not support manual focus");
+            ignored_controls_.push_back("libcam_lens_position");
+        }
     }
 
     retcd = config->validate();
@@ -797,26 +981,36 @@ int cls_libcam::req_add(Request *request)
             }
         }
 
-        // Apply AF controls
-        req_controls.set(controls::AfMode, pending_ctrls.af_mode);
-        req_controls.set(controls::AfRange, pending_ctrls.af_range);
-        req_controls.set(controls::AfSpeed, pending_ctrls.af_speed);
+        // Apply AF controls (only if camera supports them)
+        if (is_control_supported(&controls::AfMode)) {
+            req_controls.set(controls::AfMode, pending_ctrls.af_mode);
+        }
+        if (is_control_supported(&controls::AfRange)) {
+            req_controls.set(controls::AfRange, pending_ctrls.af_range);
+        }
+        if (is_control_supported(&controls::AfSpeed)) {
+            req_controls.set(controls::AfSpeed, pending_ctrls.af_speed);
+        }
 
-        // Apply LensPosition only in manual mode
-        if (pending_ctrls.af_mode == 0) {
+        // Apply LensPosition only in manual mode and if supported
+        if (pending_ctrls.af_mode == 0 && is_control_supported(&controls::LensPosition)) {
             req_controls.set(controls::LensPosition, pending_ctrls.lens_position);
         }
 
-        // Handle AF trigger (one-shot, then clear)
-        if (pending_ctrls.af_trigger) {
+        // Handle AF trigger (one-shot, then clear) - only if supported
+        if (pending_ctrls.af_trigger && is_control_supported(&controls::AfTrigger)) {
             req_controls.set(controls::AfTrigger, controls::AfTriggerStart);
             pending_ctrls.af_trigger = false;
+        } else if (pending_ctrls.af_trigger) {
+            pending_ctrls.af_trigger = false;  // Clear even if not supported
         }
 
-        // Handle AF cancel (one-shot, then clear)
-        if (pending_ctrls.af_cancel) {
+        // Handle AF cancel (one-shot, then clear) - only if supported
+        if (pending_ctrls.af_cancel && is_control_supported(&controls::AfTrigger)) {
             req_controls.set(controls::AfTrigger, controls::AfTriggerCancel);
             pending_ctrls.af_cancel = false;
+        } else if (pending_ctrls.af_cancel) {
+            pending_ctrls.af_cancel = false;  // Clear even if not supported
         }
 
         pending_ctrls.dirty.store(false);
@@ -1400,6 +1594,7 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
     #ifdef HAVE_LIBCAM
         MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO,_("Opening libcam"));
         params = nullptr;
+        cam_controls = nullptr;
         reconnect_count = 0;
         /* Initialize pending controls with config values */
         pending_ctrls.brightness = cam->cfg->parm_cam.libcam_brightness;

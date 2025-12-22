@@ -25,6 +25,8 @@
 #include "webu_ans.hpp"
 #include "webu_json.hpp"
 #include "dbse.hpp"
+#include "libcam.hpp"
+#include <map>
 
 std::string cls_webu_json::escstr(std::string invar)
 {
@@ -474,6 +476,24 @@ void cls_webu_json::status_vars(int indx_cam)
 
     webua->resp_page += ",\"user_pause\":\"" + cam->user_pause +"\"";
 
+    /* Add supportedControls for libcamera capability discovery */
+    #ifdef HAVE_LIBCAM
+    if (cam->has_libcam()) {
+        webua->resp_page += ",\"supportedControls\":{";
+        std::map<std::string, bool> caps = cam->get_libcam_capabilities();
+        bool first = true;
+        for (const auto& [name, supported] : caps) {
+            if (!first) {
+                webua->resp_page += ",";
+            }
+            webua->resp_page += "\"" + name + "\":" +
+                               (supported ? "true" : "false");
+            first = false;
+        }
+        webua->resp_page += "}";
+    }
+    #endif
+
     webua->resp_page += "}";
 }
 
@@ -739,6 +759,28 @@ void cls_webu_json::config_set()
 
     /* Build success response */
     build_response(true, parm_name, old_val, parm_val, true);
+
+    /* Add ignored controls list if any (capability discovery) */
+    #ifdef HAVE_LIBCAM
+    if (webua->cam != nullptr && webua->cam->has_libcam()) {
+        std::vector<std::string> ignored = webua->cam->get_libcam_ignored_controls();
+        if (!ignored.empty()) {
+            webua->resp_page += ",\"ignored\":[";
+            bool first = true;
+            for (const auto& ctrl : ignored) {
+                if (!first) {
+                    webua->resp_page += ",";
+                }
+                webua->resp_page += "\"" + ctrl + "\"";
+                first = false;
+            }
+            webua->resp_page += "]";
+            /* Clear ignored list after reporting */
+            webua->cam->clear_libcam_ignored_controls();
+        }
+    }
+    #endif
+
     webua->resp_page += "}";
 }
 

@@ -20,6 +20,10 @@
 #ifndef _INCLUDE_CAMERA_HPP_
 #define _INCLUDE_CAMERA_HPP_
 
+#include <map>
+#include <vector>
+#include <string>
+
 enum CAMERA_TYPE {
     CAMERA_TYPE_UNKNOWN,
     CAMERA_TYPE_V4L2,
@@ -218,6 +222,12 @@ class cls_camera {
         void set_libcam_af_speed(int value);
         void trigger_libcam_af_scan();
         void cancel_libcam_af_scan();
+
+        /* Libcam capability discovery accessors */
+        bool has_libcam() const;
+        std::map<std::string, bool> get_libcam_capabilities();
+        std::vector<std::string> get_libcam_ignored_controls();
+        void clear_libcam_ignored_controls();
 
     private:
         cls_movie       *movie_norm;

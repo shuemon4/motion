@@ -21,6 +21,7 @@
     #ifdef HAVE_LIBCAM
         #include <queue>
         #include <vector>
+        #include <map>
         #include <algorithm>
         #include <atomic>
         #include <sys/mman.h>
@@ -82,6 +83,13 @@
                 void set_af_speed(int value);
                 void trigger_af_scan();  // For AfTrigger in Auto mode
                 void cancel_af_scan();   // For AfTrigger cancel
+
+                /* Capability discovery API */
+                bool is_control_supported(const libcamera::ControlId *id);
+                std::map<std::string, bool> get_capability_map();
+                std::vector<std::string> get_ignored_controls();
+                void clear_ignored_controls();
+
             private:
                 cls_camera  *cam;
                 ctx_params  *params;
@@ -97,6 +105,11 @@
                 ctx_imgmap                         membuf;         /* Legacy single buffer (kept for compatibility) */
                 std::vector<ctx_imgmap>            membuf_pool;    /* NEW: Multi-buffer pool */
                 ctx_pending_controls               pending_ctrls;  /* Hot-reload brightness/contrast */
+
+                /* Capability discovery storage */
+                const libcamera::ControlInfoMap   *cam_controls;   /* Pointer to camera's supported controls */
+                std::vector<std::string>           ignored_controls_;  /* Controls that were set but not supported */
+
                 bool    started_cam;
                 bool    started_mgr;
                 bool    started_aqr;
@@ -117,6 +130,7 @@
                 void config_orientation();
                 void config_controls();
                 void config_control_item(std::string pname, std::string pvalue);
+                void discover_capabilities();  /* Query camera for supported controls */
                 void req_complete(libcamera::Request *request);
                 int req_add(libcamera::Request *request);
                 void apply_pending_controls();

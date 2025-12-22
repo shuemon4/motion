@@ -2181,3 +2181,32 @@ void cls_camera::cancel_libcam_af_scan()
         libcam->cancel_af_scan();
     }
 }
+
+/* Capability discovery accessors */
+bool cls_camera::has_libcam() const
+{
+    return libcam != nullptr;
+}
+
+std::map<std::string, bool> cls_camera::get_libcam_capabilities()
+{
+    if (libcam != nullptr) {
+        return libcam->get_capability_map();
+    }
+    return std::map<std::string, bool>();
+}
+
+std::vector<std::string> cls_camera::get_libcam_ignored_controls()
+{
+    if (libcam != nullptr) {
+        return libcam->get_ignored_controls();
+    }
+    return std::vector<std::string>();
+}
+
+void cls_camera::clear_libcam_ignored_controls()
+{
+    if (libcam != nullptr) {
+        libcam->clear_ignored_controls();
+    }
+}
