@@ -365,8 +365,14 @@ int cls_libcam::start_mgr()
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
         , "Selected camera: %s", camera->id().c_str());
 
-    camera->acquire();
+    int acq_ret = camera->acquire();
+    if (acq_ret < 0) {
+        MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+            , "Failed to acquire camera: %d", acq_ret);
+        return -1;
+    }
     started_aqr = true;
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Camera acquired successfully");
 
     /* Discover camera capabilities after acquiring camera */
     discover_capabilities();
@@ -907,7 +913,23 @@ int cls_libcam::start_config()
 
     config->at(0).stride = 0;
 
+    /* DIAGNOSTIC: Log pre-validate configuration */
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "DIAG: Pre-validate config: requested=%dx%d, pixelFormat=%s, bufferCount=%d"
+        , config->at(0).size.width, config->at(0).size.height
+        , config->at(0).pixelFormat.toString().c_str()
+        , config->at(0).bufferCount);
+
     retcd = config->validate();
+
+    /* DIAGNOSTIC: Log post-validate configuration */
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "DIAG: Post-validate config: size=%dx%d, stride=%d, frameSize=%zu, validate_result=%d"
+        , config->at(0).size.width, config->at(0).size.height
+        , config->at(0).stride
+        , config->at(0).frameSize
+        , retcd);
+
     if (retcd == CameraConfiguration::Adjusted) {
         if (config->at(0).pixelFormat != PixelFormat::fromString("YUV420")) {
             MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
@@ -940,6 +962,12 @@ int cls_libcam::start_config()
     cam->imgs.size_norm = (cam->imgs.width * cam->imgs.height * 3) / 2;
     cam->imgs.motionsize = cam->imgs.width * cam->imgs.height;
 
+    /* DIAGNOSTIC: Log final image dimensions */
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "DIAG: Final image dimensions: imgs.width=%d, imgs.height=%d, size_norm=%d, motionsize=%d"
+        , cam->imgs.width, cam->imgs.height
+        , cam->imgs.size_norm, cam->imgs.motionsize);
+
     log_orientation();
     log_controls();
     log_draft();
@@ -947,7 +975,14 @@ int cls_libcam::start_config()
     config_orientation();
     config_controls();
 
-    camera->configure(config.get());
+    int cfg_ret = camera->configure(config.get());
+    if (cfg_ret < 0) {
+        MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+            , "Failed to configure camera: %d", cfg_ret);
+        return -1;
+    }
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "Camera configured successfully, state should now be Configured");
 
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Finished.");
 
@@ -958,81 +993,84 @@ int cls_libcam::req_add(Request *request)
 {
     int retcd;
 
-    /* Apply pending brightness/contrast/ISO/AWB controls if changed */
-    if (pending_ctrls.dirty.load()) {
-        ControlList &req_controls = request->controls();
-        req_controls.set(controls::Brightness, pending_ctrls.brightness);
-        req_controls.set(controls::Contrast, pending_ctrls.contrast);
-        req_controls.set(controls::AnalogueGain, iso_to_gain(pending_ctrls.iso));
+    /* Apply pending controls under lock */
+    {
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
+        if (pending_ctrls.dirty) {
+            ControlList &req_controls = request->controls();
+            req_controls.set(controls::Brightness, pending_ctrls.brightness);
+            req_controls.set(controls::Contrast, pending_ctrls.contrast);
+            req_controls.set(controls::AnalogueGain, iso_to_gain(pending_ctrls.iso));
 
-        // Apply AWB controls
-        req_controls.set(controls::AwbEnable, pending_ctrls.awb_enable);
-        req_controls.set(controls::AwbMode, pending_ctrls.awb_mode);
-        req_controls.set(controls::AwbLocked, pending_ctrls.awb_locked);
+            // Apply AWB controls
+            req_controls.set(controls::AwbEnable, pending_ctrls.awb_enable);
+            req_controls.set(controls::AwbMode, pending_ctrls.awb_mode);
+            req_controls.set(controls::AwbLocked, pending_ctrls.awb_locked);
 
-        // Apply manual colour controls only when AWB is disabled
-        if (!pending_ctrls.awb_enable) {
-            if (pending_ctrls.colour_temp > 0) {
-                req_controls.set(controls::ColourTemperature, pending_ctrls.colour_temp);
+            // Apply manual colour controls only when AWB is disabled
+            if (!pending_ctrls.awb_enable) {
+                if (pending_ctrls.colour_temp > 0) {
+                    req_controls.set(controls::ColourTemperature, pending_ctrls.colour_temp);
+                }
+                if (pending_ctrls.colour_gain_r > 0.0f || pending_ctrls.colour_gain_b > 0.0f) {
+                    float cg[2] = {pending_ctrls.colour_gain_r, pending_ctrls.colour_gain_b};
+                    req_controls.set(controls::ColourGains, cg);
+                }
             }
-            if (pending_ctrls.colour_gain_r > 0.0f || pending_ctrls.colour_gain_b > 0.0f) {
-                float cg[2] = {pending_ctrls.colour_gain_r, pending_ctrls.colour_gain_b};
-                req_controls.set(controls::ColourGains, cg);
+
+            // Apply AF controls (only if camera supports them)
+            if (is_control_supported(&controls::AfMode)) {
+                req_controls.set(controls::AfMode, pending_ctrls.af_mode);
+            }
+            if (is_control_supported(&controls::AfRange)) {
+                req_controls.set(controls::AfRange, pending_ctrls.af_range);
+            }
+            if (is_control_supported(&controls::AfSpeed)) {
+                req_controls.set(controls::AfSpeed, pending_ctrls.af_speed);
+            }
+
+            // Apply LensPosition only in manual mode and if supported
+            if (pending_ctrls.af_mode == 0 && is_control_supported(&controls::LensPosition)) {
+                req_controls.set(controls::LensPosition, pending_ctrls.lens_position);
+            }
+
+            // Handle AF trigger (one-shot, then clear) - only if supported
+            if (pending_ctrls.af_trigger && is_control_supported(&controls::AfTrigger)) {
+                req_controls.set(controls::AfTrigger, controls::AfTriggerStart);
+                pending_ctrls.af_trigger = false;
+            } else if (pending_ctrls.af_trigger) {
+                pending_ctrls.af_trigger = false;  // Clear even if not supported
+            }
+
+            // Handle AF cancel (one-shot, then clear) - only if supported
+            if (pending_ctrls.af_cancel && is_control_supported(&controls::AfTrigger)) {
+                req_controls.set(controls::AfTrigger, controls::AfTriggerCancel);
+                pending_ctrls.af_cancel = false;
+            } else if (pending_ctrls.af_cancel) {
+                pending_ctrls.af_cancel = false;  // Clear even if not supported
+            }
+
+            pending_ctrls.dirty = false;
+            MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+                , "Applied controls: brightness=%.2f, contrast=%.2f, iso=%.0f, "
+                  "awb_enable=%s, awb_mode=%d, af_mode=%d, lens_pos=%.2f"
+                , pending_ctrls.brightness, pending_ctrls.contrast
+                , pending_ctrls.iso
+                , pending_ctrls.awb_enable ? "true" : "false"
+                , pending_ctrls.awb_mode
+                , pending_ctrls.af_mode
+                , pending_ctrls.lens_position);
+            if (!pending_ctrls.awb_enable && pending_ctrls.colour_temp > 0) {
+                MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+                    , "Applied manual colour temperature: %dK", pending_ctrls.colour_temp);
+            }
+            if (!pending_ctrls.awb_enable && (pending_ctrls.colour_gain_r > 0.0f || pending_ctrls.colour_gain_b > 0.0f)) {
+                MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+                    , "Applied manual colour gains: R=%.2f, B=%.2f"
+                    , pending_ctrls.colour_gain_r, pending_ctrls.colour_gain_b);
             }
         }
-
-        // Apply AF controls (only if camera supports them)
-        if (is_control_supported(&controls::AfMode)) {
-            req_controls.set(controls::AfMode, pending_ctrls.af_mode);
-        }
-        if (is_control_supported(&controls::AfRange)) {
-            req_controls.set(controls::AfRange, pending_ctrls.af_range);
-        }
-        if (is_control_supported(&controls::AfSpeed)) {
-            req_controls.set(controls::AfSpeed, pending_ctrls.af_speed);
-        }
-
-        // Apply LensPosition only in manual mode and if supported
-        if (pending_ctrls.af_mode == 0 && is_control_supported(&controls::LensPosition)) {
-            req_controls.set(controls::LensPosition, pending_ctrls.lens_position);
-        }
-
-        // Handle AF trigger (one-shot, then clear) - only if supported
-        if (pending_ctrls.af_trigger && is_control_supported(&controls::AfTrigger)) {
-            req_controls.set(controls::AfTrigger, controls::AfTriggerStart);
-            pending_ctrls.af_trigger = false;
-        } else if (pending_ctrls.af_trigger) {
-            pending_ctrls.af_trigger = false;  // Clear even if not supported
-        }
-
-        // Handle AF cancel (one-shot, then clear) - only if supported
-        if (pending_ctrls.af_cancel && is_control_supported(&controls::AfTrigger)) {
-            req_controls.set(controls::AfTrigger, controls::AfTriggerCancel);
-            pending_ctrls.af_cancel = false;
-        } else if (pending_ctrls.af_cancel) {
-            pending_ctrls.af_cancel = false;  // Clear even if not supported
-        }
-
-        pending_ctrls.dirty.store(false);
-        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            , "Applied controls: brightness=%.2f, contrast=%.2f, iso=%.0f, "
-              "awb_enable=%s, awb_mode=%d, af_mode=%d, lens_pos=%.2f"
-            , pending_ctrls.brightness, pending_ctrls.contrast
-            , pending_ctrls.iso
-            , pending_ctrls.awb_enable ? "true" : "false"
-            , pending_ctrls.awb_mode
-            , pending_ctrls.af_mode
-            , pending_ctrls.lens_position);
-        if (!pending_ctrls.awb_enable && pending_ctrls.colour_temp > 0) {
-            MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-                , "Applied manual colour temperature: %dK", pending_ctrls.colour_temp);
-        }
-        if (!pending_ctrls.awb_enable && (pending_ctrls.colour_gain_r > 0.0f || pending_ctrls.colour_gain_b > 0.0f)) {
-            MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-                , "Applied manual colour gains: R=%.2f, B=%.2f"
-                , pending_ctrls.colour_gain_r, pending_ctrls.colour_gain_b);
-        }
-    }
+    }  // lock released here
 
     retcd = camera->queueRequest(request);
     return retcd;
@@ -1095,6 +1133,13 @@ int cls_libcam::start_req()
             , buffer->planes()[(uint)indx].length);
     }
 
+    /* DIAGNOSTIC: Log buffer allocation info */
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "DIAG: Buffer allocation: total_bytes=%d, expected_size_norm=%d, plane0_length=%d, num_planes=%d"
+        , bytes, cam->imgs.size_norm
+        , (int)buffer->planes()[0].length
+        , (int)buffer->planes().size());
+
     /* Adjust image dimensions if buffer size doesn't match expected */
     if (bytes > cam->imgs.size_norm) {
         width = ((int)buffer->planes()[0].length / cam->imgs.height);
@@ -1112,6 +1157,11 @@ int cls_libcam::start_req()
         cam->imgs.size_norm = (cam->imgs.width * cam->imgs.height * 3) / 2;
         cam->imgs.motionsize = cam->imgs.width * cam->imgs.height;
     }
+
+    /* DIAGNOSTIC: Log final dimensions after any buffer-based adjustment */
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "DIAG: After buffer check: imgs.width=%d, imgs.height=%d, size_norm=%d"
+        , cam->imgs.width, cam->imgs.height, cam->imgs.size_norm);
 
     /* Map memory for legacy single-buffer access (backwards compatibility) */
     membuf.buf = (uint8_t *)mmap(NULL, (uint)bytes, PROT_READ
@@ -1290,8 +1340,9 @@ void cls_libcam::libcam_stop()
 void cls_libcam::set_brightness(float value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.brightness = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: brightness set to %.2f", value);
     #else
@@ -1302,8 +1353,9 @@ void cls_libcam::set_brightness(float value)
 void cls_libcam::set_contrast(float value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.contrast = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: contrast set to %.2f", value);
     #else
@@ -1314,8 +1366,9 @@ void cls_libcam::set_contrast(float value)
 void cls_libcam::set_iso(float value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.iso = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: ISO set to %.0f (gain=%.2f)", value, iso_to_gain(value));
     #else
@@ -1326,8 +1379,9 @@ void cls_libcam::set_iso(float value)
 void cls_libcam::set_awb_enable(bool value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.awb_enable = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: AWB enable set to %s", value ? "true" : "false");
     #else
@@ -1338,6 +1392,7 @@ void cls_libcam::set_awb_enable(bool value)
 void cls_libcam::set_awb_mode(int value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.awb_mode = value;
         /* When using AWB presets (not Custom), clear manual controls */
         if (value != 7) {  // 7 = AwbCustom
@@ -1345,7 +1400,7 @@ void cls_libcam::set_awb_mode(int value)
             pending_ctrls.colour_gain_r = 0.0f;
             pending_ctrls.colour_gain_b = 0.0f;
         }
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: AWB mode set to %d (manual controls cleared)", value);
     #else
@@ -1356,8 +1411,9 @@ void cls_libcam::set_awb_mode(int value)
 void cls_libcam::set_awb_locked(bool value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.awb_locked = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: AWB locked set to %s", value ? "true" : "false");
     #else
@@ -1368,13 +1424,14 @@ void cls_libcam::set_awb_locked(bool value)
 void cls_libcam::set_colour_temp(int value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.colour_temp = value;
         /* Mutual exclusivity: temperature and gains cannot both be active */
         if (value > 0) {
             pending_ctrls.colour_gain_r = 0.0f;
             pending_ctrls.colour_gain_b = 0.0f;
         }
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: Colour temperature set to %dK (gains cleared)", value);
     #else
@@ -1385,13 +1442,14 @@ void cls_libcam::set_colour_temp(int value)
 void cls_libcam::set_colour_gains(float red, float blue)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.colour_gain_r = red;
         pending_ctrls.colour_gain_b = blue;
         /* Mutual exclusivity: gains and temperature cannot both be active */
         if (red > 0.0f || blue > 0.0f) {
             pending_ctrls.colour_temp = 0;
         }
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: Colour gains set to R=%.2f, B=%.2f (temp cleared)", red, blue);
     #else
@@ -1402,8 +1460,9 @@ void cls_libcam::set_colour_gains(float red, float blue)
 void cls_libcam::set_af_mode(int value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.af_mode = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: AF mode set to %d (%s)"
             , value
@@ -1416,8 +1475,9 @@ void cls_libcam::set_af_mode(int value)
 void cls_libcam::set_lens_position(float value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.lens_position = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: Lens position set to %.2f dioptres (focus at %.2fm)"
             , value, value > 0 ? 1.0f / value : INFINITY);
@@ -1429,8 +1489,9 @@ void cls_libcam::set_lens_position(float value)
 void cls_libcam::set_af_range(int value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.af_range = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: AF range set to %d (%s)"
             , value
@@ -1443,8 +1504,9 @@ void cls_libcam::set_af_range(int value)
 void cls_libcam::set_af_speed(int value)
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.af_speed = value;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: AF speed set to %d (%s)"
             , value, value == 0 ? "Normal" : "Fast");
@@ -1456,8 +1518,9 @@ void cls_libcam::set_af_speed(int value)
 void cls_libcam::trigger_af_scan()
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.af_trigger = true;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: AF scan triggered");
     #else
@@ -1468,8 +1531,9 @@ void cls_libcam::trigger_af_scan()
 void cls_libcam::cancel_af_scan()
 {
     #ifdef HAVE_LIBCAM
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
         pending_ctrls.af_cancel = true;
-        pending_ctrls.dirty.store(true);
+        pending_ctrls.dirty = true;
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
             , "Hot-reload: AF scan cancelled");
     #else
@@ -1485,7 +1549,8 @@ void cls_libcam::apply_pending_controls()
          * on the next queued request in req_add(). The dirty flag signals
          * that controls should be updated on next request.
          */
-        if (pending_ctrls.dirty.load()) {
+        std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
+        if (pending_ctrls.dirty) {
             MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO
                 , "Brightness/Contrast/ISO update pending: brightness=%.2f, contrast=%.2f, iso=%.0f"
                 , pending_ctrls.brightness, pending_ctrls.contrast, pending_ctrls.iso);
@@ -1612,7 +1677,7 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
         pending_ctrls.af_speed = cam->cfg->parm_cam.libcam_af_speed;
         pending_ctrls.af_trigger = false;
         pending_ctrls.af_cancel = false;
-        pending_ctrls.dirty.store(false);
+        pending_ctrls.dirty = false;
         cam->watchdog = cam->cfg->watchdog_tmo * 3; /* 3 is arbitrary multiplier to give startup more time*/
         if (libcam_start() < 0) {
             MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO,_("libcam failed to open"));

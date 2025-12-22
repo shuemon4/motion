@@ -24,6 +24,7 @@
         #include <map>
         #include <algorithm>
         #include <atomic>
+        #include <mutex>
         #include <sys/mman.h>
         #include <libcamera/libcamera.h>
 
@@ -43,6 +44,7 @@
 
         /* Pending runtime control updates (hot-reload brightness/contrast/ISO/AWB) */
         struct ctx_pending_controls {
+            mutable std::mutex mtx;     // Protects all members below
             float brightness = 0.0f;
             float contrast = 1.0f;
             float iso = 100.0f;  // ISO 100-6400 (converted to AnalogueGain)
@@ -60,7 +62,7 @@
             int af_speed = 0;           // 0=Normal, 1=Fast
             bool af_trigger = false;    // Trigger a scan (Auto mode only)
             bool af_cancel = false;     // Cancel a scan (Auto mode only)
-            std::atomic<bool> dirty{false};  /* Must use brace initialization for atomics */
+            bool dirty = false;         // Protected by mtx
         };
 
         class cls_libcam {

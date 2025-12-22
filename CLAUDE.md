@@ -259,3 +259,7 @@ doc/
 
 - **Main `doc/` directory files** (project reference docs): No prefix required
   - Examples: `motion_build.html`, `copyright`, `motion.gif`
+
+## Reading Files
+
+**Caution** Some files in this project are very large intentionally

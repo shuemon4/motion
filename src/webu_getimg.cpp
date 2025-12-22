@@ -99,6 +99,8 @@ void webu_getimg_deinit(cls_camera *cam)
 /* Get a normal image from the motion loop and compress it*/
 static void webu_getimg_norm(cls_camera *cam)
 {
+    static int diag_logged = 0;  /* DIAGNOSTIC: Only log once per session */
+
     if ((cam->stream.norm.jpg_cnct == 0) &&
         (cam->stream.norm.ts_cnct == 0) &&
         (cam->stream.norm.all_cnct == 0)) {
@@ -111,6 +113,14 @@ static void webu_getimg_norm(cls_camera *cam)
                 mymalloc((uint)cam->imgs.size_norm);
         }
         if (cam->current_image->image_norm != NULL && cam->stream.norm.consumed) {
+            /* DIAGNOSTIC: Log stream encoding dimensions (once per session) */
+            if (diag_logged == 0) {
+                MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+                    , "DIAG: Stream JPEG encode: width=%d, height=%d, size_norm=%d, quality=%d"
+                    , cam->imgs.width, cam->imgs.height
+                    , cam->imgs.size_norm, cam->cfg->stream_quality);
+                diag_logged = 1;
+            }
             cam->stream.norm.jpg_sz = cam->picture->put_memory(
                 cam->stream.norm.jpg_data
                 ,cam->imgs.size_norm
