@@ -19,7 +19,8 @@
       "Bash(./configure:*)",
       "WebFetch(domain:gitweb.git.savannah.gnu.org)",
       "Bash(PATH=\"/opt/homebrew/opt/gettext/bin:$PATH\" autoreconf:*)",
-      "WebFetch(domain:www.raspberrypi.com)"
+      "WebFetch(domain:www.raspberrypi.com)",
+      "Bash(sshpass:*)"
     ],
     "deny": [],
     "ask": []

@@ -207,6 +207,7 @@ ctx_parm config_parms[] = {
     {"webcontrol_lock_minutes",   PARM_TYP_INT,    PARM_CAT_13, PARM_LEVEL_ADVANCED, false},
     {"webcontrol_lock_attempts",  PARM_TYP_INT,    PARM_CAT_13, PARM_LEVEL_ADVANCED, false},
     {"webcontrol_lock_script",    PARM_TYP_STRING, PARM_CAT_13, PARM_LEVEL_RESTRICTED, false},
+    {"webcontrol_trusted_proxies", PARM_TYP_STRING, PARM_CAT_13, PARM_LEVEL_ADVANCED, false},
 
     /* Category 14 - Stream parameters - mostly NOT hot reloadable */
     {"stream_preview_scale",      PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
@@ -771,6 +772,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "webcontrol_key") return edit_generic_string(webcontrol_key, parm, pact, "");
     if (name == "webcontrol_headers") return edit_generic_string(webcontrol_headers, parm, pact, "");
     if (name == "webcontrol_lock_script") return edit_generic_string(webcontrol_lock_script, parm, pact, "");
+    if (name == "webcontrol_trusted_proxies") return edit_generic_string(webcontrol_trusted_proxies, parm, pact, "");
     if (name == "stream_preview_params") return edit_generic_string(stream_preview_params, parm, pact, "");
     if (name == "database_dbname") return edit_generic_string(database_dbname, parm, pact, "motion");
     if (name == "database_host") return edit_generic_string(database_host, parm, pact, "");

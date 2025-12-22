@@ -32,6 +32,41 @@ static void *netcam_handler(void *arg)
     return nullptr;
 }
 
+/**
+ * Mask credentials in a URL for safe logging
+ * Converts rtsp://user:pass@host/path to rtsp://****:****@host/path
+ *
+ * @param url The URL that may contain credentials
+ * @return URL with credentials masked, or original if no credentials found
+ */
+static std::string mask_url_credentials(const std::string &url)
+{
+    /* Find :// separator */
+    size_t scheme_end = url.find("://");
+    if (scheme_end == std::string::npos) {
+        return url;
+    }
+
+    /* Find @ separator (indicates credentials present) */
+    size_t at_pos = url.find('@', scheme_end + 3);
+    if (at_pos == std::string::npos) {
+        return url;  /* No credentials in URL */
+    }
+
+    /* Find the colon between user and password */
+    size_t cred_start = scheme_end + 3;
+    size_t colon_pos = url.find(':', cred_start);
+
+    /* Ensure the colon is before the @ (part of credentials, not port) */
+    if (colon_pos == std::string::npos || colon_pos > at_pos) {
+        /* Only username, no password */
+        return url.substr(0, cred_start) + "****" + url.substr(at_pos);
+    }
+
+    /* Mask both username and password */
+    return url.substr(0, cred_start) + "****:****" + url.substr(at_pos);
+}
+
 enum AVPixelFormat netcam_getfmt_vaapi(AVCodecContext *avctx, const enum AVPixelFormat *pix_fmts)
 {
     const enum AVPixelFormat *p;

@@ -93,20 +93,20 @@ make -j4
   --without-pgsql
 ```
 
-## Testing on Raspberry Pi 5
+## Testing on Raspberry Pi
 
 ### Before Running Tests
 
-**IMPORTANT: Always ask the user if the Pi 5 is powered on before attempting to connect or run tests.**
+**IMPORTANT: Always ask the user if the Pi is powered on before attempting to connect or run tests.**
 
 ### SSH Connection
 
-Connect to the test Pi 5:
-```bash
-ssh admin@192.168.1.176
-```
+| Device | Hostname | IP | Command |
+|--------|----------|-----|---------|
+| Pi 5 | pi5-motioneye | 192.168.1.176 | `ssh admin@192.168.1.176` |
+| Pi 4 | pi4-motion | 192.168.1.246 | `ssh admin@192.168.1.246` |
 
-The SSH key has been configured for passwordless access from the development Mac.
+SSH keys configured for passwordless access from the development Mac.
 
 ### Deployment Workflow
 

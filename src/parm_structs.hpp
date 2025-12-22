@@ -73,6 +73,7 @@ struct ctx_parm_app {
     int             webcontrol_lock_minutes;
     int             webcontrol_lock_attempts;
     std::string     webcontrol_lock_script;
+    std::string     webcontrol_trusted_proxies;  /* IPs allowed to set X-Forwarded-For */
 
     /* Database parameters (PARM_CAT_15) */
     std::string     database_type;

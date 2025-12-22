@@ -238,7 +238,62 @@ void cls_webu_ans::parms_edit()
 
 }
 
-/* Log the ip of the client connecting*/
+/**
+ * Check if an IP address is in the trusted proxies list
+ * Supports comma-separated list of IPs or CIDR ranges
+ */
+static bool is_trusted_proxy(const std::string &ip, const std::string &trusted_list)
+{
+    if (trusted_list.empty()) {
+        return false;
+    }
+
+    /* Parse comma-separated list of trusted IPs */
+    std::string list = trusted_list;
+    size_t pos;
+    while ((pos = list.find(',')) != std::string::npos) {
+        std::string trusted = list.substr(0, pos);
+        /* Trim whitespace */
+        while (!trusted.empty() && trusted[0] == ' ') trusted = trusted.substr(1);
+        while (!trusted.empty() && trusted.back() == ' ') trusted.pop_back();
+        if (trusted == ip) {
+            return true;
+        }
+        list = list.substr(pos + 1);
+    }
+    /* Check last/only entry */
+    while (!list.empty() && list[0] == ' ') list = list.substr(1);
+    while (!list.empty() && list.back() == ' ') list.pop_back();
+    return (list == ip);
+}
+
+/**
+ * Extract the first IP from X-Forwarded-For header
+ * Format: "client, proxy1, proxy2, ..."
+ */
+static std::string parse_xff_first_ip(const char *xff)
+{
+    if (xff == nullptr || xff[0] == '\0') {
+        return "";
+    }
+
+    std::string header(xff);
+    size_t comma = header.find(',');
+    std::string first_ip;
+    if (comma != std::string::npos) {
+        first_ip = header.substr(0, comma);
+    } else {
+        first_ip = header;
+    }
+
+    /* Trim whitespace */
+    while (!first_ip.empty() && first_ip[0] == ' ') first_ip = first_ip.substr(1);
+    while (!first_ip.empty() && first_ip.back() == ' ') first_ip.pop_back();
+
+    return first_ip;
+}
+
+/* Get the client IP, with X-Forwarded-For support for reverse proxies */
 void cls_webu_ans::clientip_get()
 {
     const union MHD_ConnectionInfo *con_info;
@@ -247,34 +302,54 @@ void cls_webu_ans::clientip_get()
     struct sockaddr_in6 *con_socket6;
     struct sockaddr_in *con_socket4;
     int is_ipv6;
+    std::string direct_ip;
 
     is_ipv6 = false;
     if (app->cfg->webcontrol_ipv6) {
         is_ipv6 = true;
     }
 
+    /* First, get the direct connection IP */
     con_info = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
     if (is_ipv6) {
         con_socket6 = (struct sockaddr_in6 *)con_info->client_addr;
         ip_dst = inet_ntop(AF_INET6, &con_socket6->sin6_addr, client, WEBUI_LEN_URLI);
         if (ip_dst == NULL) {
-            clientip = "Unknown";
+            direct_ip = "Unknown";
         } else {
-            clientip.assign(client);
-            if (clientip.substr(0, 7) == "::ffff:") {
-                clientip = clientip.substr(7);
+            direct_ip.assign(client);
+            if (direct_ip.substr(0, 7) == "::ffff:") {
+                direct_ip = direct_ip.substr(7);
             }
         }
     } else {
         con_socket4 = (struct sockaddr_in *)con_info->client_addr;
         ip_dst = inet_ntop(AF_INET, &con_socket4->sin_addr, client, WEBUI_LEN_URLI);
         if (ip_dst == NULL) {
-            clientip = "Unknown";
+            direct_ip = "Unknown";
         } else {
-            clientip.assign(client);
+            direct_ip.assign(client);
         }
     }
 
+    /* Check if connection is from a trusted proxy */
+    if (is_trusted_proxy(direct_ip, app->cfg->webcontrol_trusted_proxies)) {
+        /* Get client IP from X-Forwarded-For header */
+        const char *xff = MHD_lookup_connection_value(connection,
+            MHD_HEADER_KIND, "X-Forwarded-For");
+        if (xff != nullptr) {
+            std::string real_ip = parse_xff_first_ip(xff);
+            if (!real_ip.empty()) {
+                MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO,
+                    _("Trusted proxy %s forwarding for %s"),
+                    direct_ip.c_str(), real_ip.c_str());
+                clientip = real_ip;
+                return;
+            }
+        }
+    }
+
+    clientip = direct_ip;
 }
 
 /* Get the hostname */
@@ -363,15 +438,36 @@ void cls_webu_ans::client_connect()
 
     clock_gettime(CLOCK_MONOTONIC, &tm_cnct);
 
-    /* First we need to clean out any old entries from the list*/
+    /* SECURITY: Clean out stale entries (TTL-based cleanup)
+     * This prevents memory exhaustion from attackers creating many entries
+     */
     it = webu->wb_clients.begin();
     while (it != webu->wb_clients.end()) {
-        if ((tm_cnct.tv_sec - it->conn_time.tv_sec) >=
-            (app->cfg->webcontrol_lock_minutes*60)) {
+        /* Use configurable lock_minutes or fallback to WEBUI_CLIENT_TTL */
+        int ttl = (app->cfg->webcontrol_lock_minutes > 0) ?
+            (app->cfg->webcontrol_lock_minutes * 60) : WEBUI_CLIENT_TTL;
+        if ((tm_cnct.tv_sec - it->conn_time.tv_sec) >= ttl) {
             it = webu->wb_clients.erase(it);
         } else {
             it++;
         }
+    }
+
+    /* SECURITY: Enforce bounded client list to prevent memory exhaustion
+     * If at capacity, remove oldest entries first
+     */
+    while (webu->wb_clients.size() >= WEBUI_MAX_CLIENTS) {
+        /* Find and remove oldest entry */
+        auto oldest = webu->wb_clients.begin();
+        for (it = webu->wb_clients.begin(); it != webu->wb_clients.end(); it++) {
+            if (it->conn_time.tv_sec < oldest->conn_time.tv_sec) {
+                oldest = it;
+            }
+        }
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+            _("Client tracking at capacity (%d), removing oldest entry: %s"),
+            WEBUI_MAX_CLIENTS, oldest->clientip.c_str());
+        webu->wb_clients.erase(oldest);
     }
 
     /* When this function is called, we know that we are authenticated

@@ -27,6 +27,11 @@
 
     #define WEBUI_POST_BFRSZ  512
 
+    /* Security: Maximum tracked clients for rate limiting (prevents memory exhaustion) */
+    #define WEBUI_MAX_CLIENTS 10000
+    /* Security: TTL for stale client entries in seconds */
+    #define WEBUI_CLIENT_TTL  3600
+
     enum WEBUI_METHOD {
         WEBUI_METHOD_GET    = 0,
         WEBUI_METHOD_POST   = 1
