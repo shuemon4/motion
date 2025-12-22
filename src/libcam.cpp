@@ -556,6 +556,11 @@ void cls_libcam::config_controls()
     controls.set(controls::Contrast, cam->cfg->parm_cam.libcam_contrast);
     controls.set(controls::AnalogueGain, iso_to_gain(cam->cfg->parm_cam.libcam_iso));
 
+    /* Apply initial AWB controls from config */
+    controls.set(controls::AwbEnable, cam->cfg->parm_cam.libcam_awb_enable);
+    controls.set(controls::AwbMode, cam->cfg->parm_cam.libcam_awb_mode);
+    controls.set(controls::AwbLocked, cam->cfg->parm_cam.libcam_awb_locked);
+
     retcd = config->validate();
     if (retcd == CameraConfiguration::Adjusted) {
         MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO
@@ -731,23 +736,32 @@ int cls_libcam::req_add(Request *request)
         req_controls.set(controls::AwbMode, pending_ctrls.awb_mode);
         req_controls.set(controls::AwbLocked, pending_ctrls.awb_locked);
 
-        // Apply manual colour temperature if set (non-zero)
-        if (pending_ctrls.colour_temp > 0) {
-            req_controls.set(controls::ColourTemperature, pending_ctrls.colour_temp);
-        }
-
-        // Apply manual colour gains if set (non-zero)
-        if (pending_ctrls.colour_gain_r > 0.0f || pending_ctrls.colour_gain_b > 0.0f) {
-            float cg[2] = {pending_ctrls.colour_gain_r, pending_ctrls.colour_gain_b};
-            req_controls.set(controls::ColourGains, cg);
+        // Apply manual colour controls only when AWB is disabled
+        if (!pending_ctrls.awb_enable) {
+            if (pending_ctrls.colour_temp > 0) {
+                req_controls.set(controls::ColourTemperature, pending_ctrls.colour_temp);
+            }
+            if (pending_ctrls.colour_gain_r > 0.0f || pending_ctrls.colour_gain_b > 0.0f) {
+                float cg[2] = {pending_ctrls.colour_gain_r, pending_ctrls.colour_gain_b};
+                req_controls.set(controls::ColourGains, cg);
+            }
         }
 
         pending_ctrls.dirty.store(false);
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            , "Applied controls to request: brightness=%.2f, contrast=%.2f, iso=%.0f (gain=%.2f), awb_enable=%s, awb_mode=%d"
+            , "Applied controls: brightness=%.2f, contrast=%.2f, iso=%.0f, awb_enable=%s, awb_mode=%d"
             , pending_ctrls.brightness, pending_ctrls.contrast
-            , pending_ctrls.iso, iso_to_gain(pending_ctrls.iso)
+            , pending_ctrls.iso
             , pending_ctrls.awb_enable ? "true" : "false", pending_ctrls.awb_mode);
+        if (!pending_ctrls.awb_enable && pending_ctrls.colour_temp > 0) {
+            MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+                , "Applied manual colour temperature: %dK", pending_ctrls.colour_temp);
+        }
+        if (!pending_ctrls.awb_enable && (pending_ctrls.colour_gain_r > 0.0f || pending_ctrls.colour_gain_b > 0.0f)) {
+            MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+                , "Applied manual colour gains: R=%.2f, B=%.2f"
+                , pending_ctrls.colour_gain_r, pending_ctrls.colour_gain_b);
+        }
     }
 
     retcd = camera->queueRequest(request);
@@ -1055,9 +1069,15 @@ void cls_libcam::set_awb_mode(int value)
 {
     #ifdef HAVE_LIBCAM
         pending_ctrls.awb_mode = value;
+        /* When using AWB presets (not Custom), clear manual controls */
+        if (value != 7) {  // 7 = AwbCustom
+            pending_ctrls.colour_temp = 0;
+            pending_ctrls.colour_gain_r = 0.0f;
+            pending_ctrls.colour_gain_b = 0.0f;
+        }
         pending_ctrls.dirty.store(true);
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            , "Hot-reload: AWB mode set to %d", value);
+            , "Hot-reload: AWB mode set to %d (manual controls cleared)", value);
     #else
         (void)value;
     #endif
@@ -1079,9 +1099,14 @@ void cls_libcam::set_colour_temp(int value)
 {
     #ifdef HAVE_LIBCAM
         pending_ctrls.colour_temp = value;
+        /* Mutual exclusivity: temperature and gains cannot both be active */
+        if (value > 0) {
+            pending_ctrls.colour_gain_r = 0.0f;
+            pending_ctrls.colour_gain_b = 0.0f;
+        }
         pending_ctrls.dirty.store(true);
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            , "Hot-reload: Colour temperature set to %dK", value);
+            , "Hot-reload: Colour temperature set to %dK (gains cleared)", value);
     #else
         (void)value;
     #endif
@@ -1092,9 +1117,13 @@ void cls_libcam::set_colour_gains(float red, float blue)
     #ifdef HAVE_LIBCAM
         pending_ctrls.colour_gain_r = red;
         pending_ctrls.colour_gain_b = blue;
+        /* Mutual exclusivity: gains and temperature cannot both be active */
+        if (red > 0.0f || blue > 0.0f) {
+            pending_ctrls.colour_temp = 0;
+        }
         pending_ctrls.dirty.store(true);
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            , "Hot-reload: Colour gains set to R=%.2f, B=%.2f", red, blue);
+            , "Hot-reload: Colour gains set to R=%.2f, B=%.2f (temp cleared)", red, blue);
     #else
         (void)red; (void)blue;
     #endif

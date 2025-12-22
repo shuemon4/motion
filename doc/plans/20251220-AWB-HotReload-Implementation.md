@@ -328,3 +328,37 @@ curl "http://pi:8080/0/config/set?libcam_colour_gain_b=1.2"
 - ColourGains and ColourTemperature typically require `AwbEnable=false` to take effect
 - Value of 0 for colour_temp/colour_gains means "don't set" (use automatic)
 - No mode conversion needed - values pass directly to libcamera
+
+---
+
+## Implementation Summary (2025-12-21)
+
+### Bug Fix
+- **File**: `src/webu_json.cpp:637`
+- **Issue**: Single-camera path fetched wrong gain variable when setting red gain
+- **Fix**: Changed `libcam_colour_gain_r` to `libcam_colour_gain_b`
+
+### Mutual Exclusivity
+Temperature and gains are now mutually exclusive:
+- Setting `libcam_colour_temp` to non-zero clears both gain values to 0
+- Setting either `libcam_colour_gain_r` or `libcam_colour_gain_b` to non-zero clears temperature to 0
+- **Files modified**: `src/libcam.cpp` (set_colour_temp, set_colour_gains)
+
+### Enhanced Logging
+Added conditional debug logging in `req_add()`:
+- Logs colour temperature when applied (non-zero)
+- Logs colour gains when applied (either non-zero)
+- Follows existing `MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO, ...)` pattern
+
+### API Behavior After Update
+```bash
+# Method 1: Temperature-based (clears any existing gains)
+curl "http://pi:8080/0/config/set?libcam_colour_temp=6500"
+
+# Method 2: Gains-based (clears any existing temperature)
+curl "http://pi:8080/0/config/set?libcam_colour_gain_r=1.5"
+curl "http://pi:8080/0/config/set?libcam_colour_gain_b=1.2"
+
+# Reset to auto (set all to 0)
+curl "http://pi:8080/0/config/set?libcam_colour_temp=0"
+```

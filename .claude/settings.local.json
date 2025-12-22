@@ -18,7 +18,8 @@
       "Bash(brew list:*)",
       "Bash(./configure:*)",
       "WebFetch(domain:gitweb.git.savannah.gnu.org)",
-      "Bash(PATH=\"/opt/homebrew/opt/gettext/bin:$PATH\" autoreconf:*)"
+      "Bash(PATH=\"/opt/homebrew/opt/gettext/bin:$PATH\" autoreconf:*)",
+      "WebFetch(domain:www.raspberrypi.com)"
     ],
     "deny": [],
     "ask": []

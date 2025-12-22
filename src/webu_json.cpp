@@ -634,7 +634,7 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
             webua->cam->set_libcam_colour_temp(atoi(parm_val.c_str()));
         } else if (parm_name == "libcam_colour_gain_r") {
             float r = atof(parm_val.c_str());
-            float b = webua->cam->cfg->parm_cam.libcam_colour_gain_r;
+            float b = webua->cam->cfg->parm_cam.libcam_colour_gain_b;
             webua->cam->set_libcam_colour_gains(r, b);
         } else if (parm_name == "libcam_colour_gain_b") {
             float r = webua->cam->cfg->parm_cam.libcam_colour_gain_r;
