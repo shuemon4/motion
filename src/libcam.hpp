@@ -52,6 +52,12 @@
             int colour_temp = 0;        // 0 = disabled
             float colour_gain_r = 0.0f; // 0 = auto
             float colour_gain_b = 0.0f; // 0 = auto
+            // Autofocus controls
+            int af_mode = 0;            // 0=Manual, 1=Auto, 2=Continuous
+            float lens_position = 0.0f; // Dioptres (0=infinity)
+            int af_range = 0;           // 0=Normal, 1=Macro, 2=Full
+            int af_speed = 0;           // 0=Normal, 1=Fast
+            bool af_trigger = false;    // Trigger a scan (Auto mode only)
             std::atomic<bool> dirty{false};  /* Must use brace initialization for atomics */
         };
 
@@ -69,6 +75,11 @@
                 void set_awb_locked(bool value);
                 void set_colour_temp(int value);
                 void set_colour_gains(float red, float blue);
+                void set_af_mode(int value);
+                void set_lens_position(float value);
+                void set_af_range(int value);
+                void set_af_speed(int value);
+                void trigger_af_scan();  // For AfTrigger in Auto mode
             private:
                 cls_camera  *cam;
                 ctx_params  *params;

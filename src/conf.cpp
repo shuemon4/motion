@@ -85,6 +85,10 @@ ctx_parm config_parms[] = {
     {"libcam_colour_temp",        PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_colour_gain_r",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_colour_gain_b",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_af_mode",            PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_lens_position",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_af_range",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_af_speed",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
 
     /* Category 03 - Image parameters - NOT hot reloadable (buffer realloc) */
     {"width",                     PARM_TYP_INT,    PARM_CAT_03, PARM_LEVEL_LIMITED,  false},
@@ -699,6 +703,15 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "libcam_iso") return edit_generic_int(parm_cam.libcam_iso, parm, pact, 100, 100, 6400);
     if (name == "libcam_awb_mode") return edit_generic_int(parm_cam.libcam_awb_mode, parm, pact, 0, 0, 7);
     if (name == "libcam_colour_temp") return edit_generic_int(parm_cam.libcam_colour_temp, parm, pact, 0, 0, 10000);
+
+    // AF parameters - AfMode: 0=Manual (default), 1=Auto, 2=Continuous
+    if (name == "libcam_af_mode") return edit_generic_int(parm_cam.libcam_af_mode, parm, pact, 0, 0, 2);
+    // LensPosition: dioptres (0=infinity, typical max ~10 for macro)
+    if (name == "libcam_lens_position") return edit_generic_float(parm_cam.libcam_lens_position, parm, pact, 0.0f, 0.0f, 15.0f);
+    // AfRange: 0=Normal, 1=Macro, 2=Full
+    if (name == "libcam_af_range") return edit_generic_int(parm_cam.libcam_af_range, parm, pact, 0, 0, 2);
+    // AfSpeed: 0=Normal, 1=Fast
+    if (name == "libcam_af_speed") return edit_generic_int(parm_cam.libcam_af_speed, parm, pact, 0, 0, 1);
 
     // BOOLS - libcam AWB parameters
     if (name == "libcam_awb_enable") return edit_generic_bool(parm_cam.libcam_awb_enable, parm, pact, true);

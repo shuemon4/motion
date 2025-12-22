@@ -2139,3 +2139,38 @@ void cls_camera::set_libcam_colour_gains(float red, float blue)
         libcam->set_colour_gains(red, blue);
     }
 }
+
+void cls_camera::set_libcam_af_mode(int value)
+{
+    if (libcam != nullptr) {
+        libcam->set_af_mode(value);
+    }
+}
+
+void cls_camera::set_libcam_lens_position(float value)
+{
+    if (libcam != nullptr) {
+        libcam->set_lens_position(value);
+    }
+}
+
+void cls_camera::set_libcam_af_range(int value)
+{
+    if (libcam != nullptr) {
+        libcam->set_af_range(value);
+    }
+}
+
+void cls_camera::set_libcam_af_speed(int value)
+{
+    if (libcam != nullptr) {
+        libcam->set_af_speed(value);
+    }
+}
+
+void cls_camera::trigger_libcam_af_scan()
+{
+    if (libcam != nullptr) {
+        libcam->trigger_af_scan();
+    }
+}

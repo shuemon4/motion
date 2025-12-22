@@ -212,6 +212,11 @@ class cls_camera {
         void set_libcam_awb_locked(bool value);
         void set_libcam_colour_temp(int value);
         void set_libcam_colour_gains(float red, float blue);
+        void set_libcam_af_mode(int value);
+        void set_libcam_lens_position(float value);
+        void set_libcam_af_range(int value);
+        void set_libcam_af_speed(int value);
+        void trigger_libcam_af_scan();
 
     private:
         cls_movie       *movie_norm;

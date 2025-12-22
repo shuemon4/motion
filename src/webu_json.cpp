@@ -611,6 +611,14 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
                 float r = app->cam_list[indx]->cfg->parm_cam.libcam_colour_gain_r;
                 float b = atof(parm_val.c_str());
                 app->cam_list[indx]->set_libcam_colour_gains(r, b);
+            } else if (parm_name == "libcam_af_mode") {
+                app->cam_list[indx]->set_libcam_af_mode(atoi(parm_val.c_str()));
+            } else if (parm_name == "libcam_lens_position") {
+                app->cam_list[indx]->set_libcam_lens_position(atof(parm_val.c_str()));
+            } else if (parm_name == "libcam_af_range") {
+                app->cam_list[indx]->set_libcam_af_range(atoi(parm_val.c_str()));
+            } else if (parm_name == "libcam_af_speed") {
+                app->cam_list[indx]->set_libcam_af_speed(atoi(parm_val.c_str()));
             }
         }
     } else if (webua->cam != nullptr) {
@@ -640,6 +648,14 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
             float r = webua->cam->cfg->parm_cam.libcam_colour_gain_r;
             float b = atof(parm_val.c_str());
             webua->cam->set_libcam_colour_gains(r, b);
+        } else if (parm_name == "libcam_af_mode") {
+            webua->cam->set_libcam_af_mode(atoi(parm_val.c_str()));
+        } else if (parm_name == "libcam_lens_position") {
+            webua->cam->set_libcam_lens_position(atof(parm_val.c_str()));
+        } else if (parm_name == "libcam_af_range") {
+            webua->cam->set_libcam_af_range(atoi(parm_val.c_str()));
+        } else if (parm_name == "libcam_af_speed") {
+            webua->cam->set_libcam_af_speed(atoi(parm_val.c_str()));
         }
     }
 

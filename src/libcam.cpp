@@ -135,8 +135,10 @@ void cls_libcam::log_controls()
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfMeteringAuto = 0");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfMeteringWindows = 1");
 
-    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "  AfWindows(Pipe delimited)");
-    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "     x | y | h | w");
+    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "  AfWindows(Multiple windows supported)");
+    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "     Format: x|y|width|height[;x|y|width|height;...]");
+    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "     Example: 100|100|200|200;400|100|200|200");
+    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "     Max 4 windows. Coordinates in ScalerCropMaximum space.");
 
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "  AfTrigger(int)");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfTriggerStart = 0");
@@ -149,13 +151,13 @@ void cls_libcam::log_controls()
 
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "  LensPosition(float)");
 
-    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "  AfState(int)");
+    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "  AfState(int) [READ-ONLY - reported by camera]");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfStateIdle = 0");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfStateScanning = 1");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfStateFocused = 2");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfStateFailed = 3");
 
-    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "  AfPauseState(int)");
+    MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "  AfPauseState(int) [READ-ONLY - reported by camera]");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfPauseStateRunning = 0");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfPauseStatePausing = 1");
     MOTION_SHT(DBG, TYPE_VIDEO, NO_ERRNO, "    AfPauseStatePaused = 2");
@@ -487,12 +489,46 @@ void cls_libcam::config_control_item(std::string pname, std::string pvalue)
         controls.set(controls::AfMetering, mtoi(pvalue));
     }
     if (pname == "AfWindows") {
-        Rectangle afwin[1];
-        afwin[0].x = mtoi(mtok(pvalue,"|"));
-        afwin[0].y = mtoi(mtok(pvalue,"|"));
-        afwin[0].width = (uint)mtoi(mtok(pvalue,"|"));
-        afwin[0].height = (uint)mtoi(mtok(pvalue,"|"));
-        controls.set(controls::AfWindows, afwin);
+        std::vector<Rectangle> afwindows;
+        std::string windows_str = pvalue;
+        std::string window_token;
+
+        // Split by semicolon for multiple windows
+        size_t pos = 0;
+        while ((pos = windows_str.find(';')) != std::string::npos || !windows_str.empty()) {
+            if (pos != std::string::npos) {
+                window_token = windows_str.substr(0, pos);
+                windows_str.erase(0, pos + 1);
+            } else {
+                window_token = windows_str;
+                windows_str.clear();
+            }
+
+            if (!window_token.empty()) {
+                Rectangle rect;
+                std::string temp = window_token;
+                rect.x = mtoi(mtok(temp, "|"));
+                rect.y = mtoi(mtok(temp, "|"));
+                rect.width = (uint)mtoi(mtok(temp, "|"));
+                rect.height = (uint)mtoi(mtok(temp, "|"));
+
+                // Only add valid rectangles (non-zero dimensions)
+                if (rect.width > 0 && rect.height > 0) {
+                    afwindows.push_back(rect);
+                    MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+                        , "AF window %d: x=%d y=%d w=%u h=%u"
+                        , (int)afwindows.size(), rect.x, rect.y, rect.width, rect.height);
+                }
+            }
+
+            // Limit to 4 windows
+            if (afwindows.size() >= 4) break;
+        }
+
+        if (!afwindows.empty()) {
+            controls.set(controls::AfWindows,
+                Span<const Rectangle>(afwindows.data(), afwindows.size()));
+        }
     }
     if (pname == "AfTrigger") {
         controls.set(controls::AfTrigger, mtoi(pvalue));
@@ -504,10 +540,14 @@ void cls_libcam::config_control_item(std::string pname, std::string pvalue)
         controls.set(controls::LensPosition, mtof(pvalue));
     }
     if (pname == "AfState") {
-        controls.set(controls::AfState, mtoi(pvalue));
+        MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+            , "AfState is read-only (output control) - cannot be set");
+        return;  // Skip this control
     }
     if (pname == "AfPauseState") {
-        controls.set(controls::AfPauseState, mtoi(pvalue));
+        MOTION_LOG(WRN, TYPE_VIDEO, NO_ERRNO
+            , "AfPauseState is read-only (output control) - cannot be set");
+        return;  // Skip this control
     }
 
     /* DRAFT*/
@@ -560,6 +600,16 @@ void cls_libcam::config_controls()
     controls.set(controls::AwbEnable, cam->cfg->parm_cam.libcam_awb_enable);
     controls.set(controls::AwbMode, cam->cfg->parm_cam.libcam_awb_mode);
     controls.set(controls::AwbLocked, cam->cfg->parm_cam.libcam_awb_locked);
+
+    /* Apply AF controls from config */
+    controls.set(controls::AfMode, cam->cfg->parm_cam.libcam_af_mode);
+    controls.set(controls::AfRange, cam->cfg->parm_cam.libcam_af_range);
+    controls.set(controls::AfSpeed, cam->cfg->parm_cam.libcam_af_speed);
+
+    /* Apply LensPosition only in manual mode */
+    if (cam->cfg->parm_cam.libcam_af_mode == 0) {
+        controls.set(controls::LensPosition, cam->cfg->parm_cam.libcam_lens_position);
+    }
 
     retcd = config->validate();
     if (retcd == CameraConfiguration::Adjusted) {
@@ -747,12 +797,32 @@ int cls_libcam::req_add(Request *request)
             }
         }
 
+        // Apply AF controls
+        req_controls.set(controls::AfMode, pending_ctrls.af_mode);
+        req_controls.set(controls::AfRange, pending_ctrls.af_range);
+        req_controls.set(controls::AfSpeed, pending_ctrls.af_speed);
+
+        // Apply LensPosition only in manual mode
+        if (pending_ctrls.af_mode == 0) {
+            req_controls.set(controls::LensPosition, pending_ctrls.lens_position);
+        }
+
+        // Handle AF trigger (one-shot, then clear)
+        if (pending_ctrls.af_trigger) {
+            req_controls.set(controls::AfTrigger, controls::AfTriggerStart);
+            pending_ctrls.af_trigger = false;
+        }
+
         pending_ctrls.dirty.store(false);
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            , "Applied controls: brightness=%.2f, contrast=%.2f, iso=%.0f, awb_enable=%s, awb_mode=%d"
+            , "Applied controls: brightness=%.2f, contrast=%.2f, iso=%.0f, "
+              "awb_enable=%s, awb_mode=%d, af_mode=%d, lens_pos=%.2f"
             , pending_ctrls.brightness, pending_ctrls.contrast
             , pending_ctrls.iso
-            , pending_ctrls.awb_enable ? "true" : "false", pending_ctrls.awb_mode);
+            , pending_ctrls.awb_enable ? "true" : "false"
+            , pending_ctrls.awb_mode
+            , pending_ctrls.af_mode
+            , pending_ctrls.lens_position);
         if (!pending_ctrls.awb_enable && pending_ctrls.colour_temp > 0) {
             MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
                 , "Applied manual colour temperature: %dK", pending_ctrls.colour_temp);
@@ -1129,6 +1199,72 @@ void cls_libcam::set_colour_gains(float red, float blue)
     #endif
 }
 
+void cls_libcam::set_af_mode(int value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.af_mode = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: AF mode set to %d (%s)"
+            , value
+            , value == 0 ? "Manual" : value == 1 ? "Auto" : "Continuous");
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::set_lens_position(float value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.lens_position = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: Lens position set to %.2f dioptres (focus at %.2fm)"
+            , value, value > 0 ? 1.0f / value : INFINITY);
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::set_af_range(int value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.af_range = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: AF range set to %d (%s)"
+            , value
+            , value == 0 ? "Normal" : value == 1 ? "Macro" : "Full");
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::set_af_speed(int value)
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.af_speed = value;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: AF speed set to %d (%s)"
+            , value, value == 0 ? "Normal" : "Fast");
+    #else
+        (void)value;
+    #endif
+}
+
+void cls_libcam::trigger_af_scan()
+{
+    #ifdef HAVE_LIBCAM
+        pending_ctrls.af_trigger = true;
+        pending_ctrls.dirty.store(true);
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Hot-reload: AF scan triggered");
+    #else
+        // No-op when libcam not available
+    #endif
+}
+
 void cls_libcam::apply_pending_controls()
 {
     #ifdef HAVE_LIBCAM
@@ -1257,6 +1393,11 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
         pending_ctrls.colour_temp = cam->cfg->parm_cam.libcam_colour_temp;
         pending_ctrls.colour_gain_r = cam->cfg->parm_cam.libcam_colour_gain_r;
         pending_ctrls.colour_gain_b = cam->cfg->parm_cam.libcam_colour_gain_b;
+        pending_ctrls.af_mode = cam->cfg->parm_cam.libcam_af_mode;
+        pending_ctrls.lens_position = cam->cfg->parm_cam.libcam_lens_position;
+        pending_ctrls.af_range = cam->cfg->parm_cam.libcam_af_range;
+        pending_ctrls.af_speed = cam->cfg->parm_cam.libcam_af_speed;
+        pending_ctrls.af_trigger = false;
         pending_ctrls.dirty.store(false);
         cam->watchdog = cam->cfg->watchdog_tmo * 3; /* 3 is arbitrary multiplier to give startup more time*/
         if (libcam_start() < 0) {

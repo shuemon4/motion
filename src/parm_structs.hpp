@@ -147,6 +147,12 @@ struct ctx_parm_cam {
     float           libcam_colour_gain_r;
     float           libcam_colour_gain_b;
 
+    /* Autofocus parameters */
+    int             libcam_af_mode;         // 0=Manual, 1=Auto, 2=Continuous
+    float           libcam_lens_position;   // Dioptres (0=infinity, 2=0.5m)
+    int             libcam_af_range;        // 0=Normal, 1=Macro, 2=Full
+    int             libcam_af_speed;        // 0=Normal, 1=Fast
+
     /* Image parameters (PARM_CAT_03) */
     int             width;
     int             height;
