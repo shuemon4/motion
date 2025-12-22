@@ -23,6 +23,37 @@
 #include "logger.hpp"
 #include "dbse.hpp"
 
+/**
+ * Escape special characters in a string for safe SQL insertion
+ * Prevents SQL injection by escaping: single quotes, backslashes, null bytes
+ *
+ * @param input The string to escape
+ * @return Escaped string safe for SQL VALUES
+ */
+static std::string dbse_escape_sql_string(const std::string &input)
+{
+    std::string result;
+    result.reserve(input.length() * 2);  /* Worst case: all chars need escaping */
+
+    for (size_t i = 0; i < input.length(); i++) {
+        char c = input[i];
+        switch (c) {
+            case '\'':
+                result += "''";  /* Standard SQL escaping for single quotes */
+                break;
+            case '\\':
+                result += "\\\\";
+                break;
+            case '\0':
+                /* Skip null bytes - they can cause truncation attacks */
+                break;
+            default:
+                result += c;
+        }
+    }
+    return result;
+}
+
 static void *dbse_handler(void *arg)
 {
     ((cls_dbse *)arg)->handler();
@@ -1139,10 +1170,11 @@ void cls_dbse::filelist_add(cls_camera *cam, timespec *ts1, std::string ftyp
     sqlquery += " , file_tmc, file_tml, diff_avg";
     sqlquery += " , sdev_min, sdev_max, sdev_avg)";
     sqlquery += " values ("+std::to_string(cam->cfg->device_id);
-    sqlquery += " ,'" + filenm + "'";
-    sqlquery += " ,'" + ftyp + "'";
-    sqlquery += " ,'" + dirnm + "'";
-    sqlquery += " ,'" + fullnm + "'";
+    /* Use SQL escaping to prevent injection attacks */
+    sqlquery += " ,'" + dbse_escape_sql_string(filenm) + "'";
+    sqlquery += " ,'" + dbse_escape_sql_string(ftyp) + "'";
+    sqlquery += " ,'" + dbse_escape_sql_string(dirnm) + "'";
+    sqlquery += " ,'" + dbse_escape_sql_string(fullnm) + "'";
     sqlquery += " ,"  + std::to_string(bsz);
     sqlquery += " ,"  + std::string(dtl);
     sqlquery += " ,'" + std::string(tmc)+ "'";

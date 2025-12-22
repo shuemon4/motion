@@ -734,6 +734,20 @@ void cls_webu_json::config_set()
     parm_val = decoded;
     myfree(decoded);
 
+    /* SECURITY: Reject SQL parameter modifications via web interface
+     * SQL templates are too dangerous to modify remotely - they can be
+     * used for SQL injection attacks. Users must modify SQL params via
+     * config file only.
+     */
+    if (parm_name.substr(0, 4) == "sql_") {
+        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+            _("SQL parameter '%s' cannot be modified via web interface from %s"),
+            parm_name.c_str(), webua->clientip.c_str());
+        build_response(false, parm_name, "", parm_val, false);
+        webua->resp_page += ",\"error\":\"SQL parameters cannot be modified via web interface (security restriction)\"}";
+        return;
+    }
+
     /* Validate parameter exists and check if hot-reloadable */
     if (!validate_hot_reload(parm_name, parm_index)) {
         build_response(false, parm_name, "", parm_val, false);

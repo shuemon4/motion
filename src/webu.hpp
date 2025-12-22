@@ -62,6 +62,7 @@
 
     struct ctx_webu_clients {
         std::string                 clientip;
+        std::string                 username;       /* Track username for lockout */
         bool                        authenticated;
         int                         conn_nbr;
         struct timespec             conn_time;

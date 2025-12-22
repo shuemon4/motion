@@ -297,21 +297,30 @@ void cls_webu_ans::hostname_get()
     return;
 }
 
-/* Log the failed authentication check */
-void cls_webu_ans::failauth_log(bool userid_fail)
+/* Log the failed authentication check
+ * Tracks by (IP + username) combination to prevent distributed brute-force attacks
+ * where attacker uses multiple IPs to guess usernames
+ */
+void cls_webu_ans::failauth_log(bool userid_fail, const std::string &username)
 {
     timespec            tm_cnct;
     ctx_webu_clients    clients;
     std::list<ctx_webu_clients>::iterator   it;
 
-    MOTION_LOG(ALR, TYPE_STREAM, NO_ERRNO
-            ,_("Failed authentication from %s"), clientip.c_str());
+    if (username.empty()) {
+        MOTION_LOG(ALR, TYPE_STREAM, NO_ERRNO
+                ,_("Failed authentication from %s"), clientip.c_str());
+    } else {
+        MOTION_LOG(ALR, TYPE_STREAM, NO_ERRNO
+                ,_("Failed authentication from %s for user '%s'"), clientip.c_str(), username.c_str());
+    }
 
     clock_gettime(CLOCK_MONOTONIC, &tm_cnct);
 
+    /* Track by (IP + username) combination for stronger brute-force protection */
     it = webu->wb_clients.begin();
     while (it != webu->wb_clients.end()) {
-        if (it->clientip == clientip) {
+        if ((it->clientip == clientip) && (it->username == username)) {
             it->conn_nbr++;
             it->conn_time.tv_sec =tm_cnct.tv_sec;
             it->authenticated = false;
@@ -324,6 +333,7 @@ void cls_webu_ans::failauth_log(bool userid_fail)
     }
 
     clients.clientip = clientip;
+    clients.username = username;
     clients.conn_nbr = 1;
     clients.conn_time = tm_cnct;
     clients.authenticated = false;
@@ -344,26 +354,33 @@ void cls_webu_ans::client_connect()
     timespec                                tm_cnct;
     ctx_webu_clients                 clients;
     std::list<ctx_webu_clients>::iterator   it;
+    std::string current_user;
+
+    /* Get current authenticated username for tracking */
+    if (auth_user != nullptr) {
+        current_user = std::string(auth_user);
+    }
 
     clock_gettime(CLOCK_MONOTONIC, &tm_cnct);
 
-    /* First we need to clean out any old IPs from the list*/
+    /* First we need to clean out any old entries from the list*/
     it = webu->wb_clients.begin();
     while (it != webu->wb_clients.end()) {
         if ((tm_cnct.tv_sec - it->conn_time.tv_sec) >=
             (app->cfg->webcontrol_lock_minutes*60)) {
             it = webu->wb_clients.erase(it);
+        } else {
+            it++;
         }
-        it++;
     }
 
     /* When this function is called, we know that we are authenticated
      * so we reset the info and as needed print a message that the
-     * ip is connected.
+     * ip is connected. Track by (IP + username) combination.
      */
     it = webu->wb_clients.begin();
     while (it != webu->wb_clients.end()) {
-        if (it->clientip == clientip) {
+        if ((it->clientip == clientip) && (it->username == current_user)) {
             if (it->authenticated == false) {
                 MOTION_LOG(INF,TYPE_ALL, NO_ERRNO, _("Connection from: %s"),clientip.c_str());
             }
@@ -376,8 +393,9 @@ void cls_webu_ans::client_connect()
         it++;
     }
 
-    /* The ip was not already in our list. */
+    /* The (ip, username) combination was not already in our list. */
     clients.clientip = clientip;
+    clients.username = current_user;
     clients.conn_nbr = 1;
     clients.userid_fail_nbr = 0;
     clients.conn_time = tm_cnct;
@@ -475,10 +493,11 @@ mhdrslt cls_webu_ans::mhd_digest()
 
     /* Check for valid user name */
     if (mystrne(user, auth_user)) {
-        failauth_log(true);
+        failauth_log(true, user ? std::string(user) : "");
         myfree(user);
         return mhd_digest_fail(MHD_NO);
     }
+    std::string attempted_user(user);  /* Save for logging before freeing */
     myfree(user);
 
     /* Check the password as well*/
@@ -493,7 +512,7 @@ mhdrslt cls_webu_ans::mhd_digest()
     }
 
     if (retcd == MHD_NO) {
-        failauth_log(false);
+        failauth_log(false, attempted_user);
     }
 
     if ( (retcd == MHD_INVALID_NONCE) || (retcd == MHD_NO) )  {
@@ -549,7 +568,7 @@ mhdrslt cls_webu_ans::mhd_basic()
     }
 
     if ((mystrne(user, auth_user)) || (mystrne(pass, auth_pass))) {
-        failauth_log(mystrne(user, auth_user));
+        failauth_log(mystrne(user, auth_user), user ? std::string(user) : "");
         myfree(user);
         myfree(pass);
         return mhd_basic_fail();

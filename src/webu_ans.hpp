@@ -80,7 +80,7 @@
             int parseurl();
             void clientip_get();
             void hostname_get();
-            void failauth_log(bool userid_fail);
+            void failauth_log(bool userid_fail, const std::string &username = "");
             void client_connect();
             mhdrslt failauth_check();
             mhdrslt mhd_digest_fail(int signal_stale);

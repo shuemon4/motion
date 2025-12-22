@@ -90,10 +90,22 @@ movie_filename %v-%{movienbr}-%Y%m%d%H%M%S
 
 ;*************************************************
 ;*****   Web Control
+;*****
+;*****   SECURITY: Default configuration is secure:
+;*****   - Bound to localhost only (webcontrol_localhost on)
+;*****   - Authentication method set to digest (more secure than basic)
+;*****   - Lockout protection enabled after 5 failed attempts
+;*****   - Parameters restricted to level 1 (limited visibility)
+;*****
+;*****   To expose to network, set webcontrol_localhost off and
+;*****   configure webcontrol_authentication with credentials.
 ;*************************************************
 webcontrol_port 8080
 webcontrol_localhost on
-webcontrol_parms 2
+webcontrol_parms 1
+webcontrol_auth_method digest
+webcontrol_lock_attempts 5
+webcontrol_lock_minutes 10
 
 ;*************************************************
 ;*****   Web Stream

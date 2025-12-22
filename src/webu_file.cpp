@@ -27,6 +27,58 @@
 #include "webu_file.hpp"
 #include "dbse.hpp"
 
+#include <climits>  /* For PATH_MAX */
+
+/**
+ * Validate that a requested file path is within the allowed base directory
+ * Prevents path traversal attacks (e.g., ../../../etc/passwd)
+ *
+ * Uses realpath() to resolve symlinks and relative components,
+ * then verifies the resolved path starts with the allowed base.
+ *
+ * @param requested_path The full path requested (may contain ../ or symlinks)
+ * @param allowed_base The base directory that files must be within
+ * @return true if the path is safe, false if it's outside allowed_base
+ */
+static bool validate_file_path(const std::string &requested_path,
+    const std::string &allowed_base)
+{
+    char resolved_request[PATH_MAX];
+    char resolved_base[PATH_MAX];
+
+    /* Resolve the requested path to its canonical form */
+    if (realpath(requested_path.c_str(), resolved_request) == nullptr) {
+        /* File doesn't exist or path is invalid - this is not necessarily
+         * a traversal attack, but we can't verify it's safe */
+        return false;
+    }
+
+    /* Resolve the allowed base directory */
+    if (realpath(allowed_base.c_str(), resolved_base) == nullptr) {
+        /* Base directory doesn't exist - configuration error */
+        return false;
+    }
+
+    std::string req_str(resolved_request);
+    std::string base_str(resolved_base);
+
+    /* Ensure base path ends with / for proper prefix matching */
+    if (base_str.back() != '/') {
+        base_str += '/';
+    }
+
+    /* Check that resolved request starts with allowed base
+     * This prevents:
+     * - ../../../etc/passwd -> /etc/passwd (doesn't start with /home/motion/videos/)
+     * - Symlink escapes: /videos/link -> /etc (resolved path is /etc/...)
+     */
+    if (req_str.length() < base_str.length()) {
+        return false;
+    }
+
+    return (req_str.compare(0, base_str.length(), base_str) == 0);
+}
+
 /* Callback for the file reader response*/
 static ssize_t webu_file_reader (void *cls, uint64_t pos, char *buf, size_t max)
 {
@@ -73,10 +125,25 @@ void cls_webu_file::main() {
     }
 
     full_nm = "";
-    for (indx=0;indx<flst.size();indx++) {
+    for (indx=0;indx<(int)flst.size();indx++) {
         if (flst[indx].file_nm == webua->uri_cmd2) {
             full_nm = flst[indx].full_nm;
         }
+    }
+
+    /* SECURITY: Validate path before serving file to prevent path traversal attacks
+     * This catches:
+     * - Database entries modified to contain ../../../etc/passwd
+     * - Symlink escapes from target_dir
+     * - URL-encoded traversal attempts (already decoded by this point)
+     */
+    if (!full_nm.empty() && !validate_file_path(full_nm, webua->cam->cfg->target_dir)) {
+        MOTION_LOG(ALR, TYPE_STREAM, NO_ERRNO,
+            _("Path traversal attempt blocked: %s requested %s (resolved outside %s) from %s"),
+            webua->uri_cmd2.c_str(), full_nm.c_str(),
+            webua->cam->cfg->target_dir.c_str(), webua->clientip.c_str());
+        webua->bad_request();
+        return;
     }
 
     if (stat(full_nm.c_str(), &statbuf) == 0) {
