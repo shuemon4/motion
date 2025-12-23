@@ -122,11 +122,6 @@ int cls_webu_ans::parseurl()
 
     baselen = app->cfg->webcontrol_base_path.length();
 
-    /* DIAG_PARSE: Track base path and URL */
-    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
-        , "DIAG_PARSE: url='%s', base_path='%s', baselen=%d"
-        , url.c_str(), app->cfg->webcontrol_base_path.c_str(), (int)baselen);
-
     if (url.length() < baselen) {
         return -1;
     }
@@ -160,11 +155,6 @@ int cls_webu_ans::parseurl()
         uri_cmd0 = url.substr(baselen);
         return 0;
     }
-
-    /* DIAG_PARSE: Show extracted uri_cmd0 */
-    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
-        , "DIAG_PARSE: Extracted uri_cmd0='%s' from position %d to %d"
-        , uri_cmd0.c_str(), (int)(baselen+1), (int)pos_slash1);
 
     pos_slash1++;
     if (pos_slash1 >= url.length()) {
@@ -219,11 +209,6 @@ void cls_webu_ans::parms_edit()
         url = "";
     }
 
-    /* DIAG_PARSE: Show what's being checked for device_id */
-    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
-        , "DIAG_PARSE: parms_edit() - uri_cmd0='%s', length=%d"
-        , uri_cmd0.c_str(), (int)uri_cmd0.length());
-
     if (uri_cmd0.length() > 0) {
         is_nbr = true;
         for (indx=0; indx < (int)uri_cmd0.length(); indx++) {
@@ -233,18 +218,9 @@ void cls_webu_ans::parms_edit()
         }
         if (is_nbr) {
             device_id = atoi(uri_cmd0.c_str());
-            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
-                , "DIAG_PARSE: Set device_id=%d from uri_cmd0='%s'"
-                , device_id, uri_cmd0.c_str());
-        } else {
-            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
-                , "DIAG_PARSE: uri_cmd0='%s' is NOT numeric, device_id unchanged"
-                , uri_cmd0.c_str());
         }
     } else if (uri_cmd0 == "") {
         device_id = 0;
-        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
-            , "DIAG_PARSE: uri_cmd0 is empty, set device_id=0");
     }
 
     for (indx=0; indx<app->cam_cnt; indx++) {

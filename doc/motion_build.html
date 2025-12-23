@@ -55,6 +55,7 @@
         <a href="#Install_Deb"> Install from a deb package</a>
         <a href="#Build_Deb"> Building a deb package</a>
         <a href="#Building"> Abbreviated Building Guide</a>
+        <a href="#Troubleshooting"> Common Build Issues</a>
       </div>
     </div>
     <div class="dropdown">
@@ -99,16 +100,26 @@
     <p></p>
       <p></p>
       <p></p>
-      Debian based distros
+      Debian based distros (including Raspberry Pi OS)
       <ul>
-          <code><strong>sudo apt install autoconf automake autopoint build-essential pkgconf libtool libzip-dev
-          libjpeg-dev git libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev libopencv-dev
-          libwebp-dev gettext libmicrohttpd-dev libmariadb-dev libcamera-dev libcamera-tools libcamera-v4l2
-          libasound2-dev libpulse-dev libfftw3-dev </strong></code>
+          <strong>Core build tools (required):</strong>
+          <br /><code><strong>sudo apt install autoconf automake libtool pkgconf gettext build-essential git</strong></code>
           <p></p>
-          Note:  PostgreSQL or Sqlite3 database may also be added
-          via <code><strong>sudo apt install libpq-dev libsqlite3-dev</strong></code>.  If
-          no database is running on the system, some functionality of motion will not be available.
+          <strong>Required libraries:</strong>
+          <br /><code><strong>sudo apt install libjpeg-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev libmicrohttpd-dev</strong></code>
+          <p></p>
+          <strong>Optional libraries (recommended):</strong>
+          <br /><code><strong>sudo apt install libwebp-dev libopencv-dev libasound2-dev libpulse-dev libfftw3-dev</strong></code>
+          <p></p>
+          <strong>For Raspberry Pi with Camera Module (libcamera support):</strong>
+          <br /><code><strong>sudo apt install libcamera-dev libcamera-tools</strong></code>
+          <p></p>
+          <strong>Database support (at least one recommended):</strong>
+          <br /><code><strong>sudo apt install libsqlite3-dev</strong></code> (lightweight, recommended for embedded systems)
+          <br /><code><strong>sudo apt install libmariadb-dev</strong></code> (MariaDB/MySQL support)
+          <br /><code><strong>sudo apt install libpq-dev</strong></code> (PostgreSQL support)
+          <p></p>
+          Note: If no database is installed, some functionality of motion will not be available.
           <p></p>
           Once packages are installed, run the following to build motion
 	        <p></p>
@@ -118,9 +129,41 @@
           <br /><code><strong>autoreconf -fiv</strong></code>
           <br /><code><strong>./configure</strong></code>
           <br /><code><strong>make</strong></code>
-          <br /><code><strong>make install</strong></code>
+          <br /><code><strong>sudo make install</strong></code>
+          <p></p>
+          <strong>For Raspberry Pi with Camera Module:</strong>
+          <br />Use these configure options for optimal Pi configuration:
+          <br /><code><strong>./configure --with-libcam --with-sqlite3</strong></code>
+          <p></p>
+          To exclude unnecessary features and reduce build size:
+          <br /><code><strong>./configure --with-libcam --with-sqlite3 --without-mysql --without-mariadb --without-pgsql</strong></code>
           <p></p>
       </ul>
+      <p></p>
+    </ul>
+
+    <h3><a name="Troubleshooting"></a> Common Build Issues</h3>
+    <ul>
+      <p></p>
+      <strong>Error: "Can't exec 'autopoint': No such file or directory"</strong>
+      <br />Solution: Install gettext package
+      <br /><code><strong>sudo apt install gettext</strong></code>
+      <p></p>
+
+      <strong>Error: "Required jpeg headers not found"</strong>
+      <br />Solution: Install libjpeg development package
+      <br /><code><strong>sudo apt install libjpeg-dev</strong></code>
+      <p></p>
+
+      <strong>Error: "Required ffmpeg packages were not found"</strong>
+      <br />Solution: Install all FFmpeg development packages (note: libavdevice-dev is often missing)
+      <br /><code><strong>sudo apt install libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev</strong></code>
+      <p></p>
+
+      <strong>Raspberry Pi: Pre-built configure script available</strong>
+      <br />If autoreconf fails, the repository includes a pre-built configure script that can be used directly:
+      <br /><code><strong>./configure --with-libcam --with-sqlite3</strong></code>
+      <br /><code><strong>make</strong></code>
       <p></p>
     </ul>
 
