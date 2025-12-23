@@ -39,6 +39,11 @@ void cls_allcam::getsizes_img(cls_camera *p_cam)
     src_w = p_cam->all_sizes.src_w;
     src_h = p_cam->all_sizes.src_h;
 
+    /* DIAG_SCALE: Track scaling calculation inputs */
+    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+        , "DIAG_SCALE: Device %d - scale=%d, src=%dx%d, calculating dst..."
+        , p_cam->cfg->device_id, p_cam->all_loc.scale, src_w, src_h);
+
     dst_w = ((p_cam->all_loc.scale * src_w) / 100);
     if ((dst_w % 8) != 0) {
         dst_w = dst_w - (dst_w % 8) + 8;
@@ -57,6 +62,11 @@ void cls_allcam::getsizes_img(cls_camera *p_cam)
     }
     p_cam->all_sizes.dst_h = dst_h;
     p_cam->all_sizes.dst_sz = (dst_w * dst_h * 3)/2;
+
+    /* DIAG_SCALE: Log final calculated dimensions */
+    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+        , "DIAG_SCALE: Device %d - dst=%dx%d (from scale=%d%%)"
+        , p_cam->cfg->device_id, dst_w, dst_h, p_cam->all_loc.scale);
 }
 
 void cls_allcam::getimg_src(cls_camera *p_cam, std::string imgtyp, u_char *dst_img, u_char *src_img)

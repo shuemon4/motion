@@ -232,6 +232,11 @@ void cls_webu_stream::mjpeg_one_img()
     int  header_len;
     ctx_stream_data *strm;
 
+    /* DIAG_SERVE: Track entry and connection type */
+    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+        , "DIAG_SERVE: mjpeg_one_img() - cnct_type=%d, cam=%p"
+        , webua->cnct_type, webua->cam);
+
     if (check_finish()) {
         return;
     }
@@ -240,9 +245,13 @@ void cls_webu_stream::mjpeg_one_img()
 
     /* Assign to a local pointer the stream we want */
     if (webua->cam == NULL) {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+            , "DIAG_SERVE: ERROR - cam is NULL!");
         return;
     } else if (webua->cnct_type == WEBUI_CNCT_JPG_FULL) {
         strm = &webua->cam->stream.norm;
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+            , "DIAG_SERVE: Using norm stream");
     } else if (webua->cnct_type == WEBUI_CNCT_JPG_SUB) {
         strm = &webua->cam->stream.sub;
     } else if (webua->cnct_type == WEBUI_CNCT_JPG_MOTION) {
@@ -259,9 +268,15 @@ void cls_webu_stream::mjpeg_one_img()
     pthread_mutex_lock(&webua->cam->stream.mutex);
         set_fps();
         if (strm->jpg_data == NULL) {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+                , "DIAG_SERVE: jpg_data is NULL, cannot serve");
             pthread_mutex_unlock(&webua->cam->stream.mutex);
             return;
         }
+        /* DIAG_SERVE: Log the JPEG size being served */
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+            , "DIAG_SERVE: Serving JPEG - jpg_sz=%d bytes, consumed=%d"
+            , strm->jpg_sz, strm->consumed);
         header_len = snprintf(resp_head, 80
             ,"--BoundaryString\r\n"
             "Content-type: image/jpeg\r\n"
@@ -293,6 +308,12 @@ ssize_t cls_webu_stream::mjpeg_response (char *buf, size_t max)
 
         stream_pos = 0;
         resp_used = 0;
+
+        /* DIAG_ROUTE: Track which handler is being used */
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+            , "DIAG_ROUTE: device_id=%d, routing to %s"
+            , webua->device_id
+            , (webua->device_id == 0) ? "mjpeg_all_img" : "mjpeg_one_img");
 
         if (webua->device_id == 0) {
             mjpeg_all_img();

@@ -101,16 +101,31 @@ static void webu_getimg_norm(cls_camera *cam)
 {
     static int diag_logged = 0;  /* DIAGNOSTIC: Only log once per session */
 
+    /* DIAG_ENTRY: Always log entry to track if function is called */
+    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+        , "DIAG_ENTRY: webu_getimg_norm() called - jpg_cnct=%d, ts_cnct=%d, all_cnct=%d"
+        , cam->stream.norm.jpg_cnct, cam->stream.norm.ts_cnct, cam->stream.norm.all_cnct);
+
     if ((cam->stream.norm.jpg_cnct == 0) &&
         (cam->stream.norm.ts_cnct == 0) &&
         (cam->stream.norm.all_cnct == 0)) {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+            , "DIAG_ENTRY: Exiting early - no connections");
         return;
     }
 
     if (cam->stream.norm.jpg_cnct > 0) {
+        /* DIAG_PATH: Track why encoding might not happen */
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+            , "DIAG_PATH: jpg_cnct > 0, jpg_data=%p, image_norm=%p, consumed=%d"
+            , cam->stream.norm.jpg_data, cam->current_image->image_norm
+            , cam->stream.norm.consumed);
+
         if (cam->stream.norm.jpg_data == NULL) {
             cam->stream.norm.jpg_data =(unsigned char*)
                 mymalloc((uint)cam->imgs.size_norm);
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+                , "DIAG_PATH: Allocated jpg_data buffer, size=%d", cam->imgs.size_norm);
         }
         if (cam->current_image->image_norm != NULL && cam->stream.norm.consumed) {
             /* DIAGNOSTIC: Log stream encoding dimensions (once per session) */
@@ -128,7 +143,15 @@ static void webu_getimg_norm(cls_camera *cam)
                 ,cam->cfg->stream_quality
                 ,cam->imgs.width
                 ,cam->imgs.height);
+            /* DIAG_ENCODE: Confirm encoding happened and result size */
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+                , "DIAG_ENCODE: Encoded JPEG - width=%d, height=%d, jpg_sz=%d"
+                , cam->imgs.width, cam->imgs.height, cam->stream.norm.jpg_sz);
             cam->stream.norm.consumed = false;
+        } else {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+                , "DIAG_PATH: Skipping encode - image_norm=%p, consumed=%d"
+                , cam->current_image->image_norm, cam->stream.norm.consumed);
         }
     }
     if ((cam->stream.norm.ts_cnct > 0) || (cam->stream.norm.all_cnct > 0)) {
