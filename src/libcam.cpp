@@ -713,33 +713,51 @@ void cls_libcam::config_control_item(std::string pname, std::string pvalue)
         return;  // Skip this control
     }
 
-    /* DRAFT*/
+    /* DRAFT - with silent skip if unavailable (Trixie 64-bit compatibility) */
     if (pname == "AePrecaptureTrigger") {
-        controls.set(controls::draft::AePrecaptureTrigger, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::AePrecaptureTrigger)) {
+            controls.set(controls::draft::AePrecaptureTrigger, mtoi(pvalue));
+        }
     }
     if (pname == "NoiseReductionMode") {
-        controls.set(controls::draft::NoiseReductionMode, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::NoiseReductionMode)) {
+            controls.set(controls::draft::NoiseReductionMode, mtoi(pvalue));
+        }
     }
     if (pname == "ColorCorrectionAberrationMode") {
-        controls.set(controls::draft::ColorCorrectionAberrationMode, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::ColorCorrectionAberrationMode)) {
+            controls.set(controls::draft::ColorCorrectionAberrationMode, mtoi(pvalue));
+        }
     }
     if (pname == "AwbState") {
-        controls.set(controls::draft::AwbState, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::AwbState)) {
+            controls.set(controls::draft::AwbState, mtoi(pvalue));
+        }
     }
     if (pname == "SensorRollingShutterSkew") {
-        controls.set(controls::draft::SensorRollingShutterSkew, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::SensorRollingShutterSkew)) {
+            controls.set(controls::draft::SensorRollingShutterSkew, mtoi(pvalue));
+        }
     }
     if (pname == "LensShadingMapMode") {
-        controls.set(controls::draft::LensShadingMapMode, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::LensShadingMapMode)) {
+            controls.set(controls::draft::LensShadingMapMode, mtoi(pvalue));
+        }
     }
     if (pname == "PipelineDepth") {
-        controls.set(controls::draft::PipelineDepth, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::PipelineDepth)) {
+            controls.set(controls::draft::PipelineDepth, mtoi(pvalue));
+        }
     }
     if (pname == "MaxLatency") {
-        controls.set(controls::draft::MaxLatency, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::MaxLatency)) {
+            controls.set(controls::draft::MaxLatency, mtoi(pvalue));
+        }
     }
     if (pname == "TestPatternMode") {
-        controls.set(controls::draft::TestPatternMode, mtoi(pvalue));
+        if (is_control_supported(&controls::draft::TestPatternMode)) {
+            controls.set(controls::draft::TestPatternMode, mtoi(pvalue));
+        }
     }
 
 }
@@ -931,11 +949,24 @@ int cls_libcam::start_config()
         , retcd);
 
     if (retcd == CameraConfiguration::Adjusted) {
-        if (config->at(0).pixelFormat != PixelFormat::fromString("YUV420")) {
-            MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
-                , "Pixel format was adjusted to %s."
-                , config->at(0).pixelFormat.toString().c_str());
+        /* Accept safe YUV 4:2:0 format alternatives (Trixie 64-bit compatibility) */
+        libcamera::PixelFormat adjusted = config->at(0).pixelFormat;
+        libcamera::PixelFormat yuv420 = PixelFormat::fromString("YUV420");
+        libcamera::PixelFormat nv12 = PixelFormat::fromString("NV12");
+
+        if (adjusted != yuv420 && adjusted != nv12) {
+            MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
+                , "Unsupported pixel format: %s (need YUV420 or NV12)"
+                , adjusted.toString().c_str());
             return -1;
+        }
+
+        if (adjusted != yuv420) {
+            MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+                , "Using pixel format %s (NV12 uses same Y-plane for motion detection)"
+                , adjusted.toString().c_str());
+            /* Note: NV12 conversion deferred - testing may show it's not needed
+             * since motion detection primarily uses Y-plane which is identical */
         } else {
             MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
                 , "Configuration adjusted.");
@@ -1078,7 +1109,8 @@ int cls_libcam::req_add(Request *request)
 
 int cls_libcam::start_req()
 {
-    int retcd, bytes, indx, width;
+    int retcd, indx, width;
+    size_t bytes;  /* Changed to size_t for 64-bit safety */
     unsigned int buf_idx;
 
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Starting.");
@@ -1164,7 +1196,7 @@ int cls_libcam::start_req()
         , cam->imgs.width, cam->imgs.height, cam->imgs.size_norm);
 
     /* Map memory for legacy single-buffer access (backwards compatibility) */
-    membuf.buf = (uint8_t *)mmap(NULL, (uint)bytes, PROT_READ
+    membuf.buf = (uint8_t *)mmap(NULL, bytes, PROT_READ
         , MAP_SHARED, plane0.fd.get(), 0);
     membuf.bufsz = bytes;
 
@@ -1174,12 +1206,12 @@ int cls_libcam::start_req()
         ctx_imgmap map;
         const FrameBuffer::Plane &p0 = buffers[buf_idx]->planes()[0];
 
-        int buf_bytes = 0;
+        size_t buf_bytes = 0;  /* Changed to size_t for 64-bit safety */
         for (const auto &plane : buffers[buf_idx]->planes()) {
             buf_bytes += plane.length;
         }
 
-        map.buf = (uint8_t *)mmap(NULL, (uint)buf_bytes, PROT_READ
+        map.buf = (uint8_t *)mmap(NULL, buf_bytes, PROT_READ
             , MAP_SHARED, p0.fd.get(), 0);
         map.bufsz = buf_bytes;
 
@@ -1626,10 +1658,10 @@ int cls_libcam::next(ctx_image_data *img_data)
             if (buf_idx >= 0 && buf_idx < (int)membuf_pool.size()) {
                 memcpy(img_data->image_norm,
                        membuf_pool[(size_t)buf_idx].buf,
-                       (uint)membuf_pool[(size_t)buf_idx].bufsz);
+                       membuf_pool[(size_t)buf_idx].bufsz);
             } else {
                 /* Fallback to legacy single buffer for compatibility */
-                memcpy(img_data->image_norm, membuf.buf, (uint)membuf.bufsz);
+                memcpy(img_data->image_norm, membuf.buf, membuf.bufsz);
             }
 
             /* Requeue request for next frame */

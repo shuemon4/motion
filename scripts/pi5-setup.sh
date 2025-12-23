@@ -77,14 +77,17 @@ else
     exit 1
 fi
 
-# Check for camera
+# Check for camera (rpicam-* tools on Trixie, libcamera-* on Bookworm)
 echo ""
 echo "Checking for connected cameras..."
-if command -v libcamera-hello &> /dev/null; then
+if command -v rpicam-hello &> /dev/null; then
+    echo "  Running rpicam-hello --list-cameras..."
+    rpicam-hello --list-cameras 2>&1 || true
+elif command -v libcamera-hello &> /dev/null; then
     echo "  Running libcamera-hello --list-cameras..."
     libcamera-hello --list-cameras 2>&1 || true
 else
-    echo "  libcamera-hello not found"
+    echo "  No camera tools found (rpicam-hello or libcamera-hello)"
 fi
 
 echo ""

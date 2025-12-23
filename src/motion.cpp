@@ -277,7 +277,11 @@ void cls_motapp::av_init()
     #endif
 
     avformat_network_init();
-    avdevice_register_all();
+
+    /* Guard for FFmpeg 7+ compatibility (Trixie) */
+    #if (LIBAVDEVICE_VERSION_MAJOR < 61)
+        avdevice_register_all();
+    #endif
 }
 
 void cls_motapp::av_deinit()

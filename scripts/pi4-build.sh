@@ -1,6 +1,6 @@
 #!/bin/bash
-# Pi 5 Build Script for Motion
-# Run this after pi5-setup.sh and transferring source code
+# Pi 4 Build Script for Motion
+# Build with V4L2 support for USB cameras
 
 set -e
 
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "========================================"
-echo " Motion Build Script for Pi 5"
+echo " Motion Build Script for Pi 4"
 echo " Project: $PROJECT_DIR"
 echo "========================================"
 echo ""
@@ -31,13 +31,13 @@ chmod +x configure 2>/dev/null || true
 echo "[3/5] Running autoreconf..."
 autoreconf -fiv
 
-# Configure for Pi 5 with libcamera
-echo "[4/5] Configuring for Pi 5 + Camera v3..."
+# Configure for Pi 4 with both libcamera and V4L2
+echo "[4/5] Configuring for Pi 4 (libcamera + V4L2 for USB cameras)..."
 ./configure \
     --with-libcam \
+    --with-v4l2 \
     --with-sqlite3 \
     --with-webp \
-    --without-v4l2 \
     --without-mysql \
     --without-mariadb \
     --without-pgsql \
@@ -46,10 +46,9 @@ echo "[4/5] Configuring for Pi 5 + Camera v3..."
     --without-pulse \
     --without-fftw3
 
-# Note: V4L2 disabled on Pi 5 because:
-# 1. Pi 5 requires libcamera for CSI cameras (legacy camera stack removed)
-# 2. USB cameras can still work via libcamera's UVC support
-# For Pi 4 with USB cameras, use scripts/pi4-build.sh instead
+# Note: V4L2 enabled on Pi 4 for USB camera support
+# CSI cameras will still use libcamera
+# Pi 4 has VideoCore VI hardware encoder (h264_v4l2m2m)
 
 # Build
 echo "[5/5] Building (this may take a few minutes)..."

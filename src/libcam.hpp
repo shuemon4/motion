@@ -33,7 +33,7 @@
         /* Buffers and sizes for planes of image*/
         struct ctx_imgmap {
             uint8_t *buf;
-            int     bufsz;
+            size_t  bufsz;  /* Changed to size_t for 64-bit safety */
         };
 
         /* Request with associated buffer index for multi-buffer support */

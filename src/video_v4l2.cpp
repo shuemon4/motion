@@ -792,8 +792,8 @@ void cls_v4l2cam::set_mmap()
         }
 
         MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-            ,_("%i length=%d Address (%x)")
-            ,buffer_index, p_buf.length, buffers[buffer_index].ptr);
+            ,_("%i length=%d Address (%p)")
+            ,buffer_index, p_buf.length, (void*)buffers[buffer_index].ptr);
     }
 
     for (buffer_index = 0; buffer_index < buffer_count; buffer_index++) {
