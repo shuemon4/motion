@@ -660,7 +660,6 @@ void cls_camera::init_values()
     rotate = nullptr;
     picture = nullptr;
     movie_norm = nullptr;
-    movie_norm = nullptr;
     movie_motion = nullptr;
     movie_timelapse = nullptr;
     movie_extpipe = nullptr;

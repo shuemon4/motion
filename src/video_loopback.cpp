@@ -27,6 +27,7 @@
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
+#include <errno.h>
 
 typedef struct capent {const char *cap; unsigned int code;} capentT;
     capentT cap_list[] ={
@@ -100,7 +101,16 @@ static int vlp_open_vidpipe(void)
                     close(fd);
                     continue;
                 }
-                min = atoi(&buffer[21]);
+                char *endptr;
+                errno = 0;
+                long parsed = strtol(&buffer[21], &endptr, 10);
+                if (errno != 0 || endptr == &buffer[21] || parsed < 0 || parsed > INT_MAX) {
+                    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO,
+                        _("Invalid minor number in loopback device name: %s"), buffer);
+                    close(fd);
+                    continue;
+                }
+                min = (int)parsed;
 
                 retcd = snprintf(buffer,sizeof(buffer),"/dev/%s",dirp->d_name);
                 if ((retcd < 0) || (retcd >= (int)sizeof(buffer))) {

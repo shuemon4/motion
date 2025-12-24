@@ -41,14 +41,19 @@
 
 void cls_rotate::reverse_inplace_quad(u_char *src, int size)
 {
-    uint32_t *nsrc = (uint32_t *)src;              /* first quad */
-    uint32_t *ndst = (uint32_t *)(src + size - 4); /* last quad */
-    uint32_t tmp;
+    u_char *front = src;
+    u_char *back = src + size - 4;
+    uint32_t tmp_front, tmp_back;
 
-    while (nsrc < ndst) {
-        tmp = bswap_32(*ndst);
-        *ndst-- = bswap_32(*nsrc);
-        *nsrc++ = tmp;
+    while (front < back) {
+        memcpy(&tmp_front, front, sizeof(uint32_t));
+        memcpy(&tmp_back, back, sizeof(uint32_t));
+        tmp_front = bswap_32(tmp_front);
+        tmp_back = bswap_32(tmp_back);
+        memcpy(front, &tmp_back, sizeof(uint32_t));
+        memcpy(back, &tmp_front, sizeof(uint32_t));
+        front += 4;
+        back -= 4;
     }
 }
 

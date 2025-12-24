@@ -22,19 +22,10 @@
 
 #define MYFFVER (LIBAVFORMAT_VERSION_MAJOR * 1000)+LIBAVFORMAT_VERSION_MINOR
 
-#if (LIBAVCODEC_VERSION_MAJOR >= 59)
-    typedef const AVCodec myAVCodec; /* Version independent definition for AVCodec*/
-#else
-    typedef AVCodec myAVCodec; /* Version independent definition for AVCodec*/
-#endif
-
-#if (MYFFVER <= 60016)
-    typedef uint8_t myuint;         /* Version independent uint */
-    #define MY_PROFILE_H264_HIGH   FF_PROFILE_H264_HIGH
-#else
-    typedef const uint8_t myuint;   /* Version independent uint */
-    #define MY_PROFILE_H264_HIGH   AV_PROFILE_H264_HIGH
-#endif
+/* Modern FFmpeg (6.0+) - Pi 5 with 64-bit OS uses current FFmpeg APIs */
+typedef const AVCodec myAVCodec;
+typedef const uint8_t myuint;
+#define MY_PROFILE_H264_HIGH   AV_PROFILE_H264_HIGH
 
 
 #ifdef HAVE_GETTEXT

@@ -585,7 +585,7 @@ static void jpgutl_buffer_src(j_decompress_ptr cinfo, u_char *buffer, long buffe
     cinfo->src->skip_input_data = jpgutl_skip_data;
     cinfo->src->resync_to_restart = jpeg_resync_to_restart;    /* Use default method */
     cinfo->src->term_source = jpgutl_term_source;
-    cinfo->src->bytes_in_buffer = (ulong)buffer_len;
+    cinfo->src->bytes_in_buffer = (unsigned long)buffer_len;
     cinfo->src->next_input_byte = (JOCTET *) buffer;
 
 

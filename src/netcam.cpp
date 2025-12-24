@@ -917,7 +917,6 @@ int cls_netcam::init_vaapi()
 
     hw_pix_fmt = AV_PIX_FMT_VAAPI;
     codec_context->get_format  = netcam_getfmt_vaapi;
-    av_opt_set_int(codec_context, "refcounted_frames", 1, 0);
     codec_context->sw_pix_fmt = AV_PIX_FMT_YUV420P;
     codec_context->pix_fmt= AV_PIX_FMT_YUV420P;
     codec_context->hwaccel_flags=
@@ -1020,7 +1019,6 @@ int cls_netcam::init_cuda()
 
     hw_pix_fmt = AV_PIX_FMT_CUDA;
     codec_context->get_format  = netcam_getfmt_cuda;
-    av_opt_set_int(codec_context, "refcounted_frames", 1, 0);
     codec_context->sw_pix_fmt = AV_PIX_FMT_YUV420P;
     codec_context->hwaccel_flags=
         AV_HWACCEL_FLAG_ALLOW_PROFILE_MISMATCH |
@@ -1066,7 +1064,6 @@ int cls_netcam::init_drm()
 
     hw_pix_fmt = AV_PIX_FMT_DRM_PRIME;
     codec_context->get_format  = netcam_getfmt_drm;
-    av_opt_set_int(codec_context, "refcounted_frames", 1, 0);
     codec_context->sw_pix_fmt = AV_PIX_FMT_YUV420P;
     codec_context->hwaccel_flags=
         AV_HWACCEL_FLAG_ALLOW_PROFILE_MISMATCH |

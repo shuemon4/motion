@@ -810,7 +810,7 @@ void cls_movie::passthru_write(int indx)
     retcd = av_packet_ref(pkt, netcam_data->pktarray[indx].packet);
     if (retcd < 0) {
         av_strerror(retcd, errstr, sizeof(errstr));
-        MOTION_LOG(INF, TYPE_ENCODER, NO_ERRNO, "av_copy_packet: %s",errstr);
+        MOTION_LOG(INF, TYPE_ENCODER, NO_ERRNO, "av_packet_ref: %s",errstr);
         free_pkt();
         return;
     }

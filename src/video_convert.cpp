@@ -186,9 +186,9 @@ int cls_convert::sonix_decompress(u_char *img_dst, u_char *img_src)
  */
 void cls_convert::bayer2rgb24(u_char *img_dst, u_char *img_src)
 {
-    long int i;
+    int i;
     u_char *rawpt, *scanpt;
-    long int size;
+    int size;  /* width * height fits in int for any practical resolution */
 
     rawpt = img_src;
     scanpt = img_dst;
