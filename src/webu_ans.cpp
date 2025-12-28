@@ -926,6 +926,17 @@ void cls_webu_ans::answer_get()
     MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO
         ,"processing get: %s",uri_cmd1.c_str());
 
+    /* Check for static file serving (React UI) before camera validation
+     * This allows serving files like /assets/*, /settings, / without a camera ID */
+    if (app->cfg->webcontrol_html_path != "" && device_id < 0) {
+        if (webu_file == nullptr) {
+            webu_file = new cls_webu_file(this);
+        }
+        gzip_encode = false;
+        webu_file->serve_static_file();
+        return;
+    }
+
     if (valid_request() == false) {
         bad_request();
         return;
@@ -945,6 +956,24 @@ void cls_webu_ans::answer_get()
         }
         gzip_encode = false;
         webu_file->main();
+
+    } else if (uri_cmd1 == "api") {
+        /* React UI JSON API endpoints */
+        if (webu_json == nullptr) {
+            webu_json = new cls_webu_json(this);
+        }
+        if (uri_cmd2 == "auth" && uri_cmd3 == "me") {
+            webu_json->api_auth_me();
+            mhd_send();
+        } else if (uri_cmd2 == "media" && uri_cmd3 == "pictures") {
+            webu_json->api_media_pictures();
+            mhd_send();
+        } else if (uri_cmd2 == "system" && uri_cmd3 == "temperature") {
+            webu_json->api_system_temperature();
+            mhd_send();
+        } else {
+            bad_request();
+        }
 
     } else if (uri_cmd1 == "config") {
         /* Hot reload API: /config/set?param=value */
@@ -984,10 +1013,20 @@ void cls_webu_ans::answer_get()
         webu_text->main();
 
     } else {
-        if (webu_html == nullptr) {
-            webu_html = new cls_webu_html(this);
+        /* Check if static file serving is configured for React UI */
+        if (app->cfg->webcontrol_html_path != "") {
+            if (webu_file == nullptr) {
+                webu_file = new cls_webu_file(this);
+            }
+            gzip_encode = false;
+            webu_file->serve_static_file();
+        } else {
+            /* Default: serve built-in HTML interface */
+            if (webu_html == nullptr) {
+                webu_html = new cls_webu_html(this);
+            }
+            webu_html->main();
         }
-        webu_html->main();
     }
 }
 

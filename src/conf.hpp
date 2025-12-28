@@ -265,6 +265,8 @@
             int&            webcontrol_lock_attempts = parm_app.webcontrol_lock_attempts;
             std::string&    webcontrol_lock_script  = parm_app.webcontrol_lock_script;
             std::string&    webcontrol_trusted_proxies = parm_app.webcontrol_trusted_proxies;
+            std::string&    webcontrol_html_path    = parm_app.webcontrol_html_path;
+            bool&           webcontrol_spa_mode     = parm_app.webcontrol_spa_mode;
 
             /* Stream parameters (-> parm_cam) */
             int&            stream_preview_scale    = parm_cam.stream_preview_scale;

@@ -798,6 +798,92 @@ void cls_webu_json::config_set()
     webua->resp_page += "}";
 }
 
+/*
+ * React UI API: Authentication status
+ * Returns current authentication state
+ */
+void cls_webu_json::api_auth_me()
+{
+    webua->resp_page = "{";
+
+    /* Check if authentication is configured */
+    if (app->cfg->webcontrol_authentication != "") {
+        webua->resp_page += "\"authenticated\":true,";
+        webua->resp_page += "\"auth_method\":\"digest\"";
+    } else {
+        webua->resp_page += "\"authenticated\":false";
+    }
+
+    webua->resp_page += "}";
+    webua->resp_type = WEBUI_RESP_JSON;
+}
+
+/*
+ * React UI API: Media pictures list
+ * Returns list of snapshot images for a camera
+ */
+void cls_webu_json::api_media_pictures()
+{
+    vec_files flst;
+    std::string sql;
+
+    if (webua->cam == nullptr) {
+        webua->bad_request();
+        return;
+    }
+
+    sql  = " select * from motion ";
+    sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
+    sql += " and file_typ = '1'";  /* 1 = snapshot */
+    sql += " order by file_dtl desc, file_tml desc";
+    sql += " limit 100;";
+
+    app->dbse->filelist_get(sql, flst);
+
+    webua->resp_page = "{\"pictures\":[";
+    for (size_t i = 0; i < flst.size(); i++) {
+        if (i > 0) webua->resp_page += ",";
+        webua->resp_page += "{";
+        webua->resp_page += "\"id\":" + std::to_string(flst[i].record_id) + ",";
+        webua->resp_page += "\"filename\":\"" + escstr(flst[i].file_nm) + "\",";
+        webua->resp_page += "\"path\":\"" + escstr(flst[i].full_nm) + "\",";
+        webua->resp_page += "\"date\":\"" + std::to_string(flst[i].file_dtl) + "\",";
+        webua->resp_page += "\"time\":\"" + escstr(flst[i].file_tml) + "\",";
+        webua->resp_page += "\"size\":" + std::to_string(flst[i].file_sz);
+        webua->resp_page += "}";
+    }
+    webua->resp_page += "]}";
+    webua->resp_type = WEBUI_RESP_JSON;
+}
+
+/*
+ * React UI API: System temperature
+ * Returns CPU temperature (Raspberry Pi)
+ */
+void cls_webu_json::api_system_temperature()
+{
+    FILE *temp_file;
+    int temp_raw;
+    double temp_celsius;
+
+    webua->resp_page = "{";
+
+    temp_file = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
+    if (temp_file != nullptr) {
+        if (fscanf(temp_file, "%d", &temp_raw) == 1) {
+            temp_celsius = temp_raw / 1000.0;
+            webua->resp_page += "\"celsius\":" + std::to_string(temp_celsius) + ",";
+            webua->resp_page += "\"fahrenheit\":" + std::to_string(temp_celsius * 9.0 / 5.0 + 32.0);
+        }
+        fclose(temp_file);
+    } else {
+        webua->resp_page += "\"error\":\"Temperature not available\"";
+    }
+
+    webua->resp_page += "}";
+    webua->resp_type = WEBUI_RESP_JSON;
+}
+
 void cls_webu_json::main()
 {
     pthread_mutex_lock(&app->mutex_post);

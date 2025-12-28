@@ -27,6 +27,11 @@
             /* Hot reload API: Set single parameter at runtime */
             void config_set();
 
+            /* React UI API endpoints */
+            void api_auth_me();
+            void api_media_pictures();
+            void api_system_temperature();
+
         private:
             cls_motapp      *app;
             cls_webu        *webu;

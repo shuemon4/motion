@@ -23,6 +23,7 @@
             cls_webu_file(cls_webu_ans *p_webua);
             ~cls_webu_file();
             void main();
+            void serve_static_file();
         private:
             cls_motapp      *app;
             cls_webu        *webu;

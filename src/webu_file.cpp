@@ -79,6 +79,54 @@ static bool validate_file_path(const std::string &requested_path,
     return (req_str.compare(0, base_str.length(), base_str) == 0);
 }
 
+/**
+ * Get MIME type based on file extension
+ */
+static std::string get_mime_type(const std::string &filename)
+{
+    size_t dot_pos = filename.find_last_of('.');
+    if (dot_pos == std::string::npos) {
+        return "application/octet-stream";
+    }
+
+    std::string ext = filename.substr(dot_pos + 1);
+    mylower(ext);
+
+    if (ext == "html") return "text/html; charset=utf-8";
+    if (ext == "htm")  return "text/html; charset=utf-8";
+    if (ext == "js")   return "text/javascript; charset=utf-8";
+    if (ext == "css")  return "text/css; charset=utf-8";
+    if (ext == "json") return "application/json; charset=utf-8";
+    if (ext == "png")  return "image/png";
+    if (ext == "jpg")  return "image/jpeg";
+    if (ext == "jpeg") return "image/jpeg";
+    if (ext == "gif")  return "image/gif";
+    if (ext == "svg")  return "image/svg+xml";
+    if (ext == "ico")  return "image/x-icon";
+    if (ext == "woff") return "font/woff";
+    if (ext == "woff2") return "font/woff2";
+    if (ext == "ttf")  return "font/ttf";
+    if (ext == "eot")  return "application/vnd.ms-fontobject";
+
+    return "application/octet-stream";
+}
+
+/**
+ * Get cache control header based on path
+ * - /assets/* files are hashed, cache aggressively
+ * - index.html must not be cached (for SPA updates)
+ */
+static std::string get_cache_control(const std::string &path)
+{
+    if (path.find("/assets/") != std::string::npos) {
+        return "public, max-age=31536000, immutable";  /* 1 year */
+    }
+    if (path.find("index.html") != std::string::npos) {
+        return "no-cache, no-store, must-revalidate";
+    }
+    return "public, max-age=3600";  /* 1 hour for other files */
+}
+
 /* Callback for the file reader response*/
 static ssize_t webu_file_reader (void *cls, uint64_t pos, char *buf, size_t max)
 {
@@ -181,6 +229,105 @@ void cls_webu_file::main() {
         MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, "Error processing file request");
     }
 
+}
+
+/**
+ * Serve static files from React build directory
+ * Implements SPA routing: if file not found, serve index.html
+ */
+void cls_webu_file::serve_static_file()
+{
+    struct stat statbuf;
+    std::string file_path;
+    std::string index_path;
+    FILE *file_handle = nullptr;
+    struct MHD_Response *response;
+    mhdrslt retcd;
+
+    /* Construct file path from webcontrol_html_path + request URI */
+    file_path = app->cfg->webcontrol_html_path;
+    if (file_path.back() != '/') {
+        file_path += '/';
+    }
+
+    /* Use full URL path, not just uri_cmd1 which only contains first segment */
+    std::string uri = webua->url;
+    if (uri.empty() || uri == "/") {
+        uri = "index.html";
+    } else if (uri[0] == '/') {
+        uri = uri.substr(1);
+    }
+
+    file_path += uri;
+
+    /* Try to serve the requested file */
+    if (stat(file_path.c_str(), &statbuf) == 0 && S_ISREG(statbuf.st_mode)) {
+        /* Security: Validate path to prevent traversal attacks (only if file exists) */
+        if (!validate_file_path(file_path, app->cfg->webcontrol_html_path)) {
+            MOTION_LOG(WRN, TYPE_STREAM, NO_ERRNO,
+                _("Path traversal attempt blocked: %s from %s"),
+                file_path.c_str(), webua->clientip.c_str());
+            webua->bad_request();
+            return;
+        }
+        file_handle = myfopen(file_path.c_str(), "rbe");
+    }
+
+    /* If file not found and SPA mode enabled, serve index.html */
+    if (file_handle == nullptr && app->cfg->webcontrol_spa_mode) {
+        index_path = app->cfg->webcontrol_html_path;
+        if (index_path.back() != '/') {
+            index_path += '/';
+        }
+        index_path += "index.html";
+
+        if (stat(index_path.c_str(), &statbuf) == 0) {
+            file_handle = myfopen(index_path.c_str(), "rbe");
+            file_path = index_path;  /* For MIME type detection */
+        }
+    }
+
+    /* If still no file, return 404 */
+    if (file_handle == nullptr) {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+            _("Static file not found: %s from %s"),
+            uri.c_str(), webua->clientip.c_str());
+        webua->bad_request();
+        return;
+    }
+
+    /* Create response from file */
+    webua->req_file = file_handle;
+    response = MHD_create_response_from_callback(
+        (size_t)statbuf.st_size, 32 * 1024,
+        &webu_file_reader,
+        webua, NULL);
+
+    if (response == NULL) {
+        myfclose(webua->req_file);
+        webua->req_file = nullptr;
+        webua->bad_request();
+        return;
+    }
+
+    /* Set Content-Type header */
+    std::string mime_type = get_mime_type(file_path);
+    MHD_add_response_header(response, "Content-Type", mime_type.c_str());
+
+    /* Set Cache-Control header */
+    std::string cache_control = get_cache_control(file_path);
+    MHD_add_response_header(response, "Cache-Control", cache_control.c_str());
+
+    /* Security headers */
+    MHD_add_response_header(response, "X-Content-Type-Options", "nosniff");
+
+    retcd = MHD_queue_response(webua->connection, MHD_HTTP_OK, response);
+    MHD_destroy_response(response);
+
+    if (retcd == MHD_NO) {
+        MOTION_LOG(WRN, TYPE_STREAM, NO_ERRNO,
+            _("Error queueing static file response"));
+    }
 }
 
 cls_webu_file::cls_webu_file(cls_webu_ans *p_webua)
