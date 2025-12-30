@@ -1,0 +1,16 @@
+# Motion Notification Configuration
+# Copy to /etc/motion/notify.conf
+
+# Email Settings
+NOTIFY_EMAIL_ENABLED=false
+NOTIFY_EMAIL_TO="user@example.com"
+# Configure /etc/msmtprc for SMTP settings
+
+# Telegram Settings
+NOTIFY_TELEGRAM_ENABLED=false
+NOTIFY_TELEGRAM_TOKEN=""
+NOTIFY_TELEGRAM_CHAT=""
+
+# Webhook Settings
+NOTIFY_WEBHOOK_ENABLED=false
+NOTIFY_WEBHOOK_URL=""

@@ -24,9 +24,6 @@
             ~cls_webu_json();
             void main();
 
-            /* Hot reload API: Set single parameter at runtime */
-            void config_set();
-
             /* React UI API endpoints */
             void api_auth_me();
             void api_media_pictures();
@@ -38,6 +35,9 @@
             void api_cameras();
             void api_config();
             void api_config_patch();  /* Batch config update via PATCH */
+            void api_mask_get();      /* GET /{camId}/api/mask/{type} */
+            void api_mask_post();     /* POST /{camId}/api/mask/{type} */
+            void api_mask_delete();   /* DELETE /{camId}/api/mask/{type} */
 
         private:
             cls_motapp      *app;

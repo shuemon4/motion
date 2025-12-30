@@ -5,6 +5,16 @@ import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/for
 import { useToast } from '@/components/Toast'
 import { useBatchUpdateConfig } from '@/api/queries'
 import { validateConfigParam } from '@/lib/validation'
+import { DeviceSettings } from '@/components/settings/DeviceSettings'
+import { LibcameraSettings } from '@/components/settings/LibcameraSettings'
+import { OverlaySettings } from '@/components/settings/OverlaySettings'
+import { StreamSettings } from '@/components/settings/StreamSettings'
+import { MotionSettings } from '@/components/settings/MotionSettings'
+import { PictureSettings } from '@/components/settings/PictureSettings'
+import { MovieSettings } from '@/components/settings/MovieSettings'
+import { StorageSettings } from '@/components/settings/StorageSettings'
+import { ScheduleSettings } from '@/components/settings/ScheduleSettings'
+import { PreferencesSettings } from '@/components/settings/PreferencesSettings'
 
 interface MotionConfig {
   version: string
@@ -198,9 +208,67 @@ export function Settings() {
         </select>
       </div>
 
+      <DeviceSettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <LibcameraSettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <OverlaySettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <StreamSettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <MotionSettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <PictureSettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <MovieSettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <StorageSettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <ScheduleSettings
+        config={config.configuration.default}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <PreferencesSettings />
+
       <FormSection
         title="System"
         description="Core Motion daemon settings"
+        collapsible
+        defaultOpen={false}
       >
         <FormToggle
           label="Run as Daemon"
@@ -232,151 +300,6 @@ export function Settings() {
           ]}
           helpText="Verbosity level for logging"
           error={getError('log_level')}
-        />
-      </FormSection>
-
-      <FormSection
-        title="Video Device"
-        description="Camera input configuration"
-      >
-        <FormInput
-          label="Device Name"
-          value={String(getValue('device_name', ''))}
-          onChange={(val) => handleChange('device_name', val)}
-          placeholder="My Camera"
-          helpText="Friendly name for this camera"
-          error={getError('device_name')}
-        />
-        <FormInput
-          label="Device ID"
-          value={String(getValue('device_id', '1'))}
-          onChange={(val) => handleChange('device_id', val)}
-          type="number"
-          helpText="Unique identifier for this camera"
-          error={getError('device_id')}
-        />
-      </FormSection>
-
-      <FormSection
-        title="Motion Detection"
-        description="Configure motion detection sensitivity and behavior"
-      >
-        <FormInput
-          label="Threshold"
-          value={String(getValue('threshold', '1500'))}
-          onChange={(val) => handleChange('threshold', val)}
-          type="number"
-          helpText="Number of changed pixels to trigger motion (higher = less sensitive)"
-          error={getError('threshold')}
-        />
-        <FormInput
-          label="Noise Level"
-          value={String(getValue('noise_level', '32'))}
-          onChange={(val) => handleChange('noise_level', val)}
-          type="number"
-          helpText="Noise tolerance level (0-255)"
-          error={getError('noise_level')}
-        />
-        <FormToggle
-          label="Despeckle Filter"
-          value={getValue('despeckle_filter', '') as boolean || false}
-          onChange={(val) => handleChange('despeckle_filter', val ? 'on' : '')}
-          helpText="Remove noise speckles from detection"
-        />
-        <FormInput
-          label="Minimum Motion Frames"
-          value={String(getValue('minimum_motion_frames', '1'))}
-          onChange={(val) => handleChange('minimum_motion_frames', val)}
-          type="number"
-          helpText="Frames required to trigger motion event"
-          error={getError('minimum_motion_frames')}
-        />
-      </FormSection>
-
-      <FormSection
-        title="Storage"
-        description="Configure where and how Motion saves files"
-      >
-        <FormInput
-          label="Target Directory"
-          value={String(getValue('target_dir', '/var/lib/motion'))}
-          onChange={(val) => handleChange('target_dir', val)}
-          helpText="Directory where files are saved"
-          error={getError('target_dir')}
-        />
-        <FormInput
-          label="Snapshot Filename"
-          value={String(getValue('snapshot_filename', '%Y%m%d%H%M%S-snapshot'))}
-          onChange={(val) => handleChange('snapshot_filename', val)}
-          helpText="Format for snapshot filenames (strftime syntax)"
-          error={getError('snapshot_filename')}
-        />
-        <FormInput
-          label="Picture Filename"
-          value={String(getValue('picture_filename', '%Y%m%d%H%M%S-%q'))}
-          onChange={(val) => handleChange('picture_filename', val)}
-          helpText="Format for motion picture filenames"
-          error={getError('picture_filename')}
-        />
-        <FormInput
-          label="Movie Filename"
-          value={String(getValue('movie_filename', '%Y%m%d%H%M%S'))}
-          onChange={(val) => handleChange('movie_filename', val)}
-          helpText="Format for movie filenames"
-          error={getError('movie_filename')}
-        />
-        <FormSelect
-          label="Movie Container"
-          value={String(getValue('movie_container', 'mkv'))}
-          onChange={(val) => handleChange('movie_container', val)}
-          options={[
-            { value: 'mkv', label: 'MKV' },
-            { value: 'mp4', label: 'MP4' },
-            { value: '3gp', label: '3GP' },
-          ]}
-          helpText="Container format for movies"
-        />
-      </FormSection>
-
-      <FormSection
-        title="Streaming"
-        description="Configure live video streaming settings"
-      >
-        <FormInput
-          label="Stream Port"
-          value={String(getValue('stream_port', '8081'))}
-          onChange={(val) => handleChange('stream_port', val)}
-          type="number"
-          helpText="Port for MJPEG stream (0 = disabled)"
-          error={getError('stream_port')}
-        />
-        <FormInput
-          label="Stream Quality"
-          value={String(getValue('stream_quality', '50'))}
-          onChange={(val) => handleChange('stream_quality', val)}
-          type="number"
-          helpText="JPEG compression quality (1-100)"
-          error={getError('stream_quality')}
-        />
-        <FormInput
-          label="Stream Max Rate"
-          value={String(getValue('stream_maxrate', '1'))}
-          onChange={(val) => handleChange('stream_maxrate', val)}
-          type="number"
-          helpText="Maximum framerate for stream"
-          error={getError('stream_maxrate')}
-        />
-        <FormToggle
-          label="Stream Motion Detection"
-          value={getValue('stream_motion', false) as boolean}
-          onChange={(val) => handleChange('stream_motion', val)}
-          helpText="Show motion detection boxes in stream"
-        />
-        <FormToggle
-          label="Stream Authentication"
-          value={getValue('stream_auth_method', '0') !== '0'}
-          onChange={(val) => handleChange('stream_auth_method', val ? '1' : '0')}
-          helpText="Require authentication for stream access"
         />
       </FormSection>
 

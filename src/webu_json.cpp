@@ -28,7 +28,85 @@
 #include "libcam.hpp"
 #include "json_parse.hpp"
 #include <map>
+#include <algorithm>
+#include <vector>
 #include <sys/statvfs.h>
+
+/* CPU-efficient polygon fill using scanline algorithm
+ * Fills polygon interior with specified value in bitmap
+ * O(height * edges) complexity, minimal memory allocation
+ */
+static void fill_polygon(u_char *bitmap, int width, int height,
+    const std::vector<std::pair<int,int>> &polygon, u_char fill_val)
+{
+    if (polygon.size() < 3) return;
+
+    /* Find vertical bounds */
+    int min_y = height, max_y = 0;
+    for (const auto &pt : polygon) {
+        if (pt.second < min_y) min_y = pt.second;
+        if (pt.second > max_y) max_y = pt.second;
+    }
+
+    /* Clamp to image bounds */
+    if (min_y < 0) min_y = 0;
+    if (max_y >= height) max_y = height - 1;
+
+    /* Scanline fill */
+    std::vector<int> x_intersects;
+    for (int y = min_y; y <= max_y; y++) {
+        x_intersects.clear();
+
+        /* Find intersections with polygon edges */
+        size_t n = polygon.size();
+        for (size_t i = 0; i < n; i++) {
+            int x1 = polygon[i].first;
+            int y1 = polygon[i].second;
+            int x2 = polygon[(i + 1) % n].first;
+            int y2 = polygon[(i + 1) % n].second;
+
+            /* Check if edge crosses this scanline */
+            if ((y1 <= y && y2 > y) || (y2 <= y && y1 > y)) {
+                /* Compute x intersection using integer math to avoid float */
+                int x = x1 + ((y - y1) * (x2 - x1)) / (y2 - y1);
+                x_intersects.push_back(x);
+            }
+        }
+
+        /* Sort intersections */
+        std::sort(x_intersects.begin(), x_intersects.end());
+
+        /* Fill between pairs */
+        for (size_t i = 0; i + 1 < x_intersects.size(); i += 2) {
+            int xs = x_intersects[i];
+            int xe = x_intersects[i + 1];
+
+            /* Clamp to image bounds */
+            if (xs < 0) xs = 0;
+            if (xe >= width) xe = width - 1;
+
+            /* Fill the span */
+            for (int x = xs; x <= xe; x++) {
+                bitmap[y * width + x] = fill_val;
+            }
+        }
+    }
+}
+
+/* Generate auto-path for mask file in target_dir */
+static std::string build_mask_path(cls_camera *cam, const std::string &type)
+{
+    std::string target = cam->cfg->target_dir;
+    if (target.empty()) {
+        target = "/var/lib/motion";
+    }
+    /* Remove trailing slash */
+    if (!target.empty() && target.back() == '/') {
+        target.pop_back();
+    }
+    return target + "/cam" + std::to_string(cam->cfg->device_id) +
+           "_" + type + ".pgm";
+}
 
 std::string cls_webu_json::escstr(std::string invar)
 {
@@ -558,21 +636,6 @@ void cls_webu_json::loghistory()
 }
 
 /*
- * Hot Reload API: Build JSON response for config_set
- */
-void cls_webu_json::build_response(bool success, const std::string &parm_name,
-                                   const std::string &old_val, const std::string &new_val,
-                                   bool hot_reload)
-{
-    webua->resp_page = "{";
-    webua->resp_page += "\"status\":\"" + std::string(success ? "ok" : "error") + "\"";
-    webua->resp_page += ",\"parameter\":\"" + parm_name + "\"";
-    webua->resp_page += ",\"old_value\":\"" + escstr(old_val) + "\"";
-    webua->resp_page += ",\"new_value\":\"" + escstr(new_val) + "\"";
-    webua->resp_page += ",\"hot_reload\":" + std::string(hot_reload ? "true" : "false");
-}
-
-/*
  * Hot Reload API: Validate parameter exists and is hot-reloadable
  * Returns true if parameter can be hot-reloaded
  * Sets parm_index to the index in config_parms[] (-1 if not found)
@@ -700,105 +763,6 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
         parm_name.c_str(), parm_val.c_str(), webua->device_id);
 }
 
-/*
- * Hot Reload API: Handle /config/set endpoint
- * URL format: /{camera_id}/config/set?{param}={value}
- *
- * Returns JSON response indicating success/failure and whether
- * the parameter was applied immediately (hot_reload=true) or
- * requires restart (hot_reload=false).
- */
-void cls_webu_json::config_set()
-{
-    std::string parm_name, parm_val, old_val;
-    int parm_index = -1;
-
-    webua->resp_type = WEBUI_RESP_JSON;
-
-    /* Parse query string for parameter name and value
-     * uri_cmd2 contains "set?threshold=2000" */
-    size_t eq_pos = webua->uri_cmd2.find('=');
-    size_t q_pos = webua->uri_cmd2.find('?');
-
-    if (q_pos == std::string::npos || eq_pos == std::string::npos) {
-        build_response(false, "", "", "", false);
-        webua->resp_page += ",\"error\":\"Invalid query format. Use: /config/set?param=value\"}";
-        return;
-    }
-
-    parm_name = webua->uri_cmd2.substr(q_pos + 1, eq_pos - q_pos - 1);
-    parm_val = webua->uri_cmd2.substr(eq_pos + 1);
-
-    /* URL decode the value */
-    char *decoded = (char*)mymalloc(parm_val.length() + 1);
-    memcpy(decoded, parm_val.c_str(), parm_val.length() + 1);
-    MHD_http_unescape(decoded);
-    parm_val = decoded;
-    myfree(decoded);
-
-    /* SECURITY: Reject SQL parameter modifications via web interface
-     * SQL templates are too dangerous to modify remotely - they can be
-     * used for SQL injection attacks. Users must modify SQL params via
-     * config file only.
-     */
-    if (parm_name.substr(0, 4) == "sql_") {
-        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
-            _("SQL parameter '%s' cannot be modified via web interface from %s"),
-            parm_name.c_str(), webua->clientip.c_str());
-        build_response(false, parm_name, "", parm_val, false);
-        webua->resp_page += ",\"error\":\"SQL parameters cannot be modified via web interface (security restriction)\"}";
-        return;
-    }
-
-    /* Validate parameter exists and check if hot-reloadable */
-    if (!validate_hot_reload(parm_name, parm_index)) {
-        build_response(false, parm_name, "", parm_val, false);
-        if (parm_index >= 0) {
-            webua->resp_page += ",\"error\":\"Parameter requires daemon restart\"}";
-        } else {
-            webua->resp_page += ",\"error\":\"Unknown parameter\"}";
-        }
-        return;
-    }
-
-    /* Get old value before updating */
-    cls_config *cfg;
-    if (webua->cam != nullptr) {
-        cfg = webua->cam->cfg;
-    } else {
-        cfg = app->cfg;
-    }
-    cfg->edit_get(parm_name, old_val, config_parms[parm_index].parm_cat);
-
-    /* Apply the hot reload */
-    apply_hot_reload(parm_index, parm_val);
-
-    /* Build success response */
-    build_response(true, parm_name, old_val, parm_val, true);
-
-    /* Add ignored controls list if any (capability discovery) */
-    #ifdef HAVE_LIBCAM
-    if (webua->cam != nullptr && webua->cam->has_libcam()) {
-        std::vector<std::string> ignored = webua->cam->get_libcam_ignored_controls();
-        if (!ignored.empty()) {
-            webua->resp_page += ",\"ignored\":[";
-            bool first = true;
-            for (const auto& ctrl : ignored) {
-                if (!first) {
-                    webua->resp_page += ",";
-                }
-                webua->resp_page += "\"" + ctrl + "\"";
-                first = false;
-            }
-            webua->resp_page += "]";
-            /* Clear ignored list after reporting */
-            webua->cam->clear_libcam_ignored_controls();
-        }
-    }
-    #endif
-
-    webua->resp_page += "}";
-}
 
 /*
  * React UI API: Authentication status
@@ -1372,6 +1336,327 @@ void cls_webu_json::api_config_patch()
     webua->resp_page += ",\"success\":" + std::to_string(success_count);
     webua->resp_page += ",\"errors\":" + std::to_string(error_count);
     webua->resp_page += "}}";
+}
+
+/*
+ * React UI API: Get mask information
+ * GET /{camId}/api/mask/{type}
+ * type = "motion" or "privacy"
+ */
+void cls_webu_json::api_mask_get()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Camera not specified\"}";
+        return;
+    }
+
+    std::string type = webua->uri_cmd3;
+    if (type != "motion" && type != "privacy") {
+        webua->resp_page = "{\"error\":\"Invalid mask type. Use 'motion' or 'privacy'\"}";
+        return;
+    }
+
+    /* Get current mask path from config */
+    std::string mask_path;
+    if (type == "motion") {
+        mask_path = webua->cam->cfg->mask_file;
+    } else {
+        mask_path = webua->cam->cfg->mask_privacy;
+    }
+
+    webua->resp_page = "{";
+    webua->resp_page += "\"type\":\"" + type + "\"";
+
+    if (mask_path.empty()) {
+        webua->resp_page += ",\"exists\":false";
+        webua->resp_page += ",\"path\":\"\"";
+    } else {
+        /* Check if file exists and get dimensions */
+        FILE *f = myfopen(mask_path.c_str(), "rbe");
+        if (f != nullptr) {
+            char line[256];
+            int w = 0, h = 0;
+
+            /* Skip magic number P5 */
+            if (fgets(line, sizeof(line), f)) {
+                /* Skip comments */
+                do {
+                    if (!fgets(line, sizeof(line), f)) break;
+                } while (line[0] == '#');
+
+                /* Parse dimensions */
+                sscanf(line, "%d %d", &w, &h);
+            }
+            myfclose(f);
+
+            webua->resp_page += ",\"exists\":true";
+            webua->resp_page += ",\"path\":\"" + escstr(mask_path) + "\"";
+            webua->resp_page += ",\"width\":" + std::to_string(w);
+            webua->resp_page += ",\"height\":" + std::to_string(h);
+        } else {
+            webua->resp_page += ",\"exists\":false";
+            webua->resp_page += ",\"path\":\"" + escstr(mask_path) + "\"";
+            webua->resp_page += ",\"error\":\"File not accessible\"";
+        }
+    }
+
+    webua->resp_page += "}";
+}
+
+/*
+ * React UI API: Save mask from polygon data
+ * POST /{camId}/api/mask/{type}
+ * Request body: {"polygons":[[{x,y},...]], "width":W, "height":H, "invert":bool}
+ */
+void cls_webu_json::api_mask_post()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Camera not specified\"}";
+        return;
+    }
+
+    std::string type = webua->uri_cmd3;
+    if (type != "motion" && type != "privacy") {
+        webua->resp_page = "{\"error\":\"Invalid mask type. Use 'motion' or 'privacy'\"}";
+        return;
+    }
+
+    /* Validate CSRF */
+    const char* csrf_token = MHD_lookup_connection_value(
+        webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
+    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+        webua->resp_page = "{\"error\":\"CSRF validation failed\"}";
+        return;
+    }
+
+    /* Parse JSON request body */
+    std::string body = webua->raw_body;
+
+    /* Extract dimensions - default to camera size */
+    int img_width = webua->cam->imgs.width;
+    int img_height = webua->cam->imgs.height;
+    bool invert = false;
+
+    /* Parse width/height from body if present */
+    size_t pos = body.find("\"width\":");
+    if (pos != std::string::npos) {
+        img_width = atoi(body.c_str() + pos + 8);
+    }
+    pos = body.find("\"height\":");
+    if (pos != std::string::npos) {
+        img_height = atoi(body.c_str() + pos + 9);
+    }
+    pos = body.find("\"invert\":");
+    if (pos != std::string::npos) {
+        invert = (body.substr(pos + 9, 4) == "true");
+    }
+
+    /* Validate dimensions match camera */
+    if (img_width != webua->cam->imgs.width || img_height != webua->cam->imgs.height) {
+        MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+            "Mask dimensions %dx%d differ from camera %dx%d, will be resized on load",
+            img_width, img_height, webua->cam->imgs.width, webua->cam->imgs.height);
+    }
+
+    /* Allocate bitmap */
+    u_char default_val = invert ? 255 : 0;  /* 255=detect, 0=mask */
+    u_char fill_val = invert ? 0 : 255;
+    std::vector<u_char> bitmap(img_width * img_height, default_val);
+
+    /* Parse polygons array */
+    /* Format: "polygons":[[[x,y],[x,y],...],[[x,y],...]] */
+    pos = body.find("\"polygons\":");
+    if (pos != std::string::npos) {
+        size_t start = body.find('[', pos);
+        if (start != std::string::npos) {
+            start++; /* Skip outer [ */
+
+            while (start < body.length() && body[start] != ']') {
+                /* Skip whitespace */
+                while (start < body.length() &&
+                       (body[start] == ' ' || body[start] == '\n' || body[start] == ',')) {
+                    start++;
+                }
+
+                if (body[start] == '[') {
+                    /* Parse one polygon */
+                    std::vector<std::pair<int,int>> polygon;
+                    start++; /* Skip [ */
+
+                    while (start < body.length() && body[start] != ']') {
+                        /* Skip to { or [ */
+                        while (start < body.length() &&
+                               body[start] != '{' && body[start] != '[' && body[start] != ']') {
+                            start++;
+                        }
+                        if (body[start] == ']') break;
+
+                        /* Parse point {x:N, y:N} or [x,y] */
+                        int x = 0, y = 0;
+                        if (body[start] == '{') {
+                            /* Object format */
+                            size_t xpos = body.find("\"x\":", start);
+                            size_t ypos = body.find("\"y\":", start);
+                            if (xpos != std::string::npos && ypos != std::string::npos) {
+                                x = atoi(body.c_str() + xpos + 4);
+                                y = atoi(body.c_str() + ypos + 4);
+                            }
+                            start = body.find('}', start) + 1;
+                        } else if (body[start] == '[') {
+                            /* Array format [x,y] */
+                            start++;
+                            x = atoi(body.c_str() + start);
+                            size_t comma = body.find(',', start);
+                            if (comma != std::string::npos) {
+                                y = atoi(body.c_str() + comma + 1);
+                            }
+                            start = body.find(']', start) + 1;
+                        }
+
+                        polygon.push_back({x, y});
+                    }
+                    start++; /* Skip ] */
+
+                    /* Fill polygon */
+                    if (polygon.size() >= 3) {
+                        fill_polygon(bitmap.data(), img_width, img_height, polygon, fill_val);
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    /* Generate mask path */
+    std::string mask_path = build_mask_path(webua->cam, type);
+
+    /* Write PGM file */
+    FILE *f = myfopen(mask_path.c_str(), "wbe");
+    if (f == nullptr) {
+        MOTION_LOG(ERR, TYPE_ALL, SHOW_ERRNO,
+            "Cannot write mask file: %s", mask_path.c_str());
+        webua->resp_page = "{\"error\":\"Cannot write mask file\"}";
+        return;
+    }
+
+    /* Write PGM P5 header */
+    fprintf(f, "P5\n");
+    fprintf(f, "# Motion mask - type: %s\n", type.c_str());
+    fprintf(f, "%d %d\n", img_width, img_height);
+    fprintf(f, "255\n");
+
+    /* Write bitmap data */
+    if (fwrite(bitmap.data(), 1, bitmap.size(), f) != bitmap.size()) {
+        MOTION_LOG(ERR, TYPE_ALL, SHOW_ERRNO,
+            "Failed writing mask data to: %s", mask_path.c_str());
+        myfclose(f);
+        webua->resp_page = "{\"error\":\"Failed writing mask data\"}";
+        return;
+    }
+
+    myfclose(f);
+
+    /* Update config parameter */
+    pthread_mutex_lock(&app->mutex_post);
+    if (type == "motion") {
+        webua->cam->cfg->mask_file = mask_path;
+        app->cfg->edit_set("mask_file", mask_path);
+    } else {
+        webua->cam->cfg->mask_privacy = mask_path;
+        app->cfg->edit_set("mask_privacy", mask_path);
+    }
+    pthread_mutex_unlock(&app->mutex_post);
+
+    MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
+        "Mask saved: %s (type=%s, %dx%d, polygons parsed)",
+        mask_path.c_str(), type.c_str(), img_width, img_height);
+
+    webua->resp_page = "{";
+    webua->resp_page += "\"success\":true";
+    webua->resp_page += ",\"path\":\"" + escstr(mask_path) + "\"";
+    webua->resp_page += ",\"width\":" + std::to_string(img_width);
+    webua->resp_page += ",\"height\":" + std::to_string(img_height);
+    webua->resp_page += ",\"message\":\"Mask saved. Reload camera to apply.\"";
+    webua->resp_page += "}";
+}
+
+/*
+ * React UI API: Delete mask file
+ * DELETE /{camId}/api/mask/{type}
+ */
+void cls_webu_json::api_mask_delete()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Camera not specified\"}";
+        return;
+    }
+
+    std::string type = webua->uri_cmd3;
+    if (type != "motion" && type != "privacy") {
+        webua->resp_page = "{\"error\":\"Invalid mask type. Use 'motion' or 'privacy'\"}";
+        return;
+    }
+
+    /* Validate CSRF */
+    const char* csrf_token = MHD_lookup_connection_value(
+        webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
+    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+        webua->resp_page = "{\"error\":\"CSRF validation failed\"}";
+        return;
+    }
+
+    /* Get current mask path */
+    std::string mask_path;
+    if (type == "motion") {
+        mask_path = webua->cam->cfg->mask_file;
+    } else {
+        mask_path = webua->cam->cfg->mask_privacy;
+    }
+
+    bool file_deleted = false;
+    if (!mask_path.empty()) {
+        /* Security: Validate path doesn't contain traversal */
+        if (mask_path.find("..") != std::string::npos) {
+            MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+                "Path traversal attempt blocked: %s", mask_path.c_str());
+            webua->resp_page = "{\"error\":\"Invalid path\"}";
+            return;
+        }
+
+        /* Delete file */
+        if (remove(mask_path.c_str()) == 0) {
+            file_deleted = true;
+            MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
+                "Deleted mask file: %s", mask_path.c_str());
+        } else if (errno != ENOENT) {
+            MOTION_LOG(WRN, TYPE_ALL, SHOW_ERRNO,
+                "Failed to delete mask file: %s", mask_path.c_str());
+        }
+    }
+
+    /* Clear config parameter */
+    pthread_mutex_lock(&app->mutex_post);
+    if (type == "motion") {
+        webua->cam->cfg->mask_file = "";
+        app->cfg->edit_set("mask_file", "");
+    } else {
+        webua->cam->cfg->mask_privacy = "";
+        app->cfg->edit_set("mask_privacy", "");
+    }
+    pthread_mutex_unlock(&app->mutex_post);
+
+    webua->resp_page = "{";
+    webua->resp_page += "\"success\":true";
+    webua->resp_page += ",\"deleted\":" + std::string(file_deleted ? "true" : "false");
+    webua->resp_page += ",\"message\":\"Mask removed. Reload camera to apply.\"";
+    webua->resp_page += "}";
 }
 
 void cls_webu_json::main()

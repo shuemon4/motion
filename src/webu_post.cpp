@@ -882,22 +882,9 @@ mhdrslt cls_webu_post::processor_init()
     post_processor = MHD_create_post_processor (webua->connection
         , WEBUI_POST_BFRSZ, webup_iterate_post, (void *)this);
     if (post_processor == NULL) {
-        /* POST processor requires Content-Type: application/x-www-form-urlencoded
-         * or multipart/form-data. For API endpoints using query strings (like
-         * /config/set?param=value), we don't need a POST body, so continue anyway.
-         * This allows React/JSON clients to use Content-Type: application/json */
-        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
-            _("POST processor failed - uri_cmd1='%s' uri_cmd2='%s'"),
-            webua->uri_cmd1.c_str(), webua->uri_cmd2.c_str());
-        if ((webua->uri_cmd1 == "config") &&
-            (webua->uri_cmd2.length() >= 3) &&
-            (webua->uri_cmd2.substr(0, 3) == "set")) {
-            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
-                _("POST processor not needed for config/set (query string API)"));
-            return MHD_YES;
-        }
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
-            _("POST processor init failed for non-config/set request"));
+            _("Failed to create POST processor for %s"),
+            webua->url.c_str());
         return MHD_NO;
     }
     return MHD_YES;
@@ -908,14 +895,7 @@ mhdrslt cls_webu_post::processor_start(const char *upload_data, size_t *upload_d
      mhdrslt    retcd;
 
     if (*upload_data_size != 0) {
-        /* Only process POST data if we have a valid processor.
-         * For config/set endpoints using query strings with JSON Content-Type,
-         * the processor is NULL but we still need to consume the data. */
-        if (post_processor != nullptr) {
-            retcd = MHD_post_process (post_processor, upload_data, *upload_data_size);
-        } else {
-            retcd = MHD_YES;  /* Continue without processing - data will be ignored */
-        }
+        retcd = MHD_post_process (post_processor, upload_data, *upload_data_size);
         *upload_data_size = 0;
     } else {
         /* Validate CSRF token before processing any state-changing operations */
@@ -947,34 +927,14 @@ mhdrslt cls_webu_post::processor_start(const char *upload_data, size_t *upload_d
             return MHD_YES;
         }
 
-        /* Check if this is a hot reload request (POST /config/set?param=value) */
-        if ((webua->uri_cmd1 == "config") &&
-            (webua->uri_cmd2.length() >= 3) &&
-            (webua->uri_cmd2.substr(0, 3) == "set")) {
-            /* Route to JSON hot reload handler instead of full config update */
-            cls_webu_json *webu_json = new cls_webu_json(webua);
-            webu_json->config_set();
-            delete webu_json;
-
-            /* Ensure resp_page has content before sending */
-            if (webua->resp_page.empty()) {
-                MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
-                    _("config_set returned empty response for %s"), webua->uri_cmd2.c_str());
-                webua->resp_page = "{\"status\":\"error\",\"error\":\"Internal error: empty response\"}";
-                webua->resp_type = WEBUI_RESP_JSON;
-            }
-            webua->mhd_send();
-            retcd = MHD_YES;
-        } else {
-            pthread_mutex_lock(&app->mutex_post);
-                process_actions();
-            pthread_mutex_unlock(&app->mutex_post);
-            /* Send updated page back to user */
-            webu_html = new cls_webu_html(webua);
-            webu_html->main();
-            delete webu_html;
-            retcd = MHD_YES;
-        }
+        pthread_mutex_lock(&app->mutex_post);
+            process_actions();
+        pthread_mutex_unlock(&app->mutex_post);
+        /* Send updated page back to user */
+        webu_html = new cls_webu_html(webua);
+        webu_html->main();
+        delete webu_html;
+        retcd = MHD_YES;
     }
     return retcd;
 }

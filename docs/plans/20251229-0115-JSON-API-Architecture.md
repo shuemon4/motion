@@ -26,7 +26,9 @@ The codebase has an architectural mismatch:
 ### API Design
 
 ```
-# Current (legacy, keep for backwards compatibility)
+# Current (legacy, keep for backwards compatibility). This has been 
+# changed to - remove legacy code. No backwards compatibility 
+# needed.
 POST /0/config/set?threshold=4000
 Content-Type: application/x-www-form-urlencoded
 
@@ -178,7 +180,7 @@ const handleSave = async () => {
 
 ### Rollback Plan
 
-The legacy `/config/set?param=value` endpoint remains functional. If issues arise with the new API, frontend can revert to sequential calls.
+The legacy `/config/set?param=value` endpoint remains functional. If issues arise with the new API, frontend can revert to sequential calls. This has been changed to - remove legacy code. No backwards compatibility needed.
 
 ### Testing Checklist
 
@@ -196,7 +198,7 @@ The legacy `/config/set?param=value` endpoint remains functional. If issues aris
 Implement Option B: **Backend reads JSON body** with:
 - Minimal custom JSON parser (no external deps)
 - New `PATCH /api/config` endpoint for batch updates
-- Keep legacy API for backwards compatibility
+- Keep legacy API for backwards compatibility. This has been changed to - remove legacy code. No backwards compatibility needed.
 - Frontend updated to use batch API
 
 ## Estimated Scope

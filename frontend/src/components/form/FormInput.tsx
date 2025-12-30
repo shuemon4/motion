@@ -10,6 +10,9 @@ interface FormInputProps {
   required?: boolean
   helpText?: string
   error?: string
+  min?: string | number
+  max?: string | number
+  step?: string | number
 }
 
 export function FormInput({
@@ -22,6 +25,9 @@ export function FormInput({
   required = false,
   helpText,
   error,
+  min,
+  max,
+  step,
 }: FormInputProps) {
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value)
@@ -42,6 +48,9 @@ export function FormInput({
         placeholder={placeholder}
         disabled={disabled}
         required={required}
+        min={min}
+        max={max}
+        step={step}
         className={`w-full px-3 py-2 bg-surface border rounded-lg focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${
           hasError
             ? 'border-red-500 focus:ring-red-500'

@@ -970,6 +970,13 @@ void cls_webu_ans::answer_delete()
         } else {
             bad_request();
         }
+    } else if (uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "") {
+        if (webu_json == nullptr) {
+            webu_json = new cls_webu_json(this);
+        }
+        /* CSRF validation is done inside api_mask_delete() */
+        webu_json->api_mask_delete();
+        mhd_send();
     } else {
         /* DELETE not allowed for other endpoints */
         resp_type = WEBUI_RESP_TEXT;
@@ -1041,33 +1048,19 @@ void cls_webu_ans::answer_get()
         } else if (uri_cmd2 == "config") {
             webu_json->api_config();
             mhd_send();
+        } else if (uri_cmd2 == "mask" && uri_cmd3 != "") {
+            webu_json->api_mask_get();
+            mhd_send();
         } else {
             bad_request();
         }
 
     } else if (uri_cmd1 == "config") {
-        /* Hot reload API: /config/set?param=value */
+        /* Treat /config like /config.json */
         if (webu_json == nullptr) {
             webu_json = new cls_webu_json(this);
         }
-        if (uri_cmd2.substr(0, 3) == "set") {
-            /* CSRF Protection: config/set is state-changing, require POST */
-            if (cnct_method != WEBUI_METHOD_POST) {
-                MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
-                    _("State-changing operation requires POST method from %s: /config/set"),
-                    clientip.c_str());
-                resp_type = WEBUI_RESP_TEXT;
-                resp_page = "HTTP 405: Method Not Allowed\n"
-                           "Configuration changes must use POST method.\n";
-                mhd_send();
-                return;
-            }
-            webu_json->config_set();
-            mhd_send();
-        } else {
-            /* Fallback: treat /config like /config.json */
-            webu_json->main();
-        }
+        webu_json->main();
 
     } else if ((uri_cmd1 == "config.json") || (uri_cmd1 == "log") ||
         (uri_cmd1 == "movies.json") || (uri_cmd1 == "status.json")) {
@@ -1149,11 +1142,18 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
     if (mhd_first) {
         mhd_first = false;
         if (mystreq(method,"POST")) {
-            if (webu_post == nullptr) {
-                webu_post = new cls_webu_post(this);
-            }
             cnct_method = WEBUI_METHOD_POST;
-            retcd = webu_post->processor_init();
+            /* Check if this is a JSON API endpoint (mask API) */
+            if (uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "") {
+                raw_body.clear();  /* Clear body buffer for JSON POST */
+                retcd = MHD_YES;
+            } else {
+                /* Use form post processor for legacy endpoints */
+                if (webu_post == nullptr) {
+                    webu_post = new cls_webu_post(this);
+                }
+                retcd = webu_post->processor_init();
+            }
         } else if (mystreq(method,"PATCH")) {
             cnct_method = WEBUI_METHOD_PATCH;
             raw_body.clear();  /* Clear body buffer for new PATCH request */
@@ -1171,7 +1171,24 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
     hostname_get();
 
     if (mystreq(method,"POST")) {
-        retcd = webu_post->processor_start(upload_data, upload_data_size);
+        /* Check if this is a JSON API endpoint */
+        if (uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "") {
+            /* Accumulate raw body for JSON POST */
+            if (*upload_data_size > 0) {
+                raw_body.append(upload_data, *upload_data_size);
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            /* Body complete, process mask POST */
+            if (webu_json == nullptr) {
+                webu_json = new cls_webu_json(this);
+            }
+            webu_json->api_mask_post();
+            mhd_send();
+            retcd = MHD_YES;
+        } else {
+            retcd = webu_post->processor_start(upload_data, upload_data_size);
+        }
     } else if (mystreq(method,"PATCH")) {
         /* Accumulate raw body for JSON endpoints */
         if (*upload_data_size > 0) {
