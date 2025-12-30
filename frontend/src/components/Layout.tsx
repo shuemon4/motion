@@ -1,8 +1,10 @@
 import { Outlet, Link } from 'react-router-dom'
 import { useSystemStatus } from '@/api/queries'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 export function Layout() {
   const { data: status } = useSystemStatus()
+  const { isAuthenticated, showLoginModal } = useAuthContext()
 
   const formatBytes = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -29,10 +31,24 @@ export function Layout() {
               )}
             </div>
             <div className="flex items-center gap-6">
-              <div className="flex gap-4">
+              <div className="flex items-center gap-4">
                 <Link to="/" className="hover:text-primary">Dashboard</Link>
-                <Link to="/settings" className="hover:text-primary">Settings</Link>
+                {isAuthenticated && (
+                  <Link to="/settings" className="hover:text-primary">Settings</Link>
+                )}
                 <Link to="/media" className="hover:text-primary">Media</Link>
+                <button
+                  onClick={showLoginModal}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-elevated transition-colors"
+                  title={isAuthenticated ? 'Logged in' : 'Login'}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className={`text-xs ${isAuthenticated ? 'text-green-500' : 'text-gray-400'}`}>
+                    {isAuthenticated ? 'Admin' : 'Login'}
+                  </span>
+                </button>
               </div>
               {status && (
                 <div className="flex items-center gap-3 text-xs border-l border-gray-700 pl-4">

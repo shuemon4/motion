@@ -153,59 +153,56 @@ export function Settings() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-3xl font-bold">Settings</h2>
-        <div className="flex gap-2">
-          {isDirty && (
+      {/* Sticky sub-header for save controls */}
+      <div className="sticky top-[73px] z-40 -mx-6 px-6 py-3 bg-surface/95 backdrop-blur border-b border-gray-800 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-bold">Settings</h2>
+            <div>
+              <select
+                value={selectedCamera}
+                onChange={(e) => setSelectedCamera(e.target.value)}
+                className="px-3 py-1.5 bg-surface-elevated border border-gray-700 rounded-lg text-sm"
+              >
+                <option value="0">Global Settings</option>
+                {config.cameras && Object.keys(config.cameras).map((key) => {
+                  if (key !== 'count') {
+                    return (
+                      <option key={key} value={key}>
+                        Camera {key}
+                      </option>
+                    )
+                  }
+                  return null
+                })}
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {isDirty && !hasValidationErrors && (
+              <span className="text-yellow-200 text-sm">Unsaved changes</span>
+            )}
+            {hasValidationErrors && (
+              <span className="text-red-200 text-sm">Fix errors below</span>
+            )}
+            {isDirty && (
+              <button
+                onClick={handleReset}
+                disabled={isSaving}
+                className="px-3 py-1.5 text-sm bg-surface-elevated hover:bg-surface rounded-lg transition-colors disabled:opacity-50"
+              >
+                Discard
+              </button>
+            )}
             <button
-              onClick={handleReset}
-              disabled={isSaving}
-              className="px-4 py-2 bg-surface-elevated hover:bg-surface rounded-lg transition-colors disabled:opacity-50"
+              onClick={handleSave}
+              disabled={!isDirty || isSaving || hasValidationErrors}
+              className="px-4 py-1.5 text-sm bg-primary hover:bg-primary-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Discard
+              {isSaving ? 'Saving...' : isDirty ? 'Save Changes' : 'Saved'}
             </button>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={!isDirty || isSaving || hasValidationErrors}
-            className="px-4 py-2 bg-primary hover:bg-primary-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSaving ? 'Saving...' : hasValidationErrors ? 'Fix Errors' : isDirty ? 'Save Changes *' : 'Save Changes'}
-          </button>
+          </div>
         </div>
-      </div>
-
-      {isDirty && !hasValidationErrors && (
-        <div className="mb-4 p-3 bg-yellow-600/10 border border-yellow-600/30 rounded-lg text-yellow-200 text-sm">
-          You have unsaved changes
-        </div>
-      )}
-
-      {hasValidationErrors && (
-        <div className="mb-4 p-3 bg-red-600/10 border border-red-600/30 rounded-lg text-red-200 text-sm">
-          Please fix the validation errors below before saving
-        </div>
-      )}
-
-      <div className="mb-6">
-        <label className="block text-sm font-medium mb-2">Camera</label>
-        <select
-          value={selectedCamera}
-          onChange={(e) => setSelectedCamera(e.target.value)}
-          className="px-3 py-2 bg-surface border border-surface-elevated rounded-lg"
-        >
-          <option value="0">Global Settings</option>
-          {config.cameras && Object.keys(config.cameras).map((key) => {
-            if (key !== 'count') {
-              return (
-                <option key={key} value={key}>
-                  Camera {key}
-                </option>
-              )
-            }
-            return null
-          })}
-        </select>
       </div>
 
       <DeviceSettings
@@ -266,7 +263,7 @@ export function Settings() {
 
       <FormSection
         title="System"
-        description="Core Motion daemon settings"
+        description="Core Motion daemon settings and device controls"
         collapsible
         defaultOpen={false}
       >
@@ -301,6 +298,29 @@ export function Settings() {
           helpText="Verbosity level for logging"
           error={getError('log_level')}
         />
+
+        <div className="border-t border-surface-elevated pt-4 mt-4">
+          <h4 className="font-medium mb-3 text-sm">Device Controls</h4>
+          <div className="flex gap-3">
+            <button
+              disabled
+              className="px-4 py-2 bg-yellow-600/20 text-yellow-300 rounded-lg text-sm opacity-50 cursor-not-allowed"
+              title="Coming soon - requires backend API"
+            >
+              Restart Pi
+            </button>
+            <button
+              disabled
+              className="px-4 py-2 bg-red-600/20 text-red-300 rounded-lg text-sm opacity-50 cursor-not-allowed"
+              title="Coming soon - requires backend API"
+            >
+              Shutdown Pi
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Device controls require backend API implementation (coming soon)
+          </p>
+        </div>
       </FormSection>
 
       <FormSection

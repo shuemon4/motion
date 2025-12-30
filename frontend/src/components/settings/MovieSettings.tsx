@@ -123,10 +123,15 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
 
         <div className="border-t border-surface-elevated pt-4">
           <h4 className="font-medium mb-2 text-sm">Format Code Reference</h4>
-          <div className="text-xs text-gray-400 space-y-1">
+          <div className="text-xs text-gray-400 space-y-2">
+            <p className="font-medium text-gray-300">Dynamic Folder Examples (Recommended):</p>
+            <p><code>%Y-%m-%d/%H%M%S</code> → <code>2025-01-29/143022.mkv</code></p>
+            <p><code>%Y/%m/%d/%v-%H%M%S</code> → <code>2025/01/29/42-143022.mkv</code></p>
+            <p><code>%$/%Y-%m-%d/%v</code> → <code>Camera1/2025-01-29/42.mkv</code></p>
+            <p className="mt-2 font-medium text-gray-300">Flat Structure:</p>
             <p><code>%Y%m%d%H%M%S</code> → <code>20250129143022.mkv</code></p>
-            <p><code>%$/%v-%Y-%m-%d_%H-%M-%S</code> → <code>Camera1/42-2025-01-29_14-30-22.mkv</code></p>
-            <p>Available codes: {formatCodes}</p>
+            <p className="mt-2">Available codes: {formatCodes}</p>
+            <p className="mt-2 text-yellow-200"><strong>Tip:</strong> Using date-based folders like <code>%Y-%m-%d/</code> keeps files organized and makes browsing faster.</p>
           </div>
         </div>
 

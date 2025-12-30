@@ -1,14 +1,33 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useCameras, usePictures, useMovies, useDeletePicture, useDeleteMovie } from '@/api/queries'
 import { useToast } from '@/components/Toast'
 import type { MediaItem } from '@/api/types'
 
 type MediaType = 'pictures' | 'movies'
+type ViewMode = 'all' | 'by-date'
+
+// Group items by date (YYYY-MM-DD)
+function groupByDate(items: MediaItem[]): Map<string, MediaItem[]> {
+  const groups = new Map<string, MediaItem[]>();
+  for (const item of items) {
+    // Convert timestamp to date string
+    const timestamp = parseInt(item.date) * 1000;
+    const dateStr = new Date(timestamp).toISOString().split('T')[0];
+    if (!groups.has(dateStr)) {
+      groups.set(dateStr, []);
+    }
+    groups.get(dateStr)!.push(item);
+  }
+  // Sort by date descending (newest first)
+  return new Map([...groups.entries()].sort((a, b) => b[0].localeCompare(a[0])));
+}
 
 export function Media() {
   const { addToast } = useToast()
   const [selectedCamera, setSelectedCamera] = useState(1)
   const [mediaType, setMediaType] = useState<MediaType>('pictures')
+  const [viewMode, setViewMode] = useState<ViewMode>('all')
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<MediaItem | null>(null)
 
@@ -20,7 +39,20 @@ export function Media() {
   const deleteMovieMutation = useDeleteMovie()
 
   const isLoading = mediaType === 'pictures' ? picturesLoading : moviesLoading
-  const items = mediaType === 'pictures' ? picturesData?.pictures ?? [] : moviesData?.movies ?? []
+  const allItems = mediaType === 'pictures' ? picturesData?.pictures ?? [] : moviesData?.movies ?? []
+
+  // Group items by date
+  const groupedItems = useMemo(() => groupByDate(allItems), [allItems])
+  const dateList = useMemo(() => Array.from(groupedItems.keys()), [groupedItems])
+
+  // Filter items based on view mode and selected date
+  const items = useMemo(() => {
+    if (viewMode === 'all') return allItems
+    if (selectedDate && groupedItems.has(selectedDate)) {
+      return groupedItems.get(selectedDate)!
+    }
+    return allItems
+  }, [viewMode, selectedDate, allItems, groupedItems])
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -118,7 +150,79 @@ export function Media() {
             </button>
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">View</label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setViewMode('all')
+                setSelectedDate(null)
+              }}
+              className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                viewMode === 'all'
+                  ? 'bg-primary text-white'
+                  : 'bg-surface-elevated hover:bg-surface'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setViewMode('by-date')}
+              className={`px-3 py-2 rounded-lg transition-colors text-sm ${
+                viewMode === 'by-date'
+                  ? 'bg-primary text-white'
+                  : 'bg-surface-elevated hover:bg-surface'
+              }`}
+            >
+              By Date ({dateList.length})
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Date folder navigation */}
+      {viewMode === 'by-date' && dateList.length > 0 && (
+        <div className="mb-6 p-4 bg-surface-elevated rounded-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <span className="text-sm font-medium text-gray-300">Browse by Date</span>
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="ml-auto text-xs text-primary hover:underline"
+              >
+                Show all dates
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {dateList.map((date) => {
+              const count = groupedItems.get(date)?.length ?? 0;
+              const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              });
+              return (
+                <button
+                  key={date}
+                  onClick={() => setSelectedDate(date)}
+                  className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                    selectedDate === date
+                      ? 'bg-primary text-white'
+                      : 'bg-surface hover:bg-surface-elevated'
+                  }`}
+                >
+                  {formattedDate} ({count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Gallery Grid */}
       {isLoading ? (
