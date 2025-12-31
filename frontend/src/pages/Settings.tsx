@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '@/api/client'
 import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form'
@@ -15,19 +15,31 @@ import { MovieSettings } from '@/components/settings/MovieSettings'
 import { StorageSettings } from '@/components/settings/StorageSettings'
 import { ScheduleSettings } from '@/components/settings/ScheduleSettings'
 import { PreferencesSettings } from '@/components/settings/PreferencesSettings'
+import { MaskEditor } from '@/components/settings/MaskEditor'
+import { NotificationSettings } from '@/components/settings/NotificationSettings'
+import { UploadSettings } from '@/components/settings/UploadSettings'
 import { systemReboot, systemShutdown } from '@/api/system'
+
+interface ConfigParam {
+  value: string | number | boolean
+  enabled: boolean
+  category: number
+  type: string
+  list?: string[]
+}
+
+interface CameraInfo {
+  id: number
+  name: string
+  url: string
+}
 
 interface MotionConfig {
   version: string
-  cameras: Record<string, unknown>
+  cameras: Record<string, CameraInfo | number>  // "count" is number, rest are CameraInfo
   configuration: {
-    default: Record<string, {
-      value: string | number | boolean
-      enabled: boolean
-      category: number
-      type: string
-      list?: string[]
-    }>
+    default: Record<string, ConfigParam>
+    [key: string]: Record<string, ConfigParam>  // cam1, cam2, etc.
   }
   categories: Record<string, { name: string; display: string }>
 }
@@ -73,14 +85,40 @@ export function Settings() {
   }, [])
 
   const getValue = (param: string, defaultValue: string | number | boolean = '') => {
+    // If there's a pending change, use that
     if (param in changes) {
       return changes[param]
     }
+
+    // For camera-specific settings, read from cam{id} config with fallback to default
+    if (selectedCamera !== '0') {
+      const camConfig = config?.configuration[`cam${selectedCamera}`]
+      if (camConfig && param in camConfig) {
+        return camConfig[param]?.value ?? defaultValue
+      }
+    }
+
+    // Fall back to global default
     return config?.configuration.default[param]?.value ?? defaultValue
   }
 
   const isDirty = Object.keys(changes).length > 0
   const hasValidationErrors = Object.keys(validationErrors).length > 0
+
+  // Get the active config for the selected camera
+  // Merges camera-specific config with defaults (camera values override defaults)
+  const activeConfig = useMemo(() => {
+    if (!config) return {}
+    const defaultConfig = config.configuration.default || {}
+
+    if (selectedCamera === '0') {
+      return defaultConfig
+    }
+
+    const cameraConfig = config.configuration[`cam${selectedCamera}`] || {}
+    // Merge: camera-specific values override defaults
+    return { ...defaultConfig, ...cameraConfig }
+  }, [config, selectedCamera])
 
   const handleSave = async () => {
     if (!isDirty) {
@@ -166,15 +204,15 @@ export function Settings() {
                 className="px-3 py-1.5 bg-surface-elevated border border-gray-700 rounded-lg text-sm"
               >
                 <option value="0">Global Settings</option>
-                {config.cameras && Object.keys(config.cameras).map((key) => {
-                  if (key !== 'count') {
-                    return (
-                      <option key={key} value={key}>
-                        Camera {key}
-                      </option>
-                    )
-                  }
-                  return null
+                {config.cameras && Object.entries(config.cameras).map(([key, cam]) => {
+                  // Skip the 'count' property
+                  if (key === 'count' || typeof cam === 'number') return null
+                  const camera = cam as CameraInfo
+                  return (
+                    <option key={camera.id} value={String(camera.id)}>
+                      {camera.name || `Camera ${camera.id}`}
+                    </option>
+                  )
                 })}
               </select>
             </div>
@@ -207,55 +245,72 @@ export function Settings() {
       </div>
 
       <DeviceSettings
-        config={config.configuration.default}
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />
 
       <LibcameraSettings
-        config={config.configuration.default}
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />
 
       <OverlaySettings
-        config={config.configuration.default}
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />
 
       <StreamSettings
-        config={config.configuration.default}
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />
 
       <MotionSettings
-        config={config.configuration.default}
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />
 
+      {/* Mask Editor - only shown when a camera is selected */}
+      {selectedCamera !== '0' && (
+        <MaskEditor cameraId={parseInt(selectedCamera, 10)} />
+      )}
+
       <PictureSettings
-        config={config.configuration.default}
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />
 
       <MovieSettings
-        config={config.configuration.default}
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />
 
       <StorageSettings
-        config={config.configuration.default}
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />
 
       <ScheduleSettings
-        config={config.configuration.default}
+        config={activeConfig}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <NotificationSettings
+        config={activeConfig}
+        onChange={handleChange}
+        getError={getError}
+      />
+
+      <UploadSettings
+        config={activeConfig}
         onChange={handleChange}
         getError={getError}
       />

@@ -488,10 +488,15 @@ void cls_camera::init_camera_type()
     } else if (cfg->v4l2_device != "") {
         camera_type = CAMERA_TYPE_V4L2;
     } else {
-        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
-            , _("Unable to determine camera type"));
+        /* No camera configured - allow camera to remain UNKNOWN
+         * User can configure camera via web UI
+         * Camera will not capture images until configured
+         */
+        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+            , _("No camera device configured. Configure camera via web interface."));
         camera_type = CAMERA_TYPE_UNKNOWN;
-        handler_stop = true;
+        /* Don't stop handler - allow web UI access for camera configuration */
+        handler_stop = false;
         restart = false;
     }
 }

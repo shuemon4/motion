@@ -741,7 +741,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
         }
         return edit_generic_string(netcam_userpass, parm, pact, "");
     }
-    if (name == "libcam_device") return edit_generic_string(libcam_device, parm, pact, "");
+    if (name == "libcam_device") return edit_generic_string(libcam_device, parm, pact, "auto");
     if (name == "libcam_params") return edit_generic_string(libcam_params, parm, pact, "");
     if (name == "schedule_params") return edit_generic_string(schedule_params, parm, pact, "");
     if (name == "cleandir_params") return edit_generic_string(cleandir_params, parm, pact, "");
@@ -834,7 +834,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "movie_encoder_preset") return edit_generic_list(movie_encoder_preset, parm, pact, "medium", movie_encoder_preset_values);
 
     static const std::vector<std::string> movie_container_values = {"mkv","mp4","3gp"};
-    if (name == "movie_container") return edit_generic_list(movie_container, parm, pact, "mkv", movie_container_values);
+    if (name == "movie_container") return edit_generic_list(movie_container, parm, pact, "mp4", movie_container_values);
 
     if (name == "movie_passthrough") return edit_generic_bool(movie_passthrough, parm, pact, false);
 
