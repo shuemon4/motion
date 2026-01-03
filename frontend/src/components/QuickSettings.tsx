@@ -51,6 +51,7 @@ function QuickSection({
 export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
   const { mutate: updateConfig, isPending } = useBatchUpdateConfig()
   const [lastApplied, setLastApplied] = useState<string | null>(null)
+  const [localChanges, setLocalChanges] = useState<Record<string, string | number | boolean>>({})
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   // Cleanup timers on unmount
@@ -60,22 +61,34 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
     }
   }, [])
 
+  // Reset local changes when config prop changes (e.g., after API update)
+  useEffect(() => {
+    setLocalChanges({})
+  }, [config])
+
   const getValue = useCallback(
     (param: string, defaultValue: string | number | boolean = '') => {
+      // Local changes take precedence over config
+      if (param in localChanges) {
+        return localChanges[param]
+      }
       return config[param]?.value ?? defaultValue
     },
-    [config]
+    [config, localChanges]
   )
 
   // Debounced change handler for sliders
   const handleChange = useCallback(
     (param: string, value: string | number | boolean) => {
+      // Update local state immediately so slider moves
+      setLocalChanges((prev) => ({ ...prev, [param]: value }))
+
       // Clear existing timer for this param
       if (debounceTimers.current[param]) {
         clearTimeout(debounceTimers.current[param])
       }
 
-      // Debounce slider changes
+      // Debounce API call
       debounceTimers.current[param] = setTimeout(() => {
         updateConfig(
           { camId: cameraId, changes: { [param]: value } },
@@ -94,6 +107,9 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
   // Immediate change handler for toggles/selects
   const handleImmediateChange = useCallback(
     (param: string, value: string | number | boolean) => {
+      // Update local state immediately
+      setLocalChanges((prev) => ({ ...prev, [param]: value }))
+
       updateConfig(
         { camId: cameraId, changes: { [param]: value } },
         {
