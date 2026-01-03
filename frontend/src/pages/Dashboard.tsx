@@ -1,8 +1,105 @@
+import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { CameraStream } from '@/components/CameraStream'
+import { BottomSheet } from '@/components/BottomSheet'
+import { QuickSettings } from '@/components/QuickSettings'
 import { useCameras } from '@/api/queries'
+import { apiGet } from '@/api/client'
+import { setCsrfToken } from '@/api/csrf'
+
+interface ConfigParam {
+  value: string | number | boolean
+  enabled: boolean
+  category: number
+  type: string
+}
+
+interface DashboardConfig {
+  configuration: {
+    default: Record<string, ConfigParam>
+    [key: string]: Record<string, ConfigParam>
+  }
+  csrf_token?: string
+}
 
 export function Dashboard() {
   const { data: cameras, isLoading, error } = useCameras()
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null)
+
+  // Fetch config when sheet is open
+  const { data: configData } = useQuery({
+    queryKey: ['config-quick'],
+    queryFn: async () => {
+      const cfg = await apiGet<DashboardConfig>('/0/api/config')
+      if (cfg.csrf_token) {
+        setCsrfToken(cfg.csrf_token)
+      }
+      return cfg
+    },
+    enabled: sheetOpen, // Only fetch when sheet is open
+    staleTime: 30000,
+  })
+
+  const openQuickSettings = (cameraId: number) => {
+    setSelectedCameraId(cameraId)
+    setSheetOpen(true)
+  }
+
+  const closeQuickSettings = () => {
+    setSheetOpen(false)
+  }
+
+  // Get camera name for sheet title
+  const selectedCamera = cameras?.find((c) => c.id === selectedCameraId)
+  const sheetTitle = selectedCamera
+    ? `Quick Settings - ${selectedCamera.name}`
+    : 'Quick Settings'
+
+  // Build config for selected camera (merge camera-specific with defaults)
+  const configForCamera = useMemo(() => {
+    if (!configData || !selectedCameraId) return {}
+
+    const defaultConfig = configData.configuration?.default || {}
+    const cameraConfig = configData.configuration?.[`cam${selectedCameraId}`] || {}
+
+    // Merge: camera-specific overrides global
+    return { ...defaultConfig, ...cameraConfig }
+  }, [configData, selectedCameraId])
+
+  // Gear icon button component
+  const SettingsButton = ({ cameraId }: { cameraId: number }) => (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        openQuickSettings(cameraId)
+      }}
+      className="p-1.5 hover:bg-surface rounded-full transition-colors"
+      aria-label="Quick settings"
+      title="Quick settings"
+    >
+      <svg
+        className="w-5 h-5 text-gray-400 hover:text-gray-200"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+        />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+        />
+      </svg>
+    </button>
+  )
 
   if (isLoading) {
     return (
@@ -75,17 +172,34 @@ export function Dashboard() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <h3 className="font-medium">{camera.name}</h3>
               </div>
-              {camera.width && camera.height && (
-                <span className="text-xs text-gray-500">
-                  {camera.width}x{camera.height}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {camera.width && camera.height && (
+                  <span className="text-xs text-gray-500">
+                    {camera.width}x{camera.height}
+                  </span>
+                )}
+                <SettingsButton cameraId={camera.id} />
+              </div>
             </div>
 
             {/* Camera stream */}
             <CameraStream cameraId={camera.id} />
           </div>
         </div>
+
+        {/* Quick Settings Bottom Sheet */}
+        <BottomSheet
+          isOpen={sheetOpen}
+          onClose={closeQuickSettings}
+          title={sheetTitle}
+        >
+          {selectedCameraId && (
+            <QuickSettings
+              cameraId={selectedCameraId}
+              config={configForCamera}
+            />
+          )}
+        </BottomSheet>
       </div>
     )
   }
@@ -119,11 +233,14 @@ export function Dashboard() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <h3 className="font-medium text-sm sm:text-base">{camera.name}</h3>
               </div>
-              {camera.width && camera.height && (
-                <span className="text-xs text-gray-500">
-                  {camera.width}x{camera.height}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {camera.width && camera.height && (
+                  <span className="text-xs text-gray-500">
+                    {camera.width}x{camera.height}
+                  </span>
+                )}
+                <SettingsButton cameraId={camera.id} />
+              </div>
             </div>
 
             {/* Camera stream */}
@@ -135,6 +252,20 @@ export function Dashboard() {
       <p className="text-center text-xs text-gray-500 mt-6">
         Click on a camera to view fullscreen
       </p>
+
+      {/* Quick Settings Bottom Sheet */}
+      <BottomSheet
+        isOpen={sheetOpen}
+        onClose={closeQuickSettings}
+        title={sheetTitle}
+      >
+        {selectedCameraId && (
+          <QuickSettings
+            cameraId={selectedCameraId}
+            config={configForCamera}
+          />
+        )}
+      </BottomSheet>
     </div>
   )
 }
