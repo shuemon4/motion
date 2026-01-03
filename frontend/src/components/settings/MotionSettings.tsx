@@ -1,4 +1,4 @@
-import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form';
+import { FormSection, FormInput, FormSelect, FormToggle, FormSlider } from '@/components/form';
 import { LOCATE_MOTION_MODES } from '@/utils/parameterMappings';
 import { percentToPixels, pixelsToPercent } from '@/utils/translations';
 
@@ -41,13 +41,14 @@ export function MotionSettings({ config, onChange, getError }: MotionSettingsPro
       defaultOpen={false}
     >
       <div className="space-y-4">
-        <FormInput
-          label="Threshold (%)"
-          value={String(thresholdPercent)}
-          onChange={handleThresholdPercentChange}
-          type="number"
-          step="0.1"
-          min="0"
+        <FormSlider
+          label="Threshold"
+          value={thresholdPercent}
+          onChange={(val) => handleThresholdPercentChange(String(val))}
+          min={0}
+          max={20}
+          step={0.1}
+          unit="%"
           helpText={`Percentage of frame that must change (${thresholdPixels} pixels at ${width}x${height}). Higher = less sensitive.`}
           error={getError?.('threshold')}
         />
@@ -75,24 +76,23 @@ export function MotionSettings({ config, onChange, getError }: MotionSettingsPro
           helpText="Automatically determine optimal noise level"
         />
 
-        <FormInput
+        <FormSlider
           label="Noise Level"
-          value={String(getValue('noise_level', 32))}
-          onChange={(val) => onChange('noise_level', Number(val))}
-          type="number"
-          min="1"
-          max="255"
+          value={Number(getValue('noise_level', 32))}
+          onChange={(val) => onChange('noise_level', val)}
+          min={1}
+          max={255}
           helpText="Noise tolerance (1-255). Lower values detect smaller motions."
           error={getError?.('noise_level')}
         />
 
-        <FormInput
-          label="Light Switch Detection (%)"
-          value={String(getValue('lightswitch_percent', 0))}
-          onChange={(val) => onChange('lightswitch_percent', Number(val))}
-          type="number"
-          min="0"
-          max="100"
+        <FormSlider
+          label="Light Switch Detection"
+          value={Number(getValue('lightswitch_percent', 0))}
+          onChange={(val) => onChange('lightswitch_percent', val)}
+          min={0}
+          max={100}
+          unit="%"
           helpText="Ignore sudden brightness changes (0 = disabled). Prevents false triggers from lights turning on/off."
           error={getError?.('lightswitch_percent')}
         />
@@ -105,13 +105,12 @@ export function MotionSettings({ config, onChange, getError }: MotionSettingsPro
           helpText="Remove noise speckles from motion detection"
         />
 
-        <FormInput
+        <FormSlider
           label="Smart Mask Speed"
-          value={String(getValue('smart_mask_speed', 0))}
-          onChange={(val) => onChange('smart_mask_speed', Number(val))}
-          type="number"
-          min="0"
-          max="10"
+          value={Number(getValue('smart_mask_speed', 0))}
+          onChange={(val) => onChange('smart_mask_speed', val)}
+          min={0}
+          max={10}
           helpText="Auto-mask static areas (0 = disabled, 1-10 = speed). Higher values adapt faster to static objects."
           error={getError?.('smart_mask_speed')}
         />

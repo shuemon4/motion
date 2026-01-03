@@ -1,4 +1,4 @@
-import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form';
+import { FormSection, FormInput, FormSelect, FormToggle, FormSlider } from '@/components/form';
 import {
   AWB_MODES,
   AUTOFOCUS_MODES,
@@ -27,30 +27,36 @@ export function LibcameraSettings({ config, onChange, getError }: LibcameraSetti
       defaultOpen={false}
     >
       {/* Image Controls */}
-      <FormInput
+      <FormSlider
         label="Brightness"
-        value={String(getValue('libcam_brightness', 0))}
-        onChange={(val) => onChange('libcam_brightness', Number(val))}
-        type="number"
+        value={Number(getValue('libcam_brightness', 0))}
+        onChange={(val) => onChange('libcam_brightness', val)}
+        min={-1}
+        max={1}
+        step={0.1}
         helpText="Brightness adjustment (-1.0 to 1.0)"
         error={getError?.('libcam_brightness')}
       />
 
-      <FormInput
+      <FormSlider
         label="Contrast"
-        value={String(getValue('libcam_contrast', 1))}
-        onChange={(val) => onChange('libcam_contrast', Number(val))}
-        type="number"
+        value={Number(getValue('libcam_contrast', 1))}
+        onChange={(val) => onChange('libcam_contrast', val)}
+        min={0}
+        max={32}
+        step={0.5}
         helpText="Contrast adjustment (0.0 to 32.0)"
         error={getError?.('libcam_contrast')}
       />
 
-      <FormInput
-        label="ISO"
-        value={String(getValue('libcam_iso', 0))}
-        onChange={(val) => onChange('libcam_iso', Number(val))}
-        type="number"
-        helpText="ISO sensitivity (0=auto, 100-6400)"
+      <FormSlider
+        label="Gain (ISO)"
+        value={Number(getValue('libcam_iso', 0))}
+        onChange={(val) => onChange('libcam_iso', val)}
+        min={0}
+        max={1000}
+        step={10}
+        helpText="ISO sensitivity (0=auto, 10-1000) — Gain 1.0 ~ ISO 100"
         error={getError?.('libcam_iso')}
       />
 
@@ -86,30 +92,37 @@ export function LibcameraSettings({ config, onChange, getError }: LibcameraSetti
 
       {!awbEnabled && (
         <>
-          <FormInput
+          <FormSlider
             label="Color Temperature"
-            value={String(getValue('libcam_colour_temp', 0))}
-            onChange={(val) => onChange('libcam_colour_temp', Number(val))}
-            type="number"
+            value={Number(getValue('libcam_colour_temp', 0))}
+            onChange={(val) => onChange('libcam_colour_temp', val)}
+            min={0}
+            max={10000}
+            step={100}
+            unit=" K"
             helpText="Manual color temperature in Kelvin (0-10000)"
             error={getError?.('libcam_colour_temp')}
           />
 
           <div className="grid grid-cols-2 gap-4">
-            <FormInput
+            <FormSlider
               label="Red Gain"
-              value={String(getValue('libcam_colour_gain_r', 1))}
-              onChange={(val) => onChange('libcam_colour_gain_r', Number(val))}
-              type="number"
+              value={Number(getValue('libcam_colour_gain_r', 1))}
+              onChange={(val) => onChange('libcam_colour_gain_r', val)}
+              min={0}
+              max={8}
+              step={0.1}
               helpText="Red color gain (0.0-8.0)"
               error={getError?.('libcam_colour_gain_r')}
             />
 
-            <FormInput
+            <FormSlider
               label="Blue Gain"
-              value={String(getValue('libcam_colour_gain_b', 1))}
-              onChange={(val) => onChange('libcam_colour_gain_b', Number(val))}
-              type="number"
+              value={Number(getValue('libcam_colour_gain_b', 1))}
+              onChange={(val) => onChange('libcam_colour_gain_b', val)}
+              min={0}
+              max={8}
+              step={0.1}
               helpText="Blue color gain (0.0-8.0)"
               error={getError?.('libcam_colour_gain_b')}
             />
@@ -130,11 +143,14 @@ export function LibcameraSettings({ config, onChange, getError }: LibcameraSetti
       />
 
       {Number(getValue('libcam_af_mode', 0)) === 0 && (
-        <FormInput
+        <FormSlider
           label="Lens Position"
-          value={String(getValue('libcam_lens_position', 0))}
-          onChange={(val) => onChange('libcam_lens_position', Number(val))}
-          type="number"
+          value={Number(getValue('libcam_lens_position', 0))}
+          onChange={(val) => onChange('libcam_lens_position', val)}
+          min={0}
+          max={15}
+          step={0.5}
+          unit=" dioptres"
           helpText="Manual focus position (0.0-15.0 dioptres)"
           error={getError?.('libcam_lens_position')}
         />

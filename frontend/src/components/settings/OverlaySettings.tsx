@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FormSection, FormInput, FormSelect } from '@/components/form';
+import { FormSection, FormInput, FormSelect, FormSlider } from '@/components/form';
 import { presetToMotionText, motionTextToPreset } from '@/utils/translations';
 
 export interface OverlaySettingsProps {
@@ -104,11 +104,13 @@ export function OverlaySettings({ config, onChange, getError }: OverlaySettingsP
         />
       )}
 
-      <FormInput
+      <FormSlider
         label="Text Scale"
-        value={String(getValue('text_scale', 1))}
-        onChange={(val) => onChange('text_scale', Number(val))}
-        type="number"
+        value={Number(getValue('text_scale', 1))}
+        onChange={(val) => onChange('text_scale', val)}
+        min={1}
+        max={10}
+        unit="x"
         helpText="Text size multiplier (1-10)"
         error={getError?.('text_scale')}
       />

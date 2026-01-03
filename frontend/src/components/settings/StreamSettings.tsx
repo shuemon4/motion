@@ -1,4 +1,4 @@
-import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form';
+import { FormSection, FormSelect, FormToggle, FormSlider } from '@/components/form';
 import { AUTH_METHODS } from '@/utils/parameterMappings';
 
 // Resolution presets matching MotionEye
@@ -48,24 +48,24 @@ export function StreamSettings({ config, onChange, getError }: StreamSettingsPro
             helpText="Scale stream as percentage of source resolution. Lower = less bandwidth and CPU."
           />
 
-          <FormInput
+          <FormSlider
             label="Stream Quality"
-            value={String(getValue('stream_quality', 50))}
-            onChange={(val) => onChange('stream_quality', Number(val))}
-            type="number"
-            min="1"
-            max="100"
+            value={Number(getValue('stream_quality', 50))}
+            onChange={(val) => onChange('stream_quality', val)}
+            min={1}
+            max={100}
+            unit="%"
             helpText="JPEG compression quality (1-100). Higher = better quality, more bandwidth."
             error={getError?.('stream_quality')}
           />
 
-          <FormInput
+          <FormSlider
             label="Stream Max Framerate"
-            value={String(getValue('stream_maxrate', 15))}
-            onChange={(val) => onChange('stream_maxrate', Number(val))}
-            type="number"
-            min="1"
-            max="100"
+            value={Number(getValue('stream_maxrate', 15))}
+            onChange={(val) => onChange('stream_maxrate', val)}
+            min={1}
+            max={30}
+            unit=" fps"
             helpText="Maximum frames per second (lower = less bandwidth and CPU)"
             error={getError?.('stream_maxrate')}
           />

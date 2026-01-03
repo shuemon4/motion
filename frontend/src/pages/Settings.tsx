@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet } from '@/api/client'
+import { setCsrfToken } from '@/api/csrf'
 import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form'
 import { useToast } from '@/components/Toast'
 import { useBatchUpdateConfig } from '@/api/queries'
@@ -54,9 +55,17 @@ export function Settings() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const [isSaving, setIsSaving] = useState(false)
 
+  const queryClient = useQueryClient()
   const { data: config, isLoading, error } = useQuery({
     queryKey: ['config'],
-    queryFn: () => apiGet<MotionConfig>('/0/api/config'),
+    queryFn: async () => {
+      const cfg = await apiGet<MotionConfig & { csrf_token?: string }>('/0/api/config')
+      // Store CSRF token for subsequent PATCH requests
+      if (cfg.csrf_token) {
+        setCsrfToken(cfg.csrf_token)
+      }
+      return cfg
+    },
   })
 
   const batchUpdateConfigMutation = useBatchUpdateConfig()
@@ -107,18 +116,33 @@ export function Settings() {
 
   // Get the active config for the selected camera
   // Merges camera-specific config with defaults (camera values override defaults)
+  // Also merges in pending changes so UI reflects unsaved edits
   const activeConfig = useMemo(() => {
     if (!config) return {}
     const defaultConfig = config.configuration.default || {}
 
+    let baseConfig: Record<string, ConfigParam>
     if (selectedCamera === '0') {
-      return defaultConfig
+      baseConfig = defaultConfig
+    } else {
+      const cameraConfig = config.configuration[`cam${selectedCamera}`] || {}
+      // Merge: camera-specific values override defaults
+      baseConfig = { ...defaultConfig, ...cameraConfig }
     }
 
-    const cameraConfig = config.configuration[`cam${selectedCamera}`] || {}
-    // Merge: camera-specific values override defaults
-    return { ...defaultConfig, ...cameraConfig }
-  }, [config, selectedCamera])
+    // Merge pending changes into config so child components see updated values
+    const mergedConfig = { ...baseConfig }
+    for (const [param, value] of Object.entries(changes)) {
+      if (mergedConfig[param]) {
+        mergedConfig[param] = { ...mergedConfig[param], value }
+      } else {
+        // Create a new entry for params not in original config
+        mergedConfig[param] = { value, enabled: true, category: 0, type: 'string' }
+      }
+    }
+
+    return mergedConfig
+  }, [config, selectedCamera, changes])
 
   const handleSave = async () => {
     if (!isDirty) {
@@ -137,16 +161,65 @@ export function Settings() {
 
     try {
       // Use batch API - send all changes in one request
-      await batchUpdateConfigMutation.mutateAsync({
+      const response = await batchUpdateConfigMutation.mutateAsync({
         camId,
         changes,
-      })
+      }) as {
+        status?: string
+        applied?: Array<{ param: string; error?: string; hot_reload?: boolean }>
+        summary?: { total: number; success: number; errors: number }
+      } | undefined
 
-      addToast(`Successfully saved ${Object.keys(changes).length} setting(s)`, 'success')
-      setChanges({})
+      // Wait for config to be refetched before clearing changes
+      // This prevents the UI from reverting to old values
+      await queryClient.invalidateQueries({ queryKey: ['config'] })
+      await queryClient.refetchQueries({ queryKey: ['config'] })
+
+      // Check response for partial failures
+      const summary = response?.summary
+      const applied = response?.applied || []
+
+      if (!summary) {
+        // No summary in response - assume success
+        addToast(`Saved ${Object.keys(changes).length} setting(s)`, 'success')
+        setChanges({})
+      } else if (summary.errors > 0) {
+        // Find which parameters failed
+        const failedParams = applied
+          .filter((p) => p.error)
+          .map((p) => p.param)
+
+        // Only clear changes that succeeded
+        const successfulParams = applied
+          .filter((p) => !p.error)
+          .map((p) => p.param)
+
+        const remainingChanges: ConfigChanges = {}
+        for (const [param, value] of Object.entries(changes)) {
+          if (!successfulParams.includes(param)) {
+            remainingChanges[param] = value
+          }
+        }
+        setChanges(remainingChanges)
+
+        if (summary.success > 0) {
+          addToast(
+            `Saved ${summary.success} setting(s). ${summary.errors} require restart: ${failedParams.join(', ')}`,
+            'warning'
+          )
+        } else {
+          addToast(
+            `Settings require daemon restart: ${failedParams.join(', ')}`,
+            'warning'
+          )
+        }
+      } else {
+        addToast(`Successfully saved ${summary.success} setting(s)`, 'success')
+        setChanges({})
+      }
     } catch (err) {
       console.error('Failed to save settings:', err)
-      addToast('Failed to save settings', 'error')
+      addToast('Failed to save settings. Check browser console for details.', 'error')
     } finally {
       setIsSaving(false)
     }

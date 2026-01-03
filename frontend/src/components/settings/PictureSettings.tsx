@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FormSection, FormInput, FormSelect } from '@/components/form';
+import { FormSection, FormInput, FormSelect, FormSlider } from '@/components/form';
 import { captureModeToMotion, motionToCaptureMode } from '@/utils/translations';
 
 export interface PictureSettingsProps {
@@ -89,13 +89,13 @@ export function PictureSettings({ config, onChange, getError }: PictureSettingsP
           />
         )}
 
-        <FormInput
+        <FormSlider
           label="Picture Quality"
-          value={String(getValue('picture_quality', 75))}
-          onChange={(val) => onChange('picture_quality', Number(val))}
-          type="number"
-          min="1"
-          max="100"
+          value={Number(getValue('picture_quality', 75))}
+          onChange={(val) => onChange('picture_quality', val)}
+          min={1}
+          max={100}
+          unit="%"
           helpText="JPEG quality (1-100). Higher = better quality, larger files."
           error={getError?.('picture_quality')}
         />

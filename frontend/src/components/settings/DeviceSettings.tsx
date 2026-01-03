@@ -1,4 +1,4 @@
-import { FormSection, FormInput, FormSelect } from '@/components/form';
+import { FormSection, FormInput, FormSelect, FormSlider } from '@/components/form';
 import { RESOLUTION_PRESETS, ROTATION_OPTIONS } from '@/utils/parameterMappings';
 import { formatResolution, parseResolution } from '@/utils/translations';
 
@@ -91,11 +91,13 @@ export function DeviceSettings({ config, onChange, getError }: DeviceSettingsPro
         </div>
       )}
 
-      <FormInput
+      <FormSlider
         label="Framerate"
-        value={String(getValue('framerate', 15))}
-        onChange={(val) => onChange('framerate', Number(val))}
-        type="number"
+        value={Number(getValue('framerate', 15))}
+        onChange={(val) => onChange('framerate', val)}
+        min={2}
+        max={30}
+        unit=" fps"
         helpText="Frames per second (higher uses more CPU)"
         error={getError?.('framerate')}
       />

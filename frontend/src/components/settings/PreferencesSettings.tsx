@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form';
+import { FormSection, FormSelect, FormToggle, FormSlider } from '@/components/form';
 
 export interface PreferencesSettingsProps {
   // No config needed - these are localStorage-only settings
@@ -65,21 +65,19 @@ export function PreferencesSettings({}: PreferencesSettingsProps) {
         <div className="border-t border-surface-elevated pt-4">
           <h4 className="font-medium mb-3">Dashboard Layout</h4>
 
-          <FormInput
+          <FormSlider
             label="Grid Columns"
-            value={String(preferences.gridColumns)}
-            onChange={(val) => updatePreference('gridColumns', Number(val))}
-            type="number"
+            value={preferences.gridColumns}
+            onChange={(val) => updatePreference('gridColumns', val)}
             min={1}
             max={4}
             helpText="Number of camera columns in dashboard grid (1-4)"
           />
 
-          <FormInput
+          <FormSlider
             label="Grid Rows"
-            value={String(preferences.gridRows)}
-            onChange={(val) => updatePreference('gridRows', Number(val))}
-            type="number"
+            value={preferences.gridRows}
+            onChange={(val) => updatePreference('gridRows', val)}
             min={1}
             max={4}
             helpText="Number of camera rows in dashboard grid (1-4)"
@@ -96,25 +94,25 @@ export function PreferencesSettings({}: PreferencesSettingsProps) {
         <div className="border-t border-surface-elevated pt-4">
           <h4 className="font-medium mb-3">Playback Settings</h4>
 
-          <FormInput
+          <FormSlider
             label="Framerate Factor"
-            value={String(preferences.playbackFramerateFactor)}
-            onChange={(val) => updatePreference('playbackFramerateFactor', Number(val))}
-            type="number"
+            value={preferences.playbackFramerateFactor}
+            onChange={(val) => updatePreference('playbackFramerateFactor', val)}
             min={0.1}
             max={4.0}
             step={0.1}
+            unit="x"
             helpText="Playback speed multiplier (0.5 = half speed, 2.0 = double speed)"
           />
 
-          <FormInput
+          <FormSlider
             label="Resolution Factor"
-            value={String(preferences.playbackResolutionFactor)}
-            onChange={(val) => updatePreference('playbackResolutionFactor', Number(val))}
-            type="number"
+            value={preferences.playbackResolutionFactor}
+            onChange={(val) => updatePreference('playbackResolutionFactor', val)}
             min={0.25}
             max={1.0}
             step={0.25}
+            unit="x"
             helpText="Playback resolution scaling (0.5 = half resolution, 1.0 = full)"
           />
 

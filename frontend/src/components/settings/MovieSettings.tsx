@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form';
+import { FormSection, FormInput, FormSelect, FormToggle, FormSlider } from '@/components/form';
 import { MOVIE_CONTAINERS } from '@/utils/parameterMappings';
 import { recordingModeToMotion, motionToRecordingMode } from '@/utils/translations';
 
@@ -75,13 +75,13 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
 
         {selectedMode !== 'off' && (
           <>
-            <FormInput
+            <FormSlider
               label="Movie Quality"
-              value={String(getValue('movie_quality', 75))}
-              onChange={(val) => onChange('movie_quality', Number(val))}
-              type="number"
-              min="1"
-              max="100"
+              value={Number(getValue('movie_quality', 75))}
+              onChange={(val) => onChange('movie_quality', val)}
+              min={1}
+              max={100}
+              unit="%"
               helpText="Video encoding quality (1-100). Higher = better quality, larger files, more CPU."
               error={getError?.('movie_quality')}
             />
