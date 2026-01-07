@@ -1,10 +1,53 @@
 Summary of changes for version 5.0.0 are below
-    * Raspberry Pi 5 + Camera Module v3 (IMX708) native support
-    * Change libcamera StreamRole from Viewfinder to VideoRecording for Pi 5 PiSP
-    * Add multi-buffer support for libcamera with configurable buffer count
+
+Platform/OS Support:
+    * Raspberry Pi OS Trixie (Debian 13) 64-bit full support
+    * 64-bit type safety fixes for aarch64 (size_t for buffer sizes, proper pointer logging)
+    * Raspberry Pi 5 + Camera Module v3 (IMX708) native support with PiSP
+    * Raspberry Pi 4 compatibility maintained with separate build profile
+    * libcamera 0.4.0/0.5.x version compatibility with feature detection
+    * ARM64 alignment fix in rotate.cpp for safe memory access
+    * FFmpeg 7+ compatibility guard for avdevice_register_all()
+    * Pi 4 build script with V4L2 support for USB cameras (scripts/pi4-build.sh)
+    * Script updates for rpicam-* tool detection (Trixie) with libcamera-* fallback (Bookworm)
+
+libcamera Enhancements:
+    * Change StreamRole from Viewfinder to VideoRecording for Pi 5 PiSP
+    * Add multi-buffer support with configurable buffer count (libcam_buffer_count, default: 4)
+    * Add camera capability discovery and validation system
     * Add camera filtering to exclude USB cameras from CSI camera detection
     * Add model-based camera selection for libcamera devices
-    * Add libcam_buffer_count configuration parameter (default: 4)
+    * Add NV12 pixel format support in addition to YUV420
+    * Add draft control guards with silent skip for unavailable controls (9 controls)
+    * Fix stream resolution bug (480x272 → 1920x1080) with diagnostic logging
+    * Add mutex synchronization for thread-safe control application
+    * Add extensive DIAG markers for resolution troubleshooting
+
+Autofocus System:
+    * Add autofocus configuration parameters (libcam_af_mode, libcam_lens_position, etc.)
+    * Add AF initialization defaults (AfMode=0 Manual, LensPosition=0.0 infinity)
+    * Add hot-reload AF controls (af_mode, lens_position, af_range, af_speed)
+    * Add AF scan trigger and cancellation support for Auto mode
+    * Add multiple AF window support (up to 4 focus regions, semicolon-separated)
+    * Fix AfWindows documentation (x|y|width|height format clarification)
+    * Remove read-only control setters (AfState, AfPauseState) bug fix
+
+Auto White Balance (AWB):
+    * Add AWB hot-reload controls (AwbMode, ColourGains, ColourTemperature)
+    * Add mutual exclusivity handling between AwbMode and manual colour controls
+    * Add support for all libcamera AWB modes with runtime switching
+    * Add brightness and contrast hot-reload controls
+
+Security Hardening:
+    * Add CSRF protection with cryptographically secure random tokens
+    * Add CSRF token validation on all POST requests
+    * Add security headers (Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy)
+    * Add HA1 digest storage for secure credential management
+    * Add environment variable expansion support (${VAR} in config files)
+    * Command injection prevention (shell metacharacter validation)
+    * Compiler hardening (stack protection flags, PIE, RELRO)
+
+Configuration System:
     * Major configuration system refactor for improved performance
     * Add O(1) parameter registry with hash map lookup (parm_registry.hpp/cpp)
     * Add scoped parameter structs for reduced memory footprint (parm_structs.hpp)
@@ -12,6 +55,19 @@ Summary of changes for version 5.0.0 are below
     * Separate file I/O from configuration storage (conf_file.hpp/cpp)
     * Replace linear array iteration with registry-based lookups in conf.cpp
     * Integrate O(1) registry lookups into edit_set_active() and parms_copy()
+    * Add hot-reload framework for dynamic control updates without restart
+    * Consolidate edit handlers for centralized configuration editing
+
+Code Quality & Cleanup:
+    * Replace unsafe atoi() with strtol() in video_loopback.cpp
+    * Remove deprecated FFmpeg refcounted_frames option (3 locations in netcam.cpp)
+    * Simplify FFmpeg shims in util.hpp (modern API only for FFmpeg 6.0+)
+    * Fix duplicate initialization in camera.cpp (movie_norm nullptr)
+    * Fix error message in movie.cpp (av_packet_ref vs av_copy_packet)
+    * Fix non-standard types (ulong → unsigned long in jpegutils.cpp)
+    * Fix type usage in video_convert.cpp (long int → int for image dimensions)
+
+Features & Enhancements:
     * Add movie_encoder_preset config parameter for H.264 encoding
     * Documentation updates for Pi 5 deployment and architecture
 Summary of changes for version 4.7.0 are below
