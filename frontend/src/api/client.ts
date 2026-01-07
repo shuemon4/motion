@@ -366,4 +366,66 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
   }
 }
 
+/**
+ * POST request with form-urlencoded data for Motion action commands
+ * Used for restart, config_write, pause, etc.
+ */
+export async function apiPostAction(
+  command: string,
+  camId: number
+): Promise<void> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+  try {
+    const response = await fetch('/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      credentials: 'same-origin',
+      body: `command=${encodeURIComponent(command)}&camid=${camId}`,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new ApiClientError(`HTTP ${response.status}: ${response.statusText}`, response.status);
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof ApiClientError) throw error;
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiClientError('Request timeout', 408);
+    }
+    throw new ApiClientError(error instanceof Error ? error.message : 'Unknown error');
+  }
+}
+
+/**
+ * Write current configuration to disk
+ * @param camId Camera ID (0 for all cameras)
+ */
+export async function writeConfig(camId: number = 0): Promise<void> {
+  return apiPostAction('config_write', camId);
+}
+
+/**
+ * Restart a camera to apply configuration changes
+ * @param camId Camera ID (0 for all cameras)
+ */
+export async function restartCamera(camId: number = 0): Promise<void> {
+  return apiPostAction('restart', camId);
+}
+
+/**
+ * Write config and restart camera - used after applying restart-required parameters
+ * @param camId Camera ID
+ */
+export async function applyRestartRequiredChanges(camId: number): Promise<void> {
+  await writeConfig(camId);
+  await restartCamera(camId);
+}
+
 export { ApiClientError };

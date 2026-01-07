@@ -298,6 +298,7 @@ void cls_config_file::log_parm(const std::string &parm_nm, const std::string &pa
         (parm_nm == "netcam_userpass") ||
         (parm_nm == "netcam_high_url") ||
         (parm_nm == "webcontrol_authentication") ||
+        (parm_nm == "webcontrol_user_authentication") ||
         (parm_nm == "webcontrol_key") ||
         (parm_nm == "webcontrol_cert") ||
         (parm_nm == "database_user") ||

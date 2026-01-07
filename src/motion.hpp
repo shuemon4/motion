@@ -96,6 +96,7 @@ class cls_sound;
 class cls_algsec;
 class cls_alg;
 class cls_config;
+class cls_config_profile;
 class cls_dbse;
 class cls_draw;
 class cls_log;
@@ -196,6 +197,7 @@ class cls_motapp {
         cls_config          *cfg;
         cls_webu            *webu;
         cls_dbse            *dbse;
+        cls_config_profile  *profiles;
         cls_allcam          *allcam;
         cls_schedule        *schedule;
 

@@ -121,6 +121,13 @@ int cls_webu_ans::parseurl()
 
     MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO, _("Decoded url: %s"),url.c_str());
 
+    /* Strip query string from URL path before parsing
+     * Query parameters are still accessible via MHD_lookup_connection_value() */
+    size_t query_pos = url.find('?');
+    if (query_pos != std::string::npos) {
+        url = url.substr(0, query_pos);
+    }
+
     baselen = app->cfg->webcontrol_base_path.length();
 
     if (url.length() < baselen) {
@@ -592,6 +599,8 @@ mhdrslt cls_webu_ans::mhd_digest()
      */
     int retcd;
     char *user;
+    bool is_admin = false;
+    bool is_user = false;
 
     /*Get username or prompt for a user/pass */
     user = MHD_digest_auth_get_username(connection);
@@ -599,26 +608,51 @@ mhdrslt cls_webu_ans::mhd_digest()
         return mhd_digest_fail(MHD_NO);
     }
 
-    /* Check for valid user name */
-    if (mystrne(user, auth_user)) {
+    /* Check which credential set to use */
+    if (mystreq(user, auth_user)) {
+        is_admin = true;
+    } else if (user_auth_user != nullptr && mystreq(user, user_auth_user)) {
+        is_user = true;
+    } else {
+        /* Unknown username */
         failauth_log(true, user ? std::string(user) : "");
         myfree(user);
         return mhd_digest_fail(MHD_NO);
     }
+
     std::string attempted_user(user);  /* Save for logging before freeing */
     myfree(user);
 
-    /* Check the password as well*/
-    if (auth_is_ha1) {
-        /* Use HA1 hash directly for digest authentication */
-        retcd = MHD_digest_auth_check2(connection, auth_realm
-            , auth_user, auth_pass, 300, MHD_DIGEST_ALG_MD5);
-    } else {
-        /* Use plain password (MHD will compute HA1) */
-        retcd = MHD_digest_auth_check(connection, auth_realm
-            , auth_user, auth_pass, 300);
+    /* Check the password based on role */
+    if (is_admin) {
+        if (auth_is_ha1) {
+            retcd = MHD_digest_auth_check2(connection, auth_realm
+                , auth_user, auth_pass, 300, MHD_DIGEST_ALG_MD5);
+        } else {
+            retcd = MHD_digest_auth_check(connection, auth_realm
+                , auth_user, auth_pass, 300);
+        }
+        if (retcd == MHD_YES) {
+            authenticated = true;
+            auth_role = "admin";
+            return MHD_YES;
+        }
+    } else if (is_user) {
+        if (user_auth_is_ha1) {
+            retcd = MHD_digest_auth_check2(connection, auth_realm
+                , user_auth_user, user_auth_pass, 300, MHD_DIGEST_ALG_MD5);
+        } else {
+            retcd = MHD_digest_auth_check(connection, auth_realm
+                , user_auth_user, user_auth_pass, 300);
+        }
+        if (retcd == MHD_YES) {
+            authenticated = true;
+            auth_role = "user";
+            return MHD_YES;
+        }
     }
 
+    /* Password check failed */
     if (retcd == MHD_NO) {
         failauth_log(false, attempted_user);
     }
@@ -675,28 +709,41 @@ mhdrslt cls_webu_ans::mhd_basic()
         return mhd_basic_fail();
     }
 
-    if ((mystrne(user, auth_user)) || (mystrne(pass, auth_pass))) {
-        failauth_log(mystrne(user, auth_user), user ? std::string(user) : "");
+    /* Try admin credentials first */
+    if ((mystreq(user, auth_user)) && (mystreq(pass, auth_pass))) {
         myfree(user);
         myfree(pass);
-        return mhd_basic_fail();
+        authenticated = true;
+        auth_role = "admin";
+        return MHD_YES;
     }
 
+    /* Try view-only user credentials if configured */
+    if (user_auth_user != nullptr && user_auth_pass != nullptr) {
+        if ((mystreq(user, user_auth_user)) && (mystreq(pass, user_auth_pass))) {
+            myfree(user);
+            myfree(pass);
+            authenticated = true;
+            auth_role = "user";
+            return MHD_YES;
+        }
+    }
+
+    /* Both failed */
+    failauth_log(true, user ? std::string(user) : "");
     myfree(user);
     myfree(pass);
-
-    authenticated = true;
-
-    return MHD_YES;
+    return mhd_basic_fail();
 
 }
 
-/* Parse apart the user:pass provided*/
+/* Parse apart the admin user:pass provided*/
 void cls_webu_ans::mhd_auth_parse()
 {
     int auth_len;
     char *col_pos;
 
+    /* Parse admin credentials */
     myfree(auth_user);
     myfree(auth_pass);
 
@@ -727,6 +774,46 @@ void cls_webu_ans::mhd_auth_parse()
                 auth_is_ha1 = true;
                 MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
                     _("Detected HA1 hash format for webcontrol authentication"));
+            }
+        }
+    }
+
+    /* Parse view-only user credentials (if configured) */
+    myfree(user_auth_user);
+    myfree(user_auth_pass);
+    user_auth_user = nullptr;
+    user_auth_pass = nullptr;
+    user_auth_is_ha1 = false;
+
+    if (app->cfg->webcontrol_user_authentication != "" &&
+        app->cfg->webcontrol_user_authentication != "noauth") {
+
+        auth_len = (int)app->cfg->webcontrol_user_authentication.length();
+        col_pos =(char*) strstr(app->cfg->webcontrol_user_authentication.c_str() ,":");
+        if (col_pos == NULL) {
+            user_auth_user = (char*)mymalloc((uint)(auth_len+1));
+            user_auth_pass = (char*)mymalloc(2);
+            snprintf(user_auth_user, (uint)auth_len + 1, "%s"
+                ,app->cfg->webcontrol_user_authentication.c_str());
+            snprintf(user_auth_pass, 2, "%s","");
+        } else {
+            user_auth_user = (char*)mymalloc((uint)auth_len - strlen(col_pos) + 1);
+            user_auth_pass =(char*)mymalloc(strlen(col_pos));
+            snprintf(user_auth_user, (uint)auth_len - strlen(col_pos) + 1, "%s"
+                ,app->cfg->webcontrol_user_authentication.c_str());
+            snprintf(user_auth_pass, strlen(col_pos), "%s", col_pos + 1);
+
+            /* Check if user password is HA1 hash */
+            if (strlen(user_auth_pass) == 32) {
+                bool is_hex = true;
+                for (int i = 0; i < 32 && is_hex; i++) {
+                    is_hex = isxdigit((unsigned char)user_auth_pass[i]);
+                }
+                if (is_hex) {
+                    user_auth_is_ha1 = true;
+                    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                        _("Detected HA1 hash format for user authentication"));
+                }
             }
         }
     }
@@ -977,6 +1064,14 @@ void cls_webu_ans::answer_delete()
         /* CSRF validation is done inside api_mask_delete() */
         webu_json->api_mask_delete();
         mhd_send();
+    } else if (uri_cmd1 == "api" && uri_cmd2 == "profiles" && !uri_cmd3.empty()) {
+        /* DELETE /0/api/profiles/{id} */
+        if (webu_json == nullptr) {
+            webu_json = new cls_webu_json(this);
+        }
+        /* CSRF validation is done inside api_profiles_delete() */
+        webu_json->api_profiles_delete();
+        mhd_send();
     } else {
         /* DELETE not allowed for other endpoints */
         resp_type = WEBUI_RESP_TEXT;
@@ -1050,6 +1145,15 @@ void cls_webu_ans::answer_get()
             mhd_send();
         } else if (uri_cmd2 == "mask" && uri_cmd3 != "") {
             webu_json->api_mask_get();
+            mhd_send();
+        } else if (uri_cmd2 == "profiles") {
+            if (uri_cmd3.empty()) {
+                /* GET /0/api/profiles?camera_id=X */
+                webu_json->api_profiles_list();
+            } else {
+                /* GET /0/api/profiles/{id} */
+                webu_json->api_profiles_get();
+            }
             mhd_send();
         } else {
             bad_request();
@@ -1143,10 +1247,11 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
         mhd_first = false;
         if (mystreq(method,"POST")) {
             cnct_method = WEBUI_METHOD_POST;
-            /* Check if this is a JSON API endpoint (mask API, power control) */
+            /* Check if this is a JSON API endpoint (mask API, power control, profiles) */
             if ((uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "") ||
                 (uri_cmd1 == "api" && uri_cmd2 == "system" &&
-                 (uri_cmd3 == "reboot" || uri_cmd3 == "shutdown"))) {
+                 (uri_cmd3 == "reboot" || uri_cmd3 == "shutdown")) ||
+                (uri_cmd1 == "api" && uri_cmd2 == "profiles")) {
                 raw_body.clear();  /* Clear body buffer for JSON POST */
                 retcd = MHD_YES;
             } else {
@@ -1204,6 +1309,31 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             webu_json->api_system_shutdown();
             mhd_send();
             retcd = MHD_YES;
+        } else if (uri_cmd1 == "api" && uri_cmd2 == "profiles") {
+            /* Profile API endpoints - accumulate raw body for JSON POST */
+            if (*upload_data_size > 0) {
+                raw_body.append(upload_data, *upload_data_size);
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            /* Body complete, route to appropriate handler */
+            if (webu_json == nullptr) {
+                webu_json = new cls_webu_json(this);
+            }
+            if (uri_cmd3.empty()) {
+                /* POST /0/api/profiles (create) */
+                webu_json->api_profiles_create();
+            } else if (uri_cmd4 == "apply") {
+                /* POST /0/api/profiles/{id}/apply */
+                webu_json->api_profiles_apply();
+            } else if (uri_cmd4 == "default") {
+                /* POST /0/api/profiles/{id}/default */
+                webu_json->api_profiles_set_default();
+            } else {
+                bad_request();
+            }
+            mhd_send();
+            retcd = MHD_YES;
         } else {
             retcd = webu_post->processor_start(upload_data, upload_data_size);
         }
@@ -1231,6 +1361,13 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
                 , resp_page.length());
             mhd_send();
             MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO, "PATCH: mhd_send() completed");
+        } else if (uri_cmd1 == "api" && uri_cmd2 == "profiles" && !uri_cmd3.empty()) {
+            /* PATCH /0/api/profiles/{id} */
+            if (webu_json == nullptr) {
+                webu_json = new cls_webu_json(this);
+            }
+            webu_json->api_profiles_update();
+            mhd_send();
         } else {
             MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO
                 , "PATCH: Bad request - cmd1=%s cmd2=%s"
@@ -1362,9 +1499,14 @@ cls_webu_ans::cls_webu_ans(cls_motapp *p_app, const char *uri)
 
     auth_opaque   = (char*)mymalloc(WEBUI_LEN_PARM);
     auth_realm    = (char*)mymalloc(WEBUI_LEN_PARM);
-    auth_user     = nullptr;                        /* Buffer to hold the user name*/
-    auth_pass     = nullptr;                        /* Buffer to hold the password */
+    auth_user     = nullptr;                        /* Buffer to hold the admin user name*/
+    auth_pass     = nullptr;                        /* Buffer to hold the admin password */
+    user_auth_user = nullptr;                       /* Buffer to hold the view-only user name*/
+    user_auth_pass = nullptr;                       /* Buffer to hold the view-only password */
     authenticated = false;                       /* boolean for whether we are authenticated*/
+    auth_role     = "";                          /* User role (admin/user)*/
+    auth_is_ha1   = false;                       /* Admin password is HA1 hash */
+    user_auth_is_ha1 = false;                    /* User password is HA1 hash */
 
     resp_page     = "";                          /* The response being constructed */
     req_file      = nullptr;
@@ -1414,6 +1556,8 @@ cls_webu_ans::~cls_webu_ans()
 
     myfree(auth_user);
     myfree(auth_pass);
+    myfree(user_auth_user);
+    myfree(user_auth_pass);
     myfree(auth_opaque);
     myfree(auth_realm);
     myfree(gzip_resp);

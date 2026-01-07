@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiGet } from '@/api/client'
+import { apiGet, applyRestartRequiredChanges } from '@/api/client'
 import { setCsrfToken } from '@/api/csrf'
 import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form'
 import { useToast } from '@/components/Toast'
@@ -20,6 +20,7 @@ import { MaskEditor } from '@/components/settings/MaskEditor'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { UploadSettings } from '@/components/settings/UploadSettings'
 import { systemReboot, systemShutdown } from '@/api/system'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 interface ConfigParam {
   value: string | number | boolean
@@ -49,11 +50,27 @@ type ConfigChanges = Record<string, string | number | boolean>
 type ValidationErrors = Record<string, string>
 
 export function Settings() {
+  const { role } = useAuthContext()
   const { addToast } = useToast()
   const [selectedCamera, setSelectedCamera] = useState('0')
   const [changes, setChanges] = useState<ConfigChanges>({})
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const [isSaving, setIsSaving] = useState(false)
+
+  // Require admin access
+  if (role !== 'admin') {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="bg-surface-elevated rounded-lg p-8 text-center max-w-2xl mx-auto">
+          <svg className="w-16 h-16 mx-auto text-yellow-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h1 className="text-2xl font-bold mb-2">Admin Access Required</h1>
+          <p className="text-gray-400">You must be logged in as an administrator to access settings.</p>
+        </div>
+      </div>
+    )
+  }
 
   const queryClient = useQueryClient()
   const { data: config, isLoading, error } = useQuery({
@@ -183,39 +200,78 @@ export function Settings() {
         // No summary in response - assume success
         addToast(`Saved ${Object.keys(changes).length} setting(s)`, 'success')
         setChanges({})
-      } else if (summary.errors > 0) {
-        // Find which parameters failed
-        const failedParams = applied
-          .filter((p) => p.error)
-          .map((p) => p.param)
-
-        // Only clear changes that succeeded
-        const successfulParams = applied
-          .filter((p) => !p.error)
-          .map((p) => p.param)
-
-        const remainingChanges: ConfigChanges = {}
-        for (const [param, value] of Object.entries(changes)) {
-          if (!successfulParams.includes(param)) {
-            remainingChanges[param] = value
-          }
-        }
-        setChanges(remainingChanges)
-
-        if (summary.success > 0) {
-          addToast(
-            `Saved ${summary.success} setting(s). ${summary.errors} require restart: ${failedParams.join(', ')}`,
-            'warning'
-          )
-        } else {
-          addToast(
-            `Settings require daemon restart: ${failedParams.join(', ')}`,
-            'warning'
-          )
-        }
       } else {
-        addToast(`Successfully saved ${summary.success} setting(s)`, 'success')
-        setChanges({})
+        // Find which parameters require restart (hot_reload: false, no error)
+        const restartParams = applied
+          .filter((p) => !p.error && p.hot_reload === false)
+          .map((p) => p.param)
+
+        if (restartParams.length > 0) {
+          // Auto-restart for restart-required parameters
+          addToast(
+            `Applying ${restartParams.length} setting(s) that require restart: ${restartParams.join(', ')}...`,
+            'info'
+          )
+
+          try {
+            // Write config to disk and restart camera
+            await applyRestartRequiredChanges(camId)
+
+            // Clear all changes since restart applies them
+            setChanges({})
+
+            // Wait briefly for camera to restart, then refetch config
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            await queryClient.invalidateQueries({ queryKey: ['config'] })
+            await queryClient.refetchQueries({ queryKey: ['config'] })
+
+            addToast(
+              `Applied ${restartParams.length} setting(s). Camera restarted.`,
+              'success'
+            )
+          } catch (restartErr) {
+            console.error('Failed to restart camera:', restartErr)
+            addToast(
+              `Saved settings but camera restart failed. Please restart manually.`,
+              'warning'
+            )
+            setChanges({})
+          }
+        } else if (summary.errors > 0) {
+          // Handle errors (not restart-related)
+          const failedParams = applied
+            .filter((p) => p.error)
+            .map((p) => p.param)
+
+          // Only clear changes that succeeded
+          const successfulParams = applied
+            .filter((p) => !p.error)
+            .map((p) => p.param)
+
+          const remainingChanges: ConfigChanges = {}
+          for (const [param, value] of Object.entries(changes)) {
+            if (!successfulParams.includes(param)) {
+              remainingChanges[param] = value
+            }
+          }
+          setChanges(remainingChanges)
+
+          if (summary.success > 0) {
+            addToast(
+              `Saved ${summary.success} setting(s). ${summary.errors} failed: ${failedParams.join(', ')}`,
+              'warning'
+            )
+          } else {
+            addToast(
+              `Failed to save settings: ${failedParams.join(', ')}`,
+              'error'
+            )
+          }
+        } else {
+          // All params applied successfully with no restart needed
+          addToast(`Successfully saved ${summary.success} setting(s)`, 'success')
+          setChanges({})
+        }
       }
     } catch (err) {
       console.error('Failed to save settings:', err)

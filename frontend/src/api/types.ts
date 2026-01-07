@@ -99,6 +99,7 @@ export interface SystemStatus {
 export interface AuthResponse {
   authenticated: boolean;
   auth_method?: string;
+  role?: 'admin' | 'user';
 }
 
 // API error

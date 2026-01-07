@@ -31,6 +31,7 @@ motion_SOURCES = \
 	alg_sec.hpp        alg_sec.cpp \
 	conf.hpp           conf.cpp \
 	conf_file.hpp      conf_file.cpp \
+	conf_profile.hpp   conf_profile.cpp \
 	dbse.hpp           dbse.cpp \
 	draw.hpp           draw.cpp \
 	jpegutils.hpp      jpegutils.cpp \

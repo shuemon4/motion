@@ -5,7 +5,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 
 export function Layout() {
   const { data: status } = useSystemStatus()
-  const { isAuthenticated, showLoginModal } = useAuthContext()
+  const { isAuthenticated, role, showLoginModal } = useAuthContext()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const formatBytes = (bytes: number) => {
@@ -38,7 +38,7 @@ export function Layout() {
             <div className="hidden md:flex items-center gap-6">
               <div className="flex items-center gap-4">
                 <Link to="/" className="hover:text-primary">Dashboard</Link>
-                {isAuthenticated && (
+                {role === 'admin' && (
                   <Link to="/settings" className="hover:text-primary">Settings</Link>
                 )}
                 <Link to="/media" className="hover:text-primary">Media</Link>
@@ -120,7 +120,7 @@ export function Layout() {
                 >
                   Dashboard
                 </Link>
-                {isAuthenticated && (
+                {role === 'admin' && (
                   <Link
                     to="/settings"
                     onClick={() => setMobileMenuOpen(false)}

@@ -41,6 +41,15 @@
             void api_mask_post();     /* POST /{camId}/api/mask/{type} */
             void api_mask_delete();   /* DELETE /{camId}/api/mask/{type} */
 
+            /* Configuration Profile API endpoints */
+            void api_profiles_list();    /* GET /0/api/profiles?camera_id=X */
+            void api_profiles_get();     /* GET /0/api/profiles/{id} */
+            void api_profiles_create();  /* POST /0/api/profiles */
+            void api_profiles_update();  /* PATCH /0/api/profiles/{id} */
+            void api_profiles_delete();  /* DELETE /0/api/profiles/{id} */
+            void api_profiles_apply();   /* POST /0/api/profiles/{id}/apply */
+            void api_profiles_set_default(); /* POST /0/api/profiles/{id}/default */
+
         private:
             cls_motapp      *app;
             cls_webu        *webu;

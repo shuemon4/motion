@@ -255,6 +255,7 @@
             std::string&    webcontrol_interface    = parm_app.webcontrol_interface;
             std::string&    webcontrol_auth_method  = parm_app.webcontrol_auth_method;
             std::string&    webcontrol_authentication = parm_app.webcontrol_authentication;
+            std::string&    webcontrol_user_authentication = parm_app.webcontrol_user_authentication;
             bool&           webcontrol_tls          = parm_app.webcontrol_tls;
             std::string&    webcontrol_cert         = parm_app.webcontrol_cert;
             std::string&    webcontrol_key          = parm_app.webcontrol_key;

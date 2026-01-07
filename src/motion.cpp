@@ -19,6 +19,7 @@
 #include "motion.hpp"
 #include "util.hpp"
 #include "conf.hpp"
+#include "conf_profile.hpp"
 #include "logger.hpp"
 #include "allcam.hpp"
 #include "schedule.hpp"
@@ -541,6 +542,7 @@ void cls_motapp::init(int p_argc, char *p_argv[])
     av_init();
 
     dbse = new cls_dbse(this);
+    profiles = new cls_config_profile(this);
     webu = new cls_webu(this);
     allcam = new cls_allcam(this);
     schedule = new cls_schedule(this);
@@ -569,6 +571,7 @@ void cls_motapp::deinit()
     pid_remove();
 
     mydelete(webu);
+    mydelete(profiles);
     mydelete(dbse);
     mydelete(allcam)
     mydelete(schedule)

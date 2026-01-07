@@ -65,19 +65,19 @@ export function BottomSheet({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - transparent to keep video visible */}
       <div
-        className="fixed inset-0 bg-black/60 z-[100] transition-opacity duration-200"
+        className="fixed inset-0 z-[100]"
         onClick={handleBackdropClick}
         aria-hidden="true"
       />
 
-      {/* Sheet */}
+      {/* Sheet - limited height to keep video visible above */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 right-0 z-[101] bg-surface rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out"
+        className="fixed bottom-0 left-0 right-0 z-[101] bg-surface/95 backdrop-blur-sm rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out border-t border-surface-elevated"
         style={{
-          maxHeight: '85vh',
+          maxHeight: '45vh',
           transform: style.transform,
         }}
         role="dialog"
@@ -122,7 +122,7 @@ export function BottomSheet({
         <div
           ref={contentRef}
           className="overflow-y-auto overscroll-contain px-4 py-4"
-          style={{ maxHeight: 'calc(85vh - 80px)' }}
+          style={{ maxHeight: 'calc(45vh - 80px)' }}
         >
           {children}
         </div>

@@ -21,6 +21,7 @@ interface AuthState {
   isLoading: boolean
   authMethod: string | null
   authRequired: boolean
+  role: 'admin' | 'user' | null
 }
 
 interface AuthContextValue extends AuthState {
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isAuthenticated = authData?.authenticated ?? false
   const authMethod = authData?.auth_method ?? null
+  const role = authData?.role ?? null
 
   // Auto-show login modal if auth is required but user isn't authenticated
   useEffect(() => {
@@ -85,6 +87,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isLoading,
     authMethod,
     authRequired,
+    role,
     showLoginModal,
     hideLoginModal,
     isLoginModalVisible,

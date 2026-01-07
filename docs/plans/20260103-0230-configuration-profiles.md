@@ -8,9 +8,19 @@
 
 Implement a configuration profile system that allows users to save and quickly switch between different camera settings configurations. This system will store snapshots of libcamera controls, motion detection settings, and device framerate for quick recall.
 
+## UI Integration Point
+
+**Location**: Dashboard → Quick Settings BottomSheet → ConfigurationPresets component
+- Existing placeholder component at `frontend/src/components/ConfigurationPresets.tsx`
+- Already integrated in QuickSettings panel (line 143 of `QuickSettings.tsx`)
+- Displays at top of Quick Settings slide-in pane above Stream/Image/Detection sections
+- This plan will **replace the placeholder** with functional implementation
+
 ## Background
 
 Users need the ability to quickly switch between different camera configurations for different scenarios (e.g., "Daytime", "Nighttime", "High Motion", "Low Motion"). Currently, all settings must be manually adjusted each time, which is time-consuming and error-prone.
+
+A placeholder UI component already exists in the Dashboard's Quick Settings panel with a "Coming Soon" message. This implementation will make it functional.
 
 **Research Document**: `docs/scratchpads/20260103-config-profiles-research.md`
 
@@ -243,9 +253,23 @@ void cls_webu_json::api_profiles_set_default();
 
 ### 3. Frontend Implementation (React)
 
-#### 3.1 New Components
+#### 3.1 UI Integration
 
-**File**: `frontend/src/components/settings/ProfileManager.tsx`
+**Existing UI Location**:
+- Dashboard → BottomSheet (Quick Settings) → ConfigurationPresets component
+- Path: `frontend/src/components/QuickSettings.tsx` (line 143)
+- Placeholder: `frontend/src/components/ConfigurationPresets.tsx`
+
+**Current Placeholder UI**:
+- Disabled dropdown with "Default (Coming Soon)"
+- Disabled "Apply" button
+- "Coming soon" help text
+
+#### 3.2 Component Updates
+
+**File**: `frontend/src/components/ConfigurationPresets.tsx` (MODIFY EXISTING)
+
+Replace placeholder with functional implementation:
 
 ```tsx
 interface Profile {
@@ -259,31 +283,35 @@ interface Profile {
   param_count: number;
 }
 
-export function ProfileManager({ cameraId }: { cameraId: number }) {
-  // Profile list management
-  // Current active profile indicator
-  // Profile selector dropdown
-  // Save/Load/Delete buttons
-  // New profile dialog
+export function ConfigurationPresets({ cameraId }: { cameraId: number }) {
+  const { data: profiles, isLoading } = useProfiles(cameraId);
+  const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showManageDialog, setShowManageDialog] = useState(false);
+  const { mutate: applyProfile, isPending: isApplying } = useApplyProfile();
+
+  // UI: Dropdown (select profile) + Save button + Apply button + Manage button
+  // Show loading states, error states, success feedback
 }
 ```
 
-**File**: `frontend/src/components/settings/ProfileSaveDialog.tsx`
+**File**: `frontend/src/components/ProfileSaveDialog.tsx` (NEW)
 
 ```tsx
 export function ProfileSaveDialog({
-  open,
+  isOpen,
   onClose,
-  onSave
+  cameraId
 }: ProfileSaveDialogProps) {
   // Profile name input
   // Description textarea
   // Save as default checkbox
   // Save/Cancel buttons
+  // Validation and error handling
 }
 ```
 
-#### 3.2 API Client
+#### 3.3 API Client
 
 **File**: `frontend/src/api/profiles.ts`
 
@@ -312,7 +340,7 @@ export const profilesApi = {
 };
 ```
 
-#### 3.3 State Management
+#### 3.4 State Management
 
 Use TanStack Query for profile data caching:
 
@@ -330,25 +358,43 @@ export function useApplyProfile() {
   return useMutation({
     mutationFn: profilesApi.apply,
     onSuccess: () => {
-      // Invalidate config cache
-      queryClient.invalidateQueries(['config']);
+      // Invalidate config cache to trigger re-fetch of current settings
+      queryClient.invalidateQueries(['config-quick']);
     },
   });
 }
 ```
 
-#### 3.4 UI Integration
+#### 3.5 UI Design Details
 
-Add to Settings page (`frontend/src/pages/Settings.tsx`):
-- Profile selector at top of page (sticky header area)
-- "Save as Profile" button next to settings categories
-- Profile management dialog (list/edit/delete)
+**Location**: Dashboard BottomSheet → Quick Settings panel (top section)
 
-**Visual Design**:
-- Dropdown selector: Shows current profile (or "Custom" if modified)
-- Save icon button: Opens save dialog
-- Settings icon button: Opens profile management dialog
-- Warning indicator: Shows when current settings differ from loaded profile
+**Visual Layout** (matching existing ConfigurationPresets placeholder):
+```
+┌─────────────────────────────────────────────────┐
+│ Configuration Preset                             │
+│ ┌───────────────────┐ ┌──────┐ ┌───────┐        │
+│ │ Select Profile ▼  │ │ Save │ │ Apply │        │
+│ └───────────────────┘ └──────┘ └───────┘        │
+│ Quick switch camera settings • 5 presets         │
+└─────────────────────────────────────────────────┘
+```
+
+**Interaction Flow**:
+1. User clicks gear icon on camera → BottomSheet opens
+2. ConfigurationPresets component loads at top
+3. Dropdown shows available profiles (loaded from API)
+4. User selects profile → Apply button enabled
+5. Click Apply → Settings update (visible in sliders below)
+6. Click Save → ProfileSaveDialog opens → Save current settings
+
+**Visual States**:
+- Loading: Show skeleton/spinner in dropdown
+- Empty: Show "No presets - create one" message
+- Selected: Highlight active profile in dropdown
+- Modified: Show "Custom (modified)" if settings changed after applying profile
+- Applying: Disable buttons, show loading indicator
+- Success: Show brief success message/toast
 
 ### 4. CPU Efficiency Considerations
 
@@ -416,27 +462,36 @@ Add to Settings page (`frontend/src/pages/Settings.tsx`):
 **Files to Create**:
 - `frontend/src/api/profiles.ts` - API client
 - `frontend/src/hooks/useProfiles.ts` - React Query hooks
-- `frontend/src/components/settings/ProfileManager.tsx` - Main UI
-- `frontend/src/components/settings/ProfileSaveDialog.tsx` - Save dialog
+- `frontend/src/components/ProfileSaveDialog.tsx` - Save dialog (modal)
 
 **Files to Modify**:
-- `frontend/src/pages/Settings.tsx` - Integrate ProfileManager
+- `frontend/src/components/ConfigurationPresets.tsx` - Replace placeholder with functional implementation
 - `frontend/src/types/api.ts` - Add profile types
+
+**Current UI Integration**:
+- Profile selector is already integrated in Dashboard's BottomSheet (Quick Settings)
+- Component location: `frontend/src/components/QuickSettings.tsx` line 143
+- Uses existing `ConfigurationPresets` placeholder component
+- Displayed at the top of Quick Settings panel (above Stream/Image/Detection sections)
 
 **Tasks**:
 1. Create API client with TypeScript types
 2. Implement React Query hooks for caching
-3. Build ProfileManager component
-4. Build ProfileSaveDialog component
-5. Integrate into Settings page header
-6. Add visual feedback (loading states, errors)
+3. Replace ConfigurationPresets placeholder with functional implementation:
+   - Profile dropdown (load existing profiles)
+   - Save button (opens ProfileSaveDialog)
+   - Apply button (applies selected profile)
+   - Manage button (delete profiles, set default)
+4. Build ProfileSaveDialog modal component
+5. Add visual feedback (loading states, errors, success toasts)
 
 **Validation**:
 - Profile dropdown shows available profiles
 - Save dialog captures name/description
-- Apply profile updates all settings
+- Apply profile updates all settings in Quick Settings panel
 - Delete profile prompts confirmation
 - Loading states show during API calls
+- Component integrates seamlessly with existing BottomSheet design
 
 ### Phase 4: Integration & Polish (1-2 hours)
 **Tasks**:

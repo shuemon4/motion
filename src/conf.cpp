@@ -198,6 +198,7 @@ ctx_parm config_parms[] = {
     {"webcontrol_interface",      PARM_TYP_LIST,   PARM_CAT_13, PARM_LEVEL_ADVANCED, false},
     {"webcontrol_auth_method",    PARM_TYP_LIST,   PARM_CAT_13, PARM_LEVEL_RESTRICTED, false},
     {"webcontrol_authentication", PARM_TYP_STRING, PARM_CAT_13, PARM_LEVEL_RESTRICTED, false},
+    {"webcontrol_user_authentication", PARM_TYP_STRING, PARM_CAT_13, PARM_LEVEL_RESTRICTED, false},
     {"webcontrol_tls",            PARM_TYP_BOOL,   PARM_CAT_13, PARM_LEVEL_RESTRICTED, false},
     {"webcontrol_cert",           PARM_TYP_STRING, PARM_CAT_13, PARM_LEVEL_RESTRICTED, false},
     {"webcontrol_key",            PARM_TYP_STRING, PARM_CAT_13, PARM_LEVEL_RESTRICTED, false},
@@ -859,6 +860,15 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
         return edit_generic_list(webcontrol_authentication, parm, pact, "noauth", webcontrol_authentication_values);
     }
 
+    static const std::vector<std::string> webcontrol_user_authentication_values = {"noauth","user:pass"};
+    if (name == "webcontrol_user_authentication") {
+        /* Apply environment variable expansion for security */
+        if (pact == PARM_ACT_SET || pact == PARM_ACT_DFLT) {
+            parm = conf_expand_env(parm);
+        }
+        return edit_generic_list(webcontrol_user_authentication, parm, pact, "noauth", webcontrol_user_authentication_values);
+    }
+
     static const std::vector<std::string> stream_preview_method_values = {"mjpeg","snapshot"};
     if (name == "stream_preview_method") return edit_generic_list(stream_preview_method, parm, pact, "mjpeg", stream_preview_method_values);
 
@@ -1401,6 +1411,7 @@ void cls_config::parms_log_parm(std::string parm_nm, std::string parm_vl)
         (parm_nm == "netcam_userpass") ||
         (parm_nm == "netcam_high_url") ||
         (parm_nm == "webcontrol_authentication") ||
+        (parm_nm == "webcontrol_user_authentication") ||
         (parm_nm == "webcontrol_key") ||
         (parm_nm == "webcontrol_cert") ||
         (parm_nm == "database_user") ||

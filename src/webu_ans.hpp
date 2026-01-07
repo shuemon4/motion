@@ -31,6 +31,7 @@
 
             FILE            *req_file;      /* requested file*/
             std::string     lang;           /* Two character abbreviation for locale language*/
+            std::string     auth_role;      /* User role: "admin" or "user" (empty if unauthenticated) */
 
             std::string     url;            /* The URL sent from the client */
             std::string     uri_cmd0;       /* Parsed command from the url eg /cmd0/cmd1/cmd2/cmd3/cmd4 */
@@ -69,10 +70,13 @@
             int             mhd_first;      /* Boolean for whether it is the first connection*/
             char            *auth_opaque;   /* Opaque string for digest authentication*/
             char            *auth_realm;    /* Realm string for digest authentication*/
-            char            *auth_user;     /* Parsed user from config authentication string*/
-            char            *auth_pass;     /* Parsed password from config authentication string*/
+            char            *auth_user;     /* Parsed admin user from config authentication string*/
+            char            *auth_pass;     /* Parsed admin password from config authentication string*/
+            char            *user_auth_user; /* Parsed view-only user from config user_authentication string*/
+            char            *user_auth_pass; /* Parsed view-only password from config user_authentication string*/
             bool            authenticated;  /* Boolean for whether authentication has been passed */
             bool            auth_is_ha1;    /* Boolean for whether auth_pass is HA1 hash (32 hex chars) */
+            bool            user_auth_is_ha1; /* Boolean for whether user_auth_pass is HA1 hash */
             enum WEBUI_METHOD   cnct_method;    /* Connection method.  Get or Post */
             u_char  *gzip_resp;     /* Response in gzip format */
             unsigned long    gzip_size;     /* Size of response in gzip format */

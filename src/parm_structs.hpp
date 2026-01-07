@@ -64,6 +64,7 @@ struct ctx_parm_app {
     std::string     webcontrol_interface;
     std::string     webcontrol_auth_method;
     std::string     webcontrol_authentication;
+    std::string     webcontrol_user_authentication;  /* View-only user credentials (optional) */
     bool            webcontrol_tls;
     std::string     webcontrol_cert;
     std::string     webcontrol_key;

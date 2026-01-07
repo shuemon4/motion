@@ -6,6 +6,7 @@ import { QuickSettings } from '@/components/QuickSettings'
 import { useCameras } from '@/api/queries'
 import { apiGet } from '@/api/client'
 import { setCsrfToken } from '@/api/csrf'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 interface ConfigParam {
   value: string | number | boolean
@@ -24,6 +25,7 @@ interface DashboardConfig {
 
 export function Dashboard() {
   const { data: cameras, isLoading, error } = useCameras()
+  const { role } = useAuthContext()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null)
 
@@ -178,7 +180,7 @@ export function Dashboard() {
                     {camera.width}x{camera.height}
                   </span>
                 )}
-                <SettingsButton cameraId={camera.id} />
+                {role === 'admin' && <SettingsButton cameraId={camera.id} />}
               </div>
             </div>
 
@@ -239,7 +241,7 @@ export function Dashboard() {
                     {camera.width}x{camera.height}
                   </span>
                 )}
-                <SettingsButton cameraId={camera.id} />
+                {role === 'admin' && <SettingsButton cameraId={camera.id} />}
               </div>
             </div>
 
