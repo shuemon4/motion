@@ -1,6 +1,5 @@
 Summary of changes for version 5.0.0 are below
-
-Platform/OS Support:
+    Platform/OS Support
     * Raspberry Pi OS Trixie (Debian 13) 64-bit full support
     * 64-bit type safety fixes for aarch64 (size_t for buffer sizes, proper pointer logging)
     * Raspberry Pi 5 + Camera Module v3 (IMX708) native support with PiSP
@@ -11,7 +10,7 @@ Platform/OS Support:
     * Pi 4 build script with V4L2 support for USB cameras (scripts/pi4-build.sh)
     * Script updates for rpicam-* tool detection (Trixie) with libcamera-* fallback (Bookworm)
 
-libcamera Enhancements:
+    libcamera Enhancements
     * Change StreamRole from Viewfinder to VideoRecording for Pi 5 PiSP
     * Add multi-buffer support with configurable buffer count (libcam_buffer_count, default: 4)
     * Add camera capability discovery and validation system
@@ -23,7 +22,7 @@ libcamera Enhancements:
     * Add mutex synchronization for thread-safe control application
     * Add extensive DIAG markers for resolution troubleshooting
 
-Autofocus System:
+    Autofocus System
     * Add autofocus configuration parameters (libcam_af_mode, libcam_lens_position, etc.)
     * Add AF initialization defaults (AfMode=0 Manual, LensPosition=0.0 infinity)
     * Add hot-reload AF controls (af_mode, lens_position, af_range, af_speed)
@@ -32,13 +31,13 @@ Autofocus System:
     * Fix AfWindows documentation (x|y|width|height format clarification)
     * Remove read-only control setters (AfState, AfPauseState) bug fix
 
-Auto White Balance (AWB):
+    Auto White Balance (AWB)
     * Add AWB hot-reload controls (AwbMode, ColourGains, ColourTemperature)
     * Add mutual exclusivity handling between AwbMode and manual colour controls
     * Add support for all libcamera AWB modes with runtime switching
     * Add brightness and contrast hot-reload controls
 
-Security Hardening:
+    Security Hardening
     * Add CSRF protection with cryptographically secure random tokens
     * Add CSRF token validation on all POST requests
     * Add security headers (Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy)
@@ -47,7 +46,7 @@ Security Hardening:
     * Command injection prevention (shell metacharacter validation)
     * Compiler hardening (stack protection flags, PIE, RELRO)
 
-Configuration System:
+    Configuration System
     * Major configuration system refactor for improved performance
     * Add O(1) parameter registry with hash map lookup (parm_registry.hpp/cpp)
     * Add scoped parameter structs for reduced memory footprint (parm_structs.hpp)
@@ -58,7 +57,7 @@ Configuration System:
     * Add hot-reload framework for dynamic control updates without restart
     * Consolidate edit handlers for centralized configuration editing
 
-Code Quality & Cleanup:
+    Code Quality & Cleanup
     * Replace unsafe atoi() with strtol() in video_loopback.cpp
     * Remove deprecated FFmpeg refcounted_frames option (3 locations in netcam.cpp)
     * Simplify FFmpeg shims in util.hpp (modern API only for FFmpeg 6.0+)
@@ -67,9 +66,10 @@ Code Quality & Cleanup:
     * Fix non-standard types (ulong → unsigned long in jpegutils.cpp)
     * Fix type usage in video_convert.cpp (long int → int for image dimensions)
 
-Features & Enhancements:
+    Features & Enhancements
     * Add movie_encoder_preset config parameter for H.264 encoding
     * Documentation updates for Pi 5 deployment and architecture
+    
 Summary of changes for version 4.7.0 are below
     * Documentation updates
     * Remove outdated MMAL camera source.
