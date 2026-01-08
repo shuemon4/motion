@@ -20,6 +20,20 @@ m4/
 missing
 stamp-h1
 
+#devFiles
+doc/analysis/
+doc/architecture/
+doc/handoff-prompts/
+doc/installation/
+doc/issues/
+doc/libcamera/
+doc/plans/
+doc/project/
+doc/reviews/
+doc/scratchpads/
+doc/sub-agent-summaries/
+doc/summaries/
+
 #data
 data/motion-dist.service
 data/motion-dist.conf

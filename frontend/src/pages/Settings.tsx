@@ -20,6 +20,7 @@ import { MaskEditor } from '@/components/settings/MaskEditor'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { UploadSettings } from '@/components/settings/UploadSettings'
 import { ProfileManager } from '@/components/settings/ProfileManager'
+import { ConfigurationPresets } from '@/components/ConfigurationPresets'
 import { systemReboot, systemShutdown } from '@/api/system'
 import { useAuthContext } from '@/contexts/AuthContext'
 
@@ -373,6 +374,13 @@ export function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Quick Profile Switch - only shown when a camera is selected (not global) */}
+      {selectedCamera !== '0' && (
+        <div className="bg-surface-elevated rounded-lg p-4 mb-6">
+          <ConfigurationPresets cameraId={Number(selectedCamera)} readOnly={false} />
+        </div>
+      )}
 
       <DeviceSettings
         config={activeConfig}
