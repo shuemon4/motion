@@ -1,18 +1,39 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useCameraStream } from '@/hooks/useCameraStream'
+import { useFpsTracker } from '@/hooks/useFpsTracker'
 
 interface CameraStreamProps {
   cameraId: number
   className?: string
+  onFpsChange?: (fps: number) => void
+  onFullscreenRequest?: () => void
 }
 
-export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
+export function CameraStream({
+  cameraId,
+  className = '',
+  onFpsChange,
+  onFullscreenRequest
+}: CameraStreamProps) {
   const { streamUrl, isLoading, error } = useCameraStream(cameraId)
   const [isExpanded, setIsExpanded] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const fps = useFpsTracker(imgRef)
+
+  // Notify parent of FPS changes
+  useEffect(() => {
+    if (onFpsChange) {
+      onFpsChange(fps)
+    }
+  }, [fps, onFpsChange])
 
   const openFullscreen = useCallback(() => {
-    setIsExpanded(true)
-  }, [])
+    if (onFullscreenRequest) {
+      onFullscreenRequest()
+    } else {
+      setIsExpanded(true)
+    }
+  }, [onFullscreenRequest])
 
   const closeFullscreen = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -58,11 +79,14 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
   if (isLoading) {
     return (
       <div className={`w-full ${className}`}>
-        <div className="aspect-video bg-gray-900 animate-pulse rounded-lg flex items-center justify-center">
-          <svg className="w-12 h-12 text-gray-600 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+        <div className="relative aspect-video bg-gray-900 animate-pulse rounded-lg">
+          {/* Loading spinner in top-right corner */}
+          <div className="absolute top-4 right-4">
+            <svg className="w-8 h-8 text-gray-600 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
         </div>
       </div>
     )
@@ -106,6 +130,7 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
           onClick={openFullscreen}
         >
           <img
+            ref={imgRef}
             src={streamUrl}
             alt={`Camera ${cameraId} stream`}
             className="absolute inset-0 w-full h-full object-contain"

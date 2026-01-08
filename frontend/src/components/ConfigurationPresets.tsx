@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useProfiles, useApplyProfile } from '../hooks/useProfiles';
 import { ProfileSaveDialog } from './ProfileSaveDialog';
+import { useToast } from './Toast';
 
 interface ConfigurationPresetsProps {
   cameraId: number;
+  readOnly?: boolean;  // Hide save button when true (for Dashboard bottom sheet)
 }
 
 /**
@@ -15,25 +17,39 @@ interface ConfigurationPresetsProps {
  * - Save current settings as a new profile
  * - Manage existing profiles (delete, set as default)
  */
-export function ConfigurationPresets({ cameraId }: ConfigurationPresetsProps) {
+export function ConfigurationPresets({ cameraId, readOnly = false }: ConfigurationPresetsProps) {
   const { data: profiles, isLoading, error } = useProfiles(cameraId);
   const { mutate: applyProfile, isPending: isApplying } = useApplyProfile();
+  const { addToast } = useToast();
 
   const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   const handleApply = () => {
     if (selectedProfileId) {
+      const profile = profiles?.find(p => p.profile_id === selectedProfileId);
+      const profileName = profile?.name || 'profile';
+
       applyProfile(selectedProfileId, {
         onSuccess: (requiresRestart) => {
           if (requiresRestart.length > 0) {
-            // TODO: Show notification about parameters requiring restart
-            console.warn('Profile applied, but requires restart:', requiresRestart);
+            addToast(
+              `Profile "${profileName}" applied. Restart required for: ${requiresRestart.join(', ')}`,
+              'warning'
+            );
+          } else {
+            addToast(
+              `Profile "${profileName}" applied successfully`,
+              'success'
+            );
           }
+          setSelectedProfileId(null);
         },
         onError: (error) => {
-          console.error('Failed to apply profile:', error);
-          // TODO: Show error notification
+          addToast(
+            `Failed to apply profile: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            'error'
+          );
         },
       });
     }
@@ -42,7 +58,12 @@ export function ConfigurationPresets({ cameraId }: ConfigurationPresetsProps) {
   if (error) {
     return (
       <div className="mb-4 pb-4 border-b border-surface-elevated">
-        <p className="text-sm text-red-400">Failed to load profiles</p>
+        <div className="bg-danger/10 border border-danger rounded-lg p-3">
+          <p className="text-sm text-danger font-medium">Failed to load profiles</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {error instanceof Error ? error.message : 'Unable to connect to profiles API'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -94,15 +115,17 @@ export function ConfigurationPresets({ cameraId }: ConfigurationPresetsProps) {
             </div>
           </div>
 
-          {/* Save button */}
-          <button
-            type="button"
-            onClick={() => setShowSaveDialog(true)}
-            className="px-4 py-2 bg-surface-elevated border border-gray-600 text-white rounded-lg hover:bg-surface-hover transition-colors"
-            title="Save current settings as a new preset"
-          >
-            Save
-          </button>
+          {/* Save button (hidden in read-only mode) */}
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => setShowSaveDialog(true)}
+              className="px-4 py-2 bg-surface-elevated border border-gray-600 text-white rounded-lg hover:bg-surface-hover transition-colors"
+              title="Save current settings as a new preset"
+            >
+              Save
+            </button>
+          )}
 
           {/* Apply button */}
           <button

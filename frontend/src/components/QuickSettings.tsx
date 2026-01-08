@@ -139,8 +139,8 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
 
   return (
     <div className="space-y-2">
-      {/* Configuration Presets */}
-      <ConfigurationPresets cameraId={cameraId} />
+      {/* Configuration Presets (load-only in bottom sheet) */}
+      <ConfigurationPresets cameraId={cameraId} readOnly={true} />
 
       {/* Stream Settings */}
       <QuickSection title="Stream" defaultOpen={true}>

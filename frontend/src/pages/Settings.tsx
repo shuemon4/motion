@@ -19,6 +19,7 @@ import { PreferencesSettings } from '@/components/settings/PreferencesSettings'
 import { MaskEditor } from '@/components/settings/MaskEditor'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { UploadSettings } from '@/components/settings/UploadSettings'
+import { ProfileManager } from '@/components/settings/ProfileManager'
 import { systemReboot, systemShutdown } from '@/api/system'
 import { useAuthContext } from '@/contexts/AuthContext'
 
@@ -446,6 +447,8 @@ export function Settings() {
 
       <PreferencesSettings />
 
+      <ProfileManager cameraId={Number(selectedCamera)} />
+
       <FormSection
         title="System"
         description="Core Motion daemon settings and device controls"
@@ -483,6 +486,29 @@ export function Settings() {
           helpText="Verbosity level for logging"
           error={getError('log_level')}
         />
+
+        <div className="border-t border-surface-elevated pt-4 mt-4">
+          <h4 className="font-medium mb-3 text-sm">Authentication</h4>
+          <p className="text-xs text-gray-400 mb-4">
+            Configure web interface authentication. Format: username:password or username:ha1hash
+          </p>
+          <FormInput
+            label="Admin Credentials"
+            value={String(getValue('webcontrol_authentication', ''))}
+            onChange={(val) => handleChange('webcontrol_authentication', val)}
+            type="password"
+            helpText="Administrator username:password (full access to all settings)"
+            error={getError('webcontrol_authentication')}
+          />
+          <FormInput
+            label="User Credentials"
+            value={String(getValue('webcontrol_user_authentication', ''))}
+            onChange={(val) => handleChange('webcontrol_user_authentication', val)}
+            type="password"
+            helpText="View-only username:password (can view streams but not change settings)"
+            error={getError('webcontrol_user_authentication')}
+          />
+        </div>
 
         <div className="border-t border-surface-elevated pt-4 mt-4">
           <h4 className="font-medium mb-3 text-sm">Device Controls</h4>
