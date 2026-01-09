@@ -4105,7 +4105,7 @@ msgstr "Reštartovanie vlákna %d"
 msgid "Quitting thread %d"
 msgstr "Ukončenie vlákna %d"
 
-#: src/webu.c src/webu_html.c src/webu_text.c
+#: src/webu.c
 #, c-format
 msgid "Invalid action requested: >%s< >%s< >%s<"
 msgstr "Požadovaná neplatná akcia:> %s <> %s <> %s <"
@@ -4286,127 +4286,96 @@ msgid "Invalid webcontrol_lock_max_ips.  Setting equal to 25."
 msgstr ""
 "Neplatný max. Počet ips zámku webového ovládania. Nastavenie rovné 25. "
 
-#: src/webu_html.c
 msgid "Cameras"
 msgstr "Caméras"
 
-#: src/webu_html.c
 msgid "Camera"
 msgstr "Caméra"
 
-#: src/webu_html.c
 msgid "All"
 msgstr "Toutes"
 
-#: src/webu_html.c
 msgid "Action"
 msgstr "Action"
 
-#: src/webu_html.c
 msgid "Start Event"
 msgstr "Štart udalostí"
 
-#: src/webu_html.c
 msgid "End Event"
 msgstr "Koniec udalostí"
 
-#: src/webu_html.c
 msgid "Snapshot"
 msgstr "Momentka"
 
-#: src/webu_html.c
 msgid "Change Configuration"
 msgstr "Zmena konfigurácie"
 
-#: src/webu_html.c
 msgid "Write Configuration"
 msgstr "Zápis konfigurácie"
 
-#: src/webu_html.c
 msgid "Tracking"
 msgstr "sledovanie"
 
-#: src/webu_html.c
 msgid "Pause"
 msgstr "Pauza"
 
-#: src/webu_html.c
 msgid "Start"
 msgstr "Štart"
 
-#: src/webu_html.c
 msgid "Restart"
 msgstr "Reštart"
 
-#: src/webu_html.c
 msgid "Quit"
 msgstr "prestať"
 
-#: src/webu_html.c
 msgid "Help"
 msgstr "Pomoc"
 
-#: src/webu_html.c
 msgid "No Configuration Options"
 msgstr "Nie sú konfiguračné možnosti"
 
-#: src/webu_html.c
 msgid "Limited Configuration Options"
 msgstr "Obmedzené konfiguračné možnosti"
 
-#: src/webu_html.c
 msgid "Advanced Configuration Options"
 msgstr "Rozšírené konfiguračné možnosti"
 
-#: src/webu_html.c
 msgid "Restricted Configuration Options"
 msgstr "Reštrikčné konfiguračné možnosti"
 
-#: src/webu_html.c
 msgid "All Cameras"
 msgstr "Všetky kamery"
 
-#: src/webu_html.c
 msgid "Not running"
 msgstr "Nebežiace"
 
-#: src/webu_html.c
 msgid "Lost connection"
 msgstr "Strata pripojenia"
 
-#: src/webu_html.c
 msgid "Paused"
 msgstr "Pauza"
 
-#: src/webu_html.c
 msgid "Active"
 msgstr "Aktívne"
 
-#: src/webu_html.c
 msgid "Select option"
 msgstr "nastaviť možnosti"
 
-#: src/webu_html.c
 msgid "Save"
 msgstr "Záapis"
 
-#: src/webu_html.c
 msgid "Pan/Tilt"
 msgstr "Rotácia / sklon"
 
-#: src/webu_html.c
 msgid "Absolute Change"
 msgstr "Absolútna zmena"
 
-#: src/webu_html.c
 msgid "Center"
 msgstr "Stred"
 
-#: src/webu_html.c
 msgid "Pan"
 msgstr "Rotácia"
 
-#: src/webu_html.c
 msgid "Tilt"
 msgstr "Sklon"
 
@@ -4435,8 +4404,3 @@ msgstr "Chybná adresa URL pre port špecifický pre kameru: %s"
 #: src/webu_stream.c
 msgid "Could not get image to stream."
 msgstr "Nemožné dostať obrázok do stream-u."
-
-#: src/webu_text.c
-#, c-format
-msgid "'%s' option is depreciated.  New option name is '%s'"
-msgstr "Možnosť ' %s' je odpisovaná. Nový názov voľby je '%s' "
