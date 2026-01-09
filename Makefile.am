@@ -24,6 +24,7 @@ SUBDIRS = src po
 pkgsysconfdir = $(sysconfdir)/@PACKAGE@
 libstatedir = @localstatedir@/lib/@PACKAGE@
 libwebdir = @localstatedir@/lib/@PACKAGE@/webcontrol
+webuiinstalldir = @localstatedir@/lib/@PACKAGE@/webui
 
 dist_libstate_DATA = \
 	data/motion-dist.conf \
@@ -52,6 +53,23 @@ dist_doc_DATA = \
 all-local:
 	@rm -f po/*.po\~
 	@sed -e 's|$${prefix}|$(prefix)|' data/motion-dist.conf > data/motion-dist.conf.tmp && mv -f data/motion-dist.conf.tmp data/motion-dist.conf
+
+###################################################################
+## Install React webui files (handles dynamic asset filenames)
+###################################################################
+install-data-local:
+	@echo "Installing React webui..."
+	$(MKDIR_P) $(DESTDIR)$(webuiinstalldir)/assets
+	$(INSTALL_DATA) data/webui/index.html $(DESTDIR)$(webuiinstalldir)/
+	$(INSTALL_DATA) data/webui/vite.svg $(DESTDIR)$(webuiinstalldir)/ 2>/dev/null || true
+	@for f in data/webui/assets/*; do \
+		if [ -f "$$f" ]; then \
+			$(INSTALL_DATA) "$$f" $(DESTDIR)$(webuiinstalldir)/assets/; \
+		fi; \
+	done
+
+uninstall-local:
+	rm -rf $(DESTDIR)$(webuiinstalldir)
 
 ###################################################################
 ## Create pristine directories to match exactly distributed files

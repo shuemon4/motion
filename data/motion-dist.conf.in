@@ -107,6 +107,10 @@ webcontrol_auth_method digest
 webcontrol_lock_attempts 5
 webcontrol_lock_minutes 10
 
+;*****   React UI path (set to enable modern web interface)
+;*****   Leave empty or comment out to use legacy HTML interface
+webcontrol_html_path @localstatedir@/lib/@PACKAGE_NAME@/webui
+
 ;*************************************************
 ;*****   Web Stream
 ;*************************************************

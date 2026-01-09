@@ -803,7 +803,7 @@ Integration guide for MotionEye developers:
 
 **Commit**: `057c20a` - Add Pi 5 Camera Module v3 support and setup scripts
 
-#### 5.2.1 Pi 5 Setup Script (`scripts/pi5-setup.sh`)
+#### 5.2.1 Pi Setup Script (`scripts/pi-setup.sh`)
 Automated dependency installation for Raspberry Pi OS Bookworm:
 ```bash
 #!/bin/bash
@@ -822,7 +822,7 @@ apt install libmicrohttpd-dev libsqlite3-dev
 apt install autoconf automake libtool pkgconf
 ```
 
-#### 5.2.2 Pi 5 Build Script (`scripts/pi5-build.sh`)
+#### 5.2.2 Pi Build Script (`scripts/pi-build.sh`)
 Optimized build configuration for Pi 5:
 ```bash
 #!/bin/bash
@@ -901,7 +901,7 @@ rsync -avz --exclude='.git' \
 # On Pi 5
 ssh admin@192.168.1.176
 cd ~/motion
-./scripts/pi5-build.sh
+./scripts/pi-build.sh
 sudo make install
 sudo systemctl restart motion
 ```
@@ -1367,8 +1367,8 @@ if (cfg->movie_codec == "hevc") {
 | `src/parm_registry.hpp` | 145 | Parameter registry header |
 | `src/parm_registry.cpp` | 178 | Parameter registry implementation |
 | `src/parm_structs.hpp` | 250 | Scoped parameter structures |
-| `scripts/pi5-setup.sh` | 97 | Pi 5 dependency installation |
-| `scripts/pi5-build.sh` | 68 | Pi 5 optimized build |
+| `scripts/pi-setup.sh` | 97 | Pi dependency installation with model detection |
+| `scripts/pi-build.sh` | 68 | Pi optimized build with auto-configuration |
 | `scripts/pi5-test.conf` | 48 | Test configuration |
 | `scripts/test_hot_reload.sh` | 202 | Hot-reload test script |
 | `doc/plans/*.md` | ~3,500 | Implementation plans |
