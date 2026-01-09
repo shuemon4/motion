@@ -23,7 +23,7 @@
         public:
             cls_webu_mpegts(cls_webu_ans *p_webua, cls_webu_stream *p_webus);
             ~cls_webu_mpegts();
-            int avio_buf(myuint *buf, int buf_size);
+            int avio_buf(uint8_t *buf, int buf_size);
             ssize_t response(char *buf, size_t max);
             mhdrslt main();
 

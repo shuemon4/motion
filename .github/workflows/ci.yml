@@ -65,6 +65,7 @@ jobs:
             autoconf-archive
             automake
             libtool
+            bash
             gettext-dev
             libzip-dev
             jpeg-dev
