@@ -50,7 +50,7 @@ jobs:
         if: matrix.libc == 'glibc'
         run: |
           sudo apt-get update
-          sudo apt-get install -y autoconf automake libtool autopoint pkgconf gettext libcamera-dev libopencv-dev libavcodec-dev libavdevice-dev libavformat-dev libavutil-dev libswscale-dev libwebp-dev libmicrohttpd-dev libmariadb-dev libasound2-dev libpulse-dev libfftw3-dev
+          sudo apt-get install -y autoconf automake libtool autopoint autoconf-archive pkgconf gettext libcamera-dev libopencv-dev libavcodec-dev libavdevice-dev libavformat-dev libavutil-dev libswscale-dev libwebp-dev libmicrohttpd-dev libmariadb-dev libasound2-dev libpulse-dev libfftw3-dev
 
       - name: Set up Alpine
         if: matrix.libc == 'musl'
@@ -62,6 +62,7 @@ jobs:
             clang
             file
             autoconf
+            autoconf-archive
             automake
             libtool
             gettext-dev

@@ -55,6 +55,7 @@ echo "[2/6] Installing build tools..."
 sudo apt install -y \
     build-essential \
     autoconf \
+    autoconf-archive \
     automake \
     libtool \
     pkgconf \
