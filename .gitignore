@@ -23,6 +23,7 @@ stamp-h1
 #devFiles
 doc/analysis/
 doc/architecture/
+doc/github/
 doc/handoff-prompts/
 doc/installation/
 doc/issues/
@@ -77,6 +78,12 @@ po/stamp-po
 
 # macOS
 .DS_Store
+
+# Node.js / Testing
+node_modules/
+package.json
+package-lock.json
+test-ui.mjs
 
 # Claude Code local settings
 .claude/
