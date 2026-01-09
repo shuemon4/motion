@@ -26,7 +26,6 @@
 #include "logger.hpp"
 #include "webu.hpp"
 #include "webu_ans.hpp"
-#include "webu_html.hpp"
 #include "webu_json.hpp"
 #include "webu_post.hpp"
 
@@ -930,10 +929,9 @@ mhdrslt cls_webu_post::processor_start(const char *upload_data, size_t *upload_d
         pthread_mutex_lock(&app->mutex_post);
             process_actions();
         pthread_mutex_unlock(&app->mutex_post);
-        /* Send updated page back to user */
-        webu_html = new cls_webu_html(webua);
-        webu_html->main();
-        delete webu_html;
+        /* Return JSON response for action result */
+        webua->resp_type = WEBUI_RESP_JSON;
+        webua->resp_page = "{\"status\":\"ok\"}";
         retcd = MHD_YES;
     }
     return retcd;

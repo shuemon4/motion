@@ -30,7 +30,7 @@
 
 /****** Callback functions for MHD ****************************************/
 
-static int webu_mpegts_avio_buf(void *opaque, uint8_t *buf, int buf_size)
+static int webu_mpegts_avio_buf(void *opaque, const uint8_t *buf, int buf_size)
 {
     cls_webu_mpegts *webu_mpegts;
     webu_mpegts =(cls_webu_mpegts *)opaque;
@@ -221,7 +221,7 @@ int cls_webu_mpegts::getimg()
     return 0;
 }
 
-int cls_webu_mpegts::avio_buf(uint8_t *buf, int buf_size)
+int cls_webu_mpegts::avio_buf(const uint8_t *buf, int buf_size)
 {
     if (webus->resp_size < (size_t)buf_size + webus->resp_used) {
         webus->resp_size = (size_t)buf_size + webus->resp_used;

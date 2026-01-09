@@ -40,7 +40,6 @@ const std::vector<const ctx_parm_ext*> ctx_parm_registry::empty_vec;
 /*
  * Determine parameter scope based on category
  *
- * Category to scope mapping based on analysis in the refactoring plan:
  * - CAT_00 (system): APP only
  * - CAT_01-17: Camera-related
  * - CAT_13 (webcontrol): APP only
