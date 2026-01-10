@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost, apiDelete } from '@/api/client'
+import { getSessionToken } from '@/api/session'
 import { FormSection } from '@/components/form'
 import { useToast } from '@/components/Toast'
 
@@ -254,7 +255,11 @@ export function MaskEditor({ cameraId }: MaskEditorProps) {
     setStreamError(false)
   }, [])
 
-  const streamUrl = `/${cameraId}/mjpg/stream`
+  const streamUrl = useMemo(() => {
+    const token = getSessionToken()
+    const baseUrl = `/${cameraId}/mjpg/stream`
+    return token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl
+  }, [cameraId])
 
   return (
     <FormSection

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getSessionToken } from '@/api/session'
 
 export function useCameraStream(cameraId: number) {
   const [streamUrl, setStreamUrl] = useState<string>('')
@@ -7,7 +8,11 @@ export function useCameraStream(cameraId: number) {
 
   useEffect(() => {
     // MJPEG stream URL - Motion uses /camId/mjpg/stream
-    const url = `/${cameraId}/mjpg/stream`
+    // Include session token as query param for authentication
+    // (img tags can't send custom headers)
+    const token = getSessionToken()
+    const baseUrl = `/${cameraId}/mjpg/stream`
+    const url = token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl
 
     // Test if stream is available
     const img = new Image()

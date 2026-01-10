@@ -838,6 +838,20 @@ mhdrslt cls_webu_ans::mhd_auth()
 
     snprintf(auth_realm, WEBUI_LEN_PARM, "%s","Motion");
 
+    /* Allow certain endpoints without HTTP auth so the React SPA can load
+     * and handle authentication itself via session tokens:
+     * 1. Static files (device_id < 0): /assets/* etc.
+     * 2. Root page and SPA routes (uri_cmd1 empty): /, /settings, etc.
+     * 3. All API endpoints: Use session-based auth, not HTTP Basic/Digest
+     *
+     * Only streams (mjpg, mpegts, static) use HTTP auth as fallback for
+     * clients that don't support session tokens.
+     */
+    if (device_id < 0 || uri_cmd1.empty() || uri_cmd1 == "api") {
+        authenticated = true;  /* Skip HTTP auth, use session auth */
+        return MHD_YES;
+    }
+
     if (app->cfg->webcontrol_authentication == "") {
         authenticated = true;
         if (app->cfg->webcontrol_auth_method != "none") {
@@ -1129,6 +1143,26 @@ void cls_webu_ans::answer_get()
         if (webu_json == nullptr) {
             webu_json = new cls_webu_json(this);
         }
+
+        /* Check session-based auth for protected API endpoints
+         * Auth endpoints (status, login, logout) are exempt */
+        if (uri_cmd2 != "auth" && app->cfg->webcontrol_authentication != "") {
+            /* Validate session token */
+            bool has_valid_session = false;
+            if (!session_token.empty()) {
+                auth_role = webu->session_validate(session_token, clientip);
+                has_valid_session = !auth_role.empty();
+            }
+            if (!has_valid_session) {
+                /* Return 401 JSON (no WWW-Authenticate to avoid browser popup) */
+                resp_type = WEBUI_RESP_JSON;
+                resp_code = 401;
+                resp_page = "{\"error\":\"Authentication required\",\"auth_required\":true}";
+                mhd_send();
+                return;
+            }
+        }
+
         if (uri_cmd2 == "auth" && uri_cmd3 == "me") {
             webu_json->api_auth_me();
             mhd_send();
@@ -1240,6 +1274,12 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
         /* Check for session token in X-Session-Token header */
         const char* token = MHD_lookup_connection_value(
             connection, MHD_HEADER_KIND, "X-Session-Token");
+
+        /* Also check query parameter for streams (img/video tags can't send headers) */
+        if (token == nullptr) {
+            token = MHD_lookup_connection_value(
+                connection, MHD_GET_ARGUMENT_KIND, "token");
+        }
 
         if (token != nullptr) {
             session_token = token;
