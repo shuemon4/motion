@@ -25,6 +25,7 @@ pkgsysconfdir = $(sysconfdir)/@PACKAGE@
 libstatedir = @localstatedir@/lib/@PACKAGE@
 libwebdir = @localstatedir@/lib/@PACKAGE@/webcontrol
 webuiinstalldir = @localstatedir@/lib/@PACKAGE@/webui
+scriptsdir = $(srcdir)/scripts
 
 dist_libstate_DATA = \
 	data/motion-dist.conf \
@@ -70,6 +71,49 @@ install-data-local:
 
 uninstall-local:
 	rm -rf $(DESTDIR)$(webuiinstalldir)
+
+###################################################################
+## Systemd service installation
+###################################################################
+SYSTEMD_UNIT_DIR = $(shell pkg-config --variable=systemdsystemunitdir systemd 2>/dev/null || echo "/etc/systemd/system")
+
+install-service: data/motion-dist.service
+	$(MKDIR_P) $(DESTDIR)$(SYSTEMD_UNIT_DIR)
+	@sed -e 's|$${exec_prefix}|$(exec_prefix)|g' \
+	     -e 's|$${prefix}|$(prefix)|g' \
+	     data/motion-dist.service > $(DESTDIR)$(SYSTEMD_UNIT_DIR)/motion.service.tmp
+	$(INSTALL_DATA) $(DESTDIR)$(SYSTEMD_UNIT_DIR)/motion.service.tmp $(DESTDIR)$(SYSTEMD_UNIT_DIR)/motion.service
+	@rm -f $(DESTDIR)$(SYSTEMD_UNIT_DIR)/motion.service.tmp
+	@echo ""
+	@echo "Service installed to $(DESTDIR)$(SYSTEMD_UNIT_DIR)/motion.service"
+	@echo ""
+	@echo "To enable and start:"
+	@echo "  sudo systemctl daemon-reload"
+	@echo "  sudo systemctl enable motion"
+	@echo "  sudo systemctl start motion"
+	@echo ""
+
+uninstall-service:
+	rm -f $(DESTDIR)$(SYSTEMD_UNIT_DIR)/motion.service
+	@echo "Service removed. Run 'sudo systemctl daemon-reload' to complete uninstall"
+
+setup-service: install-service
+	@echo ""
+	@echo "Running Motion service setup..."
+	@echo ""
+	@if [ ! -x $(scriptsdir)/setup-motion-service.sh ]; then \
+		echo "Error: Setup script not found or not executable"; \
+		echo "Expected: $(scriptsdir)/setup-motion-service.sh"; \
+		exit 1; \
+	fi
+	@if [ `id -u` -ne 0 ]; then \
+		echo "Error: This target must be run with sudo"; \
+		echo "Usage: sudo make setup-service"; \
+		exit 1; \
+	fi
+	@echo "Usage: $(scriptsdir)/setup-motion-service.sh --admin-pass PASSWORD --viewer-pass PASSWORD"
+	@echo ""
+	@echo "Run the setup script manually with your desired passwords."
 
 ###################################################################
 ## Create pristine directories to match exactly distributed files
