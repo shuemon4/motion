@@ -87,3 +87,4 @@ test-ui.mjs
 
 # Claude Code local settings
 .claude/
+CLAUDE.md

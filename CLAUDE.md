@@ -26,14 +26,14 @@ This project combines Motion and MotionEye into a single, efficient application:
 
 ## Project Rules
 
-1. **Plans** MUST be documented in `docs/plans/`
-2. **Use scratchpads for working memory** - create and use files in `docs/scratchpads/` for notes, research findings, and intermediate work
+1. **Plans** MUST be documented in `doc/plans/`
+2. **Use scratchpads for working memory** - create and use files in `doc/scratchpads/` for notes, research findings, and intermediate work
 3. **Do not guess** - ask questions and/or research for answers
 4. **Preserve `cls_alg`** - the motion detection algorithm works; don't modify unless explicitly asked
 5. **Evidence over assumptions** - verify changes work on actual hardware when possible
 6. **Minimize CPU usage** - always consider CPU impact when developing code changes
 7. **Efficiency first** - all new code must be planned for efficiency before implementation
-8. **Updating Motion binaries** - Review `docs/project/MOTION_RESTART.md` to prevent issues, prior to updating Motion binaries on the Pi
+8. **Updating Motion binaries** - Review `doc/project/MOTION_RESTART.md` to prevent issues, prior to updating Motion binaries on the Pi
 
 ## Technology Stack
 
@@ -62,7 +62,7 @@ motion-motioneye/
 │   └── package.json
 ├── data/
 │   └── webui/              # Built frontend assets (installed)
-└── docs/                   # Documentation
+└── doc/                   # Documentation
     ├── project/            # Architecture and patterns
     ├── plans/              # Implementation plans (REQUIRED)
     └── scratchpads/        # Working documents
@@ -72,11 +72,11 @@ motion-motioneye/
 
 | Need | Location |
 |------|----------|
-| React UI plans | `docs/plans/react-ui/README.md` |
-| Architecture overview | `docs/project/ARCHITECTURE.md` |
-| Code patterns | `docs/project/PATTERNS.md` |
-| How to modify | `docs/project/MODIFICATION_GUIDE.md` |
-| Agent quick-ref | `docs/project/AGENT_GUIDE.md` |
+| React UI plans | `doc/plans/react-ui/README.md` |
+| Architecture overview | `doc/project/ARCHITECTURE.md` |
+| Code patterns | `doc/project/PATTERNS.md` |
+| How to modify | `doc/project/MODIFICATION_GUIDE.md` |
+| Agent quick-ref | `doc/project/AGENT_GUIDE.md` |
 
 ## Key Files
 
@@ -211,7 +211,7 @@ ssh admin@192.168.1.176 "curl -s --max-time 3 'http://localhost:7999/1/mjpg/stre
 ## Documentation Structure
 
 ```
-docs/
+doc/
 ├── project/           # AI agent reference docs
 │   ├── AGENT_GUIDE.md
 │   ├── ARCHITECTURE.md
@@ -228,7 +228,7 @@ docs/
   - Example: `20251216-2036-Feature-Implementation.md`
   - Format: Date in YYYYMMDD, time in hhmm (24-hour), then descriptive name
 
-- **Main `docs/` directory files** (project reference docs): No prefix required
+- **Main `doc/` directory files** (project reference docs): No prefix required
 
 ## Reading Files
 
