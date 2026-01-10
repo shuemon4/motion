@@ -643,7 +643,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "movie_output_motion") return edit_generic_bool(movie_output_motion, parm, pact, false);
     if (name == "movie_all_frames") return edit_generic_bool(movie_all_frames, parm, pact, false);
     if (name == "movie_extpipe_use") return edit_generic_bool(movie_extpipe_use, parm, pact, false);
-    if (name == "webcontrol_localhost") return edit_generic_bool(webcontrol_localhost, parm, pact, true);
+    if (name == "webcontrol_localhost") return edit_generic_bool(webcontrol_localhost, parm, pact, false);
     if (name == "webcontrol_ipv6") return edit_generic_bool(webcontrol_ipv6, parm, pact, false);
     if (name == "webcontrol_tls") return edit_generic_bool(webcontrol_tls, parm, pact, false);
     if (name == "webcontrol_spa_mode") return edit_generic_bool(webcontrol_spa_mode, parm, pact, true);

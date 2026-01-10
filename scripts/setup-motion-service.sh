@@ -144,6 +144,7 @@ setup_config() {
     sed -i.bak "s|^camera |#camera |" "$conf_file"
 
     # Disable camera-level SQL to prevent relative path database errors
+    # Force network access (override any camera-level localhost setting)
     cat >> "$conf_file" << 'EOF_SQL'
 
 ;*************************************************
@@ -154,9 +155,14 @@ sql_event_end
 sql_movie_start
 sql_movie_end
 sql_pic_save
+
+;*************************************************
+;*****   Force network access (override camera defaults)
+;*************************************************
+webcontrol_localhost off
 EOF_SQL
 
-    log_info "Single-camera config mode enabled (camera file disabled)"
+    log_info "Single-camera config mode enabled (network access enabled)"
 
     # Clean up backup files
     rm -f "$conf_file.bak"
