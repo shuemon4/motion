@@ -75,6 +75,7 @@ struct ctx_parm_app {
     int             webcontrol_lock_attempts;
     std::string     webcontrol_lock_script;
     std::string     webcontrol_trusted_proxies;  /* IPs allowed to set X-Forwarded-For */
+    int             webcontrol_session_timeout;   /* Session timeout in seconds */
     std::string     webcontrol_html_path;        /* Path to React build files */
     bool            webcontrol_spa_mode;         /* Enable SPA fallback routing */
 

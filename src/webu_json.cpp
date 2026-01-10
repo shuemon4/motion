@@ -804,6 +804,164 @@ void cls_webu_json::api_auth_me()
 }
 
 /*
+ * React UI API: Login with session creation
+ * POST /0/api/auth/login
+ * Body: {username, password}
+ * Returns: {session_token, csrf_token, role, expires_in}
+ */
+void cls_webu_json::api_auth_login()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    /* Only accept POST */
+    if (webua->get_method() != WEBUI_METHOD_POST) {
+        webua->resp_page = "{\"error\":\"Method not allowed\"}";
+        webua->resp_code = 405;
+        return;
+    }
+
+    /* Parse JSON body for username/password */
+    JsonParser parser;
+    if (!parser.parse(webua->raw_body)) {
+        webua->resp_page = "{\"error\":\"Invalid JSON\"}";
+        webua->resp_code = 400;
+        return;
+    }
+
+    std::string username = parser.getString("username");
+    std::string password = parser.getString("password");
+
+    if (username.empty() || password.empty()) {
+        webua->resp_page = "{\"error\":\"Missing username or password\"}";
+        webua->resp_code = 400;
+        return;
+    }
+
+    /* Validate credentials against config */
+    std::string role = "";
+
+    /* Check admin credentials */
+    std::string admin_auth = app->cfg->webcontrol_authentication;
+    if (!admin_auth.empty()) {
+        size_t colon_pos = admin_auth.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string admin_user = admin_auth.substr(0, colon_pos);
+            std::string admin_pass = admin_auth.substr(colon_pos + 1);
+
+            if (username == admin_user && password == admin_pass) {
+                role = "admin";
+            }
+        }
+    }
+
+    /* Check user credentials if admin didn't match */
+    if (role.empty()) {
+        std::string user_auth = app->cfg->webcontrol_user_authentication;
+        if (!user_auth.empty()) {
+            size_t colon_pos = user_auth.find(':');
+            if (colon_pos != std::string::npos) {
+                std::string user_user = user_auth.substr(0, colon_pos);
+                std::string user_pass = user_auth.substr(colon_pos + 1);
+
+                if (username == user_user && password == user_pass) {
+                    role = "user";
+                }
+            }
+        }
+    }
+
+    if (role.empty()) {
+        /* Log failed attempt for rate limiting */
+        webua->failauth_log(true, username);
+
+        webua->resp_page = "{\"error\":\"Invalid credentials\"}";
+        webua->resp_code = 401;
+        return;
+    }
+
+    /* Create session */
+    std::string session_token = webu->session_create(role, webua->clientip);
+    std::string csrf_token = webu->session_get_csrf(session_token);
+
+    /* Return session info */
+    webua->resp_page = "{";
+    webua->resp_page += "\"session_token\":\"" + session_token + "\",";
+    webua->resp_page += "\"csrf_token\":\"" + csrf_token + "\",";
+    webua->resp_page += "\"role\":\"" + role + "\",";
+    webua->resp_page += "\"expires_in\":" + std::to_string(app->cfg->webcontrol_session_timeout);
+    webua->resp_page += "}";
+}
+
+/*
+ * React UI API: Logout (destroy session)
+ * POST /0/api/auth/logout
+ */
+void cls_webu_json::api_auth_logout()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (webua->get_method() != WEBUI_METHOD_POST) {
+        webua->resp_page = "{\"error\":\"Method not allowed\"}";
+        webua->resp_code = 405;
+        return;
+    }
+
+    /* Get session token from header */
+    std::string session_token = webua->session_token;
+
+    if (!session_token.empty()) {
+        webu->session_destroy(session_token);
+    }
+
+    webua->resp_page = "{\"success\":true}";
+}
+
+/*
+ * React UI API: Get authentication status
+ * GET /0/api/auth/status
+ * Returns: {auth_required, authenticated, role?, csrf_token?}
+ */
+void cls_webu_json::api_auth_status()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+    webua->resp_page = "{";
+
+    /* Check if authentication is configured */
+    bool auth_required = (app->cfg->webcontrol_authentication != "");
+
+    webua->resp_page += "\"auth_required\":" + std::string(auth_required ? "true" : "false");
+
+    if (!auth_required) {
+        /* No auth configured - full access */
+        webua->resp_page += ",\"authenticated\":true";
+        webua->resp_page += ",\"role\":\"admin\"";
+    } else if (!webua->session_token.empty()) {
+        /* Session token provided - validate it */
+        std::string role = webu->session_validate(
+            webua->session_token, webua->clientip);
+
+        if (!role.empty()) {
+            webua->resp_page += ",\"authenticated\":true";
+            webua->resp_page += ",\"role\":\"" + role + "\"";
+            webua->resp_page += ",\"csrf_token\":\"" +
+                webu->session_get_csrf(webua->session_token) + "\"";
+        } else {
+            webua->resp_page += ",\"authenticated\":false";
+        }
+    } else if (!webua->auth_role.empty()) {
+        /* HTTP Basic/Digest auth (backward compatibility) */
+        webua->resp_page += ",\"authenticated\":true";
+        webua->resp_page += ",\"role\":\"" + webua->auth_role + "\"";
+        webua->resp_page += ",\"csrf_token\":\"" + webu->csrf_token + "\"";
+    } else {
+        /* Auth required but no credentials */
+        webua->resp_page += ",\"authenticated\":false";
+    }
+
+    webua->resp_page += "}";
+}
+
+/*
  * React UI API: Media pictures list
  * Returns list of snapshot images for a camera
  */

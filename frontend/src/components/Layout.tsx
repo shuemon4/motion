@@ -2,11 +2,18 @@ import { useState } from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import { useSystemStatus } from '@/api/queries'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { logout } from '@/api/auth'
 
 export function Layout() {
   const { data: status } = useSystemStatus()
-  const { isAuthenticated, role, showLoginModal } = useAuthContext()
+  const { isAuthenticated, role } = useAuthContext()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const handleLogout = async () => {
+    await logout()
+    // Reload the page to trigger AuthGate to show login
+    window.location.reload()
+  }
 
   const formatBytes = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -42,18 +49,20 @@ export function Layout() {
                   <Link to="/settings" className="hover:text-primary">Settings</Link>
                 )}
                 <Link to="/media" className="hover:text-primary">Media</Link>
-                <button
-                  onClick={showLoginModal}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-elevated transition-colors"
-                  title={isAuthenticated ? 'Logged in' : 'Login'}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <span className={`text-xs ${isAuthenticated ? 'text-green-500' : 'text-gray-400'}`}>
-                    {isAuthenticated ? 'Admin' : 'Login'}
-                  </span>
-                </button>
+                {isAuthenticated && (
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-elevated transition-colors"
+                    title="Logout"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span className="text-xs text-green-500">
+                      {role === 'admin' ? 'Admin' : 'User'}
+                    </span>
+                  </button>
+                )}
               </div>
               {status && (
                 <div className="flex items-center gap-3 text-xs border-l border-gray-700 pl-4">
@@ -136,20 +145,22 @@ export function Layout() {
                 >
                   Media
                 </Link>
-                <button
-                  onClick={() => {
-                    showLoginModal()
-                    setMobileMenuOpen(false)
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface transition-colors text-left"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <span className={isAuthenticated ? 'text-green-500' : 'text-gray-400'}>
-                    {isAuthenticated ? 'Logged in as Admin' : 'Login'}
-                  </span>
-                </button>
+                {isAuthenticated && (
+                  <button
+                    onClick={() => {
+                      handleLogout()
+                      setMobileMenuOpen(false)
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface transition-colors text-left"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span className="text-green-500">
+                      Logout ({role === 'admin' ? 'Admin' : 'User'})
+                    </span>
+                  </button>
+                )}
 
                 {/* Mobile system stats */}
                 {status && (

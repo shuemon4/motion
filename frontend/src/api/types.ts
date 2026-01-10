@@ -95,13 +95,6 @@ export interface SystemStatus {
   version: string;
 }
 
-// Auth status response from /0/api/auth/me
-export interface AuthResponse {
-  authenticated: boolean;
-  auth_method?: string;
-  role?: 'admin' | 'user';
-}
-
 // API error
 export interface ApiError {
   message: string;

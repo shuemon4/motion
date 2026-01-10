@@ -35,6 +35,9 @@
 
             /* React UI API endpoints */
             void api_auth_me();
+            void api_auth_login();
+            void api_auth_logout();
+            void api_auth_status();
             void api_media_pictures();
             void api_media_movies();
             void api_delete_picture();

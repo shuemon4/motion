@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/Toast'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { LoginModal } from '@/components/LoginModal'
+import { AuthGate } from '@/components/AuthGate'
 import App from './App.tsx'
 import './index.css'
 
@@ -26,8 +26,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <ToastProvider>
           <BrowserRouter>
             <AuthProvider>
-              <App />
-              <LoginModal />
+              <AuthGate>
+                <App />
+              </AuthGate>
             </AuthProvider>
           </BrowserRouter>
         </ToastProvider>

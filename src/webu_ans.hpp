@@ -41,6 +41,7 @@
             FILE            *req_file;      /* requested file*/
             std::string     lang;           /* Two character abbreviation for locale language*/
             std::string     auth_role;      /* User role: "admin" or "user" (empty if unauthenticated) */
+            std::string     session_token;  /* Session token from X-Session-Token header */
 
             std::string     url;            /* The URL sent from the client */
             std::string     uri_cmd0;       /* Parsed command from the url eg /cmd0/cmd1/cmd2/cmd3/cmd4 */
@@ -52,6 +53,7 @@
             enum WEBUI_RESP resp_type;      /* indicator for the type of response to provide. */
             std::string     resp_page;      /* The response that will be sent */
             std::string     raw_body;       /* Accumulated POST/PATCH body for JSON endpoints */
+            int             resp_code;      /* HTTP response code (default 200) */
 
             int             camindx;        /* Index number of the cam */
             int             device_id;      /* Device id number requested */
@@ -64,6 +66,7 @@
             void bad_request();
             bool valid_request();
             enum WEBUI_METHOD get_method() const { return cnct_method; }
+            void failauth_log(bool userid_fail, const std::string &username = "");
 
             mhdrslt answer_main(struct MHD_Connection *connection, const char *method
                 , const char *upload_data, size_t *upload_data_size);
@@ -93,7 +96,6 @@
             int parseurl();
             void clientip_get();
             void hostname_get();
-            void failauth_log(bool userid_fail, const std::string &username = "");
             void client_connect();
             mhdrslt failauth_check();
             mhdrslt mhd_digest_fail(int signal_stale);

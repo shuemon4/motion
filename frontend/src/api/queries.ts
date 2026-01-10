@@ -8,7 +8,6 @@ import type {
   MoviesResponse,
   TemperatureResponse,
   SystemStatus,
-  AuthResponse,
 } from './types';
 
 // Query keys for cache management
@@ -19,7 +18,6 @@ export const queryKeys = {
   movies: (camId: number) => ['movies', camId] as const,
   temperature: ['temperature'] as const,
   systemStatus: ['systemStatus'] as const,
-  auth: ['auth'] as const,
 };
 
 // Fetch full Motion config (includes cameras list)
@@ -86,14 +84,6 @@ export function useSystemStatus() {
     refetchInterval: 10000, // Refresh every 10s
     refetchIntervalInBackground: false, // Pause when tab inactive to save CPU
     staleTime: 5000,
-  });
-}
-
-// Fetch auth status
-export function useAuth() {
-  return useQuery({
-    queryKey: queryKeys.auth,
-    queryFn: () => apiGet<AuthResponse>('/0/api/auth/me'),
   });
 }
 

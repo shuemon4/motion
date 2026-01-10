@@ -1,0 +1,66 @@
+import { useState, useEffect, type ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getAuthStatus } from '@/api/auth';
+import { isAuthenticated, restoreSession } from '@/api/session';
+import { LoginPage } from './LoginPage';
+
+interface AuthGateProps {
+  children: ReactNode;
+}
+
+export function AuthGate({ children }: AuthGateProps) {
+  const queryClient = useQueryClient();
+  const [initializing, setInitializing] = useState(true);
+
+  // Try to restore session on mount
+  useEffect(() => {
+    restoreSession();
+    setInitializing(false);
+  }, []);
+
+  // Check auth status from server
+  const { data: authStatus, isLoading, error } = useQuery({
+    queryKey: ['auth', 'status'],
+    queryFn: getAuthStatus,
+    retry: 1,
+    staleTime: 30000,  // 30 seconds
+  });
+
+  // Handle successful login
+  const handleLoginSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['auth'] });
+  };
+
+  // Still initializing
+  if (initializing || isLoading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="animate-pulse text-text-secondary">Loading...</div>
+      </div>
+    );
+  }
+
+  // Connection error
+  if (error) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="text-red-500">
+          Unable to connect to Motion. Please check the server.
+        </div>
+      </div>
+    );
+  }
+
+  // Auth not required - show app
+  if (!authStatus?.auth_required) {
+    return <>{children}</>;
+  }
+
+  // Auth required - check if authenticated
+  if (!authStatus?.authenticated || !isAuthenticated()) {
+    return <LoginPage onSuccess={handleLoginSuccess} />;
+  }
+
+  // Authenticated - show app
+  return <>{children}</>;
+}

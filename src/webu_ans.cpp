@@ -985,7 +985,7 @@ void cls_webu_ans::mhd_send()
         MHD_add_response_header (response, MHD_HTTP_HEADER_CONTENT_ENCODING, "gzip");
     }
 
-    retcd = MHD_queue_response (connection, MHD_HTTP_OK, response);
+    retcd = MHD_queue_response (connection, resp_code, response);
     MHD_destroy_response (response);
 
     if (retcd == MHD_NO) {
@@ -1132,6 +1132,15 @@ void cls_webu_ans::answer_get()
         if (uri_cmd2 == "auth" && uri_cmd3 == "me") {
             webu_json->api_auth_me();
             mhd_send();
+        } else if (uri_cmd2 == "auth" && uri_cmd3 == "login") {
+            webu_json->api_auth_login();
+            mhd_send();
+        } else if (uri_cmd2 == "auth" && uri_cmd3 == "logout") {
+            webu_json->api_auth_logout();
+            mhd_send();
+        } else if (uri_cmd2 == "auth" && uri_cmd3 == "status") {
+            webu_json->api_auth_status();
+            mhd_send();
         } else if (uri_cmd2 == "media" && uri_cmd3 == "pictures") {
             webu_json->api_media_pictures();
             mhd_send();
@@ -1228,9 +1237,31 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
     }
 
     if (authenticated == false) {
-        retcd = mhd_auth();
-        if (authenticated == false) {
-            return retcd;
+        /* Check for session token in X-Session-Token header */
+        const char* token = MHD_lookup_connection_value(
+            connection, MHD_HEADER_KIND, "X-Session-Token");
+
+        if (token != nullptr) {
+            session_token = token;
+
+            /* Validate and get role from session */
+            auth_role = webu->session_validate(session_token, clientip);
+            if (!auth_role.empty()) {
+                authenticated = true;
+                retcd = MHD_YES;
+            } else {
+                /* Session invalid/expired - fall through to HTTP auth */
+                retcd = mhd_auth();
+                if (authenticated == false) {
+                    return retcd;
+                }
+            }
+        } else {
+            /* No session token - use HTTP Basic/Digest auth */
+            retcd = mhd_auth();
+            if (authenticated == false) {
+                return retcd;
+            }
         }
     }
 
@@ -1240,11 +1271,13 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
         mhd_first = false;
         if (mystreq(method,"POST")) {
             cnct_method = WEBUI_METHOD_POST;
-            /* Check if this is a JSON API endpoint (mask API, power control, profiles) */
+            /* Check if this is a JSON API endpoint (mask API, power control, profiles, auth) */
             if ((uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "") ||
                 (uri_cmd1 == "api" && uri_cmd2 == "system" &&
                  (uri_cmd3 == "reboot" || uri_cmd3 == "shutdown")) ||
-                (uri_cmd1 == "api" && uri_cmd2 == "profiles")) {
+                (uri_cmd1 == "api" && uri_cmd2 == "profiles") ||
+                (uri_cmd1 == "api" && uri_cmd2 == "auth" &&
+                 (uri_cmd3 == "login" || uri_cmd3 == "logout"))) {
                 raw_body.clear();  /* Clear body buffer for JSON POST */
                 retcd = MHD_YES;
             } else {
@@ -1322,6 +1355,28 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             } else if (uri_cmd4 == "default") {
                 /* POST /0/api/profiles/{id}/default */
                 webu_json->api_profiles_set_default();
+            } else {
+                bad_request();
+            }
+            mhd_send();
+            retcd = MHD_YES;
+        } else if (uri_cmd1 == "api" && uri_cmd2 == "auth") {
+            /* Auth API endpoints - accumulate raw body for JSON POST */
+            if (*upload_data_size > 0) {
+                raw_body.append(upload_data, *upload_data_size);
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            /* Body complete, route to appropriate handler */
+            if (webu_json == nullptr) {
+                webu_json = new cls_webu_json(this);
+            }
+            if (uri_cmd3 == "login") {
+                /* POST /0/api/auth/login */
+                webu_json->api_auth_login();
+            } else if (uri_cmd3 == "logout") {
+                /* POST /0/api/auth/logout */
+                webu_json->api_auth_logout();
             } else {
                 bad_request();
             }
@@ -1502,6 +1557,7 @@ cls_webu_ans::cls_webu_ans(cls_motapp *p_app, const char *uri)
     user_auth_is_ha1 = false;                    /* User password is HA1 hash */
 
     resp_page     = "";                          /* The response being constructed */
+    resp_code     = 200;                         /* Default HTTP status code */
     req_file      = nullptr;
     gzip_resp     = nullptr;
     gzip_size     = 0;

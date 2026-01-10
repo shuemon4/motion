@@ -28,6 +28,10 @@
 #ifndef _INCLUDE_WEBU_HPP_
 #define _INCLUDE_WEBU_HPP_
 
+    #include <mutex>
+    #include <map>
+    #include <string>
+
     /* Some defines of lengths for our buffers */
     #define WEBUI_LEN_PARM 512          /* Parameters specified */
     #define WEBUI_LEN_URLI 512          /* Maximum URL permitted */
@@ -106,6 +110,17 @@
 
     #define CSRF_TOKEN_LENGTH 64    /* 32 bytes hex-encoded */
 
+    /* Session data structure for session-based authentication */
+    struct ctx_session {
+        std::string     token;          /* 64-char hex session token */
+        std::string     csrf_token;     /* Per-session CSRF token */
+        std::string     role;           /* "admin" or "user" */
+        std::string     client_ip;      /* IP that created session */
+        time_t          created;        /* Creation timestamp */
+        time_t          last_access;    /* Last activity timestamp */
+        time_t          expires;        /* Expiration timestamp */
+    };
+
     class cls_webu {
         public:
             cls_webu(cls_motapp *p_app);
@@ -121,10 +136,23 @@
             int                         cnct_cnt;
             bool                        restart;
             std::string                 csrf_token;     /* CSRF protection token */
+
+            /* Session management */
+            std::map<std::string, ctx_session> sessions; /* token -> session */
+            std::mutex                  sessions_mutex;  /* Thread-safe access */
+
             void startup();
             void shutdown();
             void csrf_generate();
             bool csrf_validate(const std::string &token);
+
+            /* Session management functions */
+            std::string session_generate_token();
+            std::string session_create(const std::string& role, const std::string& client_ip);
+            std::string session_validate(const std::string& token, const std::string& client_ip);
+            std::string session_get_csrf(const std::string& token);
+            void session_destroy(const std::string& token);
+            void session_cleanup_expired();
 
         private:
             ctx_mhdstart    *mhdst;

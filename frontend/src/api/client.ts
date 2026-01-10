@@ -1,4 +1,5 @@
-import { getCsrfToken, setCsrfToken, invalidateCsrfToken } from './csrf';
+import { getCsrfToken as getAppCsrfToken, setCsrfToken, invalidateCsrfToken } from './csrf';
+import { getSessionToken, getCsrfToken as getSessionCsrfToken, clearSession } from './session';
 
 /**
  * Request timeout in milliseconds
@@ -94,11 +95,14 @@ export async function apiGet<T>(endpoint: string, retryCount = 0): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
+  const sessionToken = getSessionToken();
+
   try {
     const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
+        ...(sessionToken && { 'X-Session-Token': sessionToken }),
       },
       credentials: 'same-origin',
       signal: controller.signal,
@@ -109,8 +113,10 @@ export async function apiGet<T>(endpoint: string, retryCount = 0): Promise<T> {
     if (!response.ok) {
       // Handle authentication errors
       if (response.status === 401) {
+        // Session expired or invalid
+        clearSession();
         authErrorCallback?.(401);
-        throw new ApiClientError('Authentication required', 401);
+        throw new ApiClientError('Session expired', 401);
       }
 
       // Handle transient errors with retry
@@ -141,7 +147,8 @@ export async function apiPost<T>(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-  const token = getCsrfToken();
+  const sessionToken = getSessionToken();
+  const csrfToken = sessionToken ? getSessionCsrfToken() : getAppCsrfToken();
 
   try {
     const response = await fetch(endpoint, {
@@ -149,7 +156,8 @@ export async function apiPost<T>(
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        ...(token && { 'X-CSRF-Token': token }),
+        ...(sessionToken && { 'X-Session-Token': sessionToken }),
+        ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
       },
       credentials: 'same-origin',
       body: JSON.stringify(data),
@@ -160,12 +168,21 @@ export async function apiPost<T>(
 
     // Handle authentication errors
     if (response.status === 401) {
+      clearSession();
       authErrorCallback?.(401);
-      throw new ApiClientError('Authentication required', 401);
+      throw new ApiClientError('Session expired', 401);
     }
 
     // Handle 403 - token may be stale (Motion restarted)
     if (response.status === 403) {
+      // If using session auth, session is invalid
+      if (sessionToken) {
+        clearSession();
+        authErrorCallback?.(403);
+        throw new ApiClientError('CSRF validation failed', 403);
+      }
+
+      // Fallback to old CSRF token refresh for HTTP Basic/Digest auth
       invalidateCsrfToken();
 
       // Refetch config to get new token (use same controller for timeout)
@@ -239,7 +256,8 @@ export async function apiPatch<T>(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-  const token = getCsrfToken();
+  const sessionToken = getSessionToken();
+  const csrfToken = sessionToken ? getSessionCsrfToken() : getAppCsrfToken();
 
   try {
     const response = await fetch(endpoint, {
@@ -247,7 +265,8 @@ export async function apiPatch<T>(
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        ...(token && { 'X-CSRF-Token': token }),
+        ...(sessionToken && { 'X-Session-Token': sessionToken }),
+        ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
       },
       credentials: 'same-origin',
       body: JSON.stringify(data),
@@ -258,8 +277,9 @@ export async function apiPatch<T>(
 
     // Handle authentication errors
     if (response.status === 401) {
+      clearSession();
       authErrorCallback?.(401);
-      throw new ApiClientError('Authentication required', 401);
+      throw new ApiClientError('Session expired', 401);
     }
 
     // Handle 403 - token may be stale (Motion restarted)
@@ -332,14 +352,16 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-  const token = getCsrfToken();
+  const sessionToken = getSessionToken();
+  const csrfToken = sessionToken ? getSessionCsrfToken() : getAppCsrfToken();
 
   try {
     const response = await fetch(endpoint, {
       method: 'DELETE',
       headers: {
         'Accept': 'application/json',
-        ...(token && { 'X-CSRF-Token': token }),
+        ...(sessionToken && { 'X-Session-Token': sessionToken }),
+        ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
       },
       credentials: 'same-origin',
       signal: controller.signal,
@@ -349,8 +371,9 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
 
     // Handle authentication errors
     if (response.status === 401) {
+      clearSession();
       authErrorCallback?.(401);
-      throw new ApiClientError('Authentication required', 401);
+      throw new ApiClientError('Session expired', 401);
     }
 
     // Handle 403 - token may be stale

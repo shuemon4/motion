@@ -595,6 +595,150 @@ bool cls_webu::csrf_validate(const std::string &token)
     return result == 0;
 }
 
+/* Generate cryptographically secure session token (64 hex chars) */
+std::string cls_webu::session_generate_token()
+{
+    unsigned char random_bytes[32];
+    char hex_token[65];
+
+    /* Use /dev/urandom for cryptographically secure random generation */
+    FILE *urandom = fopen("/dev/urandom", "rb");
+    if (urandom == nullptr) {
+        /* Fallback: use time-based seed with additional entropy */
+        MOTION_LOG(WRN, TYPE_STREAM, NO_ERRNO,
+            _("Cannot open /dev/urandom for session token, using fallback random"));
+        srand((unsigned int)(time(NULL) ^ getpid()));
+        for (int i = 0; i < 32; i++) {
+            random_bytes[i] = (unsigned char)(rand() % 256);
+        }
+    } else {
+        size_t read_cnt = fread(random_bytes, 1, 32, urandom);
+        fclose(urandom);
+        if (read_cnt != 32) {
+            MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+                _("Failed to read sufficient random data for session token"));
+            /* Use partial data with fallback */
+            srand((unsigned int)(time(NULL) ^ getpid()));
+            for (size_t i = read_cnt; i < 32; i++) {
+                random_bytes[i] = (unsigned char)(rand() % 256);
+            }
+        }
+    }
+
+    /* Convert to hex string */
+    for (int i = 0; i < 32; i++) {
+        snprintf(hex_token + (i * 2), 3, "%02x", random_bytes[i]);
+    }
+    hex_token[64] = '\0';
+
+    return std::string(hex_token);
+}
+
+/* Create new session after successful authentication */
+std::string cls_webu::session_create(const std::string& role, const std::string& client_ip)
+{
+    std::lock_guard<std::mutex> lock(sessions_mutex);
+
+    ctx_session session;
+    session.token = session_generate_token();
+    session.csrf_token = session_generate_token();  /* Separate CSRF per session */
+    session.role = role;
+    session.client_ip = client_ip;
+    session.created = time(NULL);
+    session.last_access = session.created;
+    session.expires = session.created + app->cfg->webcontrol_session_timeout;
+
+    sessions[session.token] = session;
+
+    /* Cleanup expired sessions (limit memory growth) */
+    session_cleanup_expired();
+
+    MOTION_LOG(INF, TYPE_STREAM, NO_ERRNO,
+        _("Session created for role '%s' from %s"), role.c_str(), client_ip.c_str());
+
+    return session.token;
+}
+
+/* Validate session token from request header
+ * Returns role if valid, empty string if invalid/expired
+ */
+std::string cls_webu::session_validate(const std::string& token, const std::string& client_ip)
+{
+    std::lock_guard<std::mutex> lock(sessions_mutex);
+
+    auto it = sessions.find(token);
+    if (it == sessions.end()) {
+        return "";  /* Token not found */
+    }
+
+    ctx_session& session = it->second;
+
+    /* Check expiration */
+    if (time(NULL) > session.expires) {
+        MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO,
+            _("Session expired for %s"), client_ip.c_str());
+        sessions.erase(it);
+        return "";  /* Expired */
+    }
+
+    /* Optional: IP binding (prevents token theft)
+     * Disabled by default to allow mobile clients switching networks
+     */
+    /* if (session.client_ip != client_ip) {
+        MOTION_LOG(WRN, TYPE_STREAM, NO_ERRNO,
+            _("Session IP mismatch: expected %s, got %s"),
+            session.client_ip.c_str(), client_ip.c_str());
+        return "";
+    } */
+
+    /* Update last access, extend expiration (sliding window) */
+    session.last_access = time(NULL);
+    session.expires = session.last_access + app->cfg->webcontrol_session_timeout;
+
+    return session.role;
+}
+
+/* Get CSRF token for session */
+std::string cls_webu::session_get_csrf(const std::string& token)
+{
+    std::lock_guard<std::mutex> lock(sessions_mutex);
+
+    auto it = sessions.find(token);
+    if (it != sessions.end()) {
+        return it->second.csrf_token;
+    }
+    return "";
+}
+
+/* Destroy session (logout) */
+void cls_webu::session_destroy(const std::string& token)
+{
+    std::lock_guard<std::mutex> lock(sessions_mutex);
+    auto it = sessions.find(token);
+    if (it != sessions.end()) {
+        MOTION_LOG(INF, TYPE_STREAM, NO_ERRNO,
+            _("Session destroyed for %s"), it->second.client_ip.c_str());
+        sessions.erase(it);
+    }
+}
+
+/* Cleanup expired sessions (called periodically)
+ * Note: Must be called with sessions_mutex already locked
+ */
+void cls_webu::session_cleanup_expired()
+{
+    time_t now = time(NULL);
+    for (auto it = sessions.begin(); it != sessions.end(); ) {
+        if (now > it->second.expires) {
+            MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO,
+                _("Cleaning up expired session for %s"), it->second.client_ip.c_str());
+            it = sessions.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 void cls_webu::shutdown()
 {
     int chkcnt;
