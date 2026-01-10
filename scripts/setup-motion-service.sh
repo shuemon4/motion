@@ -140,6 +140,24 @@ setup_config() {
         log_info "Viewer authentication configured (user: $VIEWER_USER)"
     fi
 
+    # Comment out camera config line (use single-file config for simplicity)
+    sed -i.bak "s|^camera |#camera |" "$conf_file"
+
+    # Disable camera-level SQL to prevent relative path database errors
+    cat >> "$conf_file" << 'EOF_SQL'
+
+;*************************************************
+;*****   Per-Camera SQL (disabled - use main config only)
+;*************************************************
+sql_event_start
+sql_event_end
+sql_movie_start
+sql_movie_end
+sql_pic_save
+EOF_SQL
+
+    log_info "Single-camera config mode enabled (camera file disabled)"
+
     # Clean up backup files
     rm -f "$conf_file.bak"
 
