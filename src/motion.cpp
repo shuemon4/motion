@@ -14,8 +14,17 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * motion.cpp - Main Application Entry Point
  *
-*/
+ * This module provides the main() entry point and application lifecycle
+ * management, including signal handling, camera initialization, and the
+ * primary event loop coordinating all subsystems.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "conf.hpp"

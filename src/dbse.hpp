@@ -16,6 +16,15 @@
  *
  */
 
+/*
+ * dbse.hpp - Database Interface Definitions
+ *
+ * Header file defining database connection and logging interfaces for
+ * SQLite, MySQL, and PostgreSQL support, enabling event and file
+ * tracking in external databases.
+ *
+ */
+
 #ifndef _INCLUDE_DBSE_HPP_
 #define _INCLUDE_DBSE_HPP_
 

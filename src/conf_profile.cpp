@@ -16,6 +16,16 @@
  *
  */
 
+/*
+ * conf_profile.cpp - Configuration Profile Persistence Implementation
+ *
+ * This module manages named configuration profiles stored in SQLite, allowing
+ * users to save and restore camera and motion detection settings. Profiles
+ * capture libcamera controls and detection parameters, enabling quick switching
+ * between presets (e.g., "daytime", "nighttime", "low-sensitivity").
+ *
+ */
+
 #include "motion.hpp"
 #include "conf_profile.hpp"
 #include "conf.hpp"

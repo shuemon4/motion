@@ -16,6 +16,15 @@
  *
  */
 
+/*
+ * alg_sec.cpp - Secondary Detection Algorithms (OpenCV)
+ *
+ * This module provides optional secondary motion detection using OpenCV,
+ * including object detection, face recognition, and advanced tracking
+ * algorithms to complement the primary motion detection.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"

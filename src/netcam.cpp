@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * netcam.cpp - Network Camera (RTSP/HTTP) Capture
  *
-*/
+ * This module handles video capture from network cameras via RTSP, HTTP,
+ * and other protocols using FFmpeg, supporting IP cameras and remote
+ * video sources with authentication and reconnection logic.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

@@ -16,6 +16,15 @@
  *
  */
 
+/*
+ * libcam.hpp - Raspberry Pi Camera Interface (libcamera)
+ *
+ * Header file defining the libcamera interface class for Raspberry Pi
+ * Camera Module 3 and compatible devices, including camera controls
+ * for ISO, white balance, and autofocus.
+ *
+ */
+
 #ifndef _INCLUDE_LIBCAM_HPP_
 #define _INCLUDE_LIBCAM_HPP_
     #ifdef HAVE_LIBCAM

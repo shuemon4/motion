@@ -15,6 +15,16 @@
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
+
+/*
+ * video_loopback.cpp - Video Loopback Device Management
+ *
+ * This module manages V4L2 loopback devices for outputting processed
+ * video streams to virtual video devices, enabling other applications
+ * to consume Motion's video output.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"

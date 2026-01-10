@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * schedule.cpp - Time-Based Scheduling System
  *
-*/
+ * This module implements time-based scheduling for camera operations,
+ * allowing configuration of detection windows, recording schedules, and
+ * automated parameter changes based on time of day or day of week.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

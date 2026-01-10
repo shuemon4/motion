@@ -16,6 +16,15 @@
  *
  */
 
+/*
+ * draw.cpp - Image Overlay and Annotation
+ *
+ * This module provides drawing functions for overlaying text, timestamps,
+ * motion boxes, and privacy masks on video frames, supporting various
+ * formats and colors for image annotation.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"

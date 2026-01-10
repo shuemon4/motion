@@ -16,6 +16,14 @@
  *
  */
 
+/*
+ * conf.hpp - Configuration System Interface
+ *
+ * Header file defining configuration parameter structures, categories,
+ * and the configuration management class for handling Motion's extensive
+ * parameter system and runtime configuration updates.
+ *
+ */
 
 #ifndef _INCLUDE_CONF_HPP_
 #define _INCLUDE_CONF_HPP_

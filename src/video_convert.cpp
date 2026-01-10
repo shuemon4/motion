@@ -16,6 +16,15 @@
  *
  */
 
+/*
+ * video_convert.cpp - Video Format Conversion and Color Space Handling
+ *
+ * This module provides pixel format conversion (YUV, RGB, YUYV, etc.),
+ * color space transformations, and codec-specific decompression for
+ * various camera formats and output requirements.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"

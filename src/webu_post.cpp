@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_post.cpp - HTTP POST Request Handler
+ *
+ * This module processes HTTP POST requests for configuration updates,
+ * camera commands, and profile operations, parsing JSON request bodies
+ * and coordinating with webu_json for API endpoint handling.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

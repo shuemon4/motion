@@ -15,6 +15,16 @@
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
+
+/*
+ * logger.hpp - Logging System Interface
+ *
+ * Header file defining logging levels, types, modes, and the logging
+ * class interface for Motion's structured logging system with support
+ * for file, syslog, and console output.
+ *
+ */
+
 #ifndef _INCLUDE_LOGGER_HPP_
 #define _INCLUDE_LOGGER_HPP_
     extern cls_log *motlog;

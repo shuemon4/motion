@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * jpegutils.cpp - JPEG Encoding and Decoding Utilities
  *
-*/
+ * This module provides JPEG image encoding and decoding using libjpeg,
+ * handling compression, decompression, quality settings, and format
+ * conversion for image capture and streaming.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * video_v4l2.cpp - Video4Linux2 Camera Interface
+ *
+ * This module provides camera capture using the Video4Linux2 (V4L2) API
+ * for USB webcams and V4L2-compatible devices, managing device controls,
+ * buffer management, and format negotiation.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

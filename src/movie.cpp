@@ -16,6 +16,15 @@
  *
  */
 
+/*
+ * movie.cpp - Video Recording and Encoding
+ *
+ * This module handles video recording using FFmpeg libraries (libavcodec,
+ * libavformat), encoding motion events and timelapse videos to various
+ * formats (MP4, WebM, etc.) with configurable codecs and quality settings.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"

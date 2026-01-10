@@ -14,6 +14,14 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * sound.cpp - Audio Capture and Processing
+ *
+ * This module manages audio capture from microphones and audio devices,
+ * coordinating with video capture for synchronized audio-video recording
+ * and audio-triggered motion events.
  *
  */
 

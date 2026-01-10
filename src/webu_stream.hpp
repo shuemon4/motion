@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_stream.hpp - MJPEG Streaming Interface
+ *
+ * Header file defining the MJPEG streaming class for delivering real-time
+ * video streams over HTTP using multipart content responses for live
+ * camera feeds in web browsers.
+ *
+ */
 
 #ifndef _INCLUDE_WEBU_STREAM_HPP_
 #define _INCLUDE_WEBU_STREAM_HPP_

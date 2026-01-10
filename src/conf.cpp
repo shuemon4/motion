@@ -17,16 +17,18 @@
  */
 
 /*
-Notes:
-This needs additional work.
-Create a vector/list from config_params.
-Reassign class categories to group together those applicable to application vs camera vs sound.
-Create a class of just the parms/edits to segregate from the config file processes
-Perhaps a lightweight class of just the parms.  Use this instead of full class for the config
-  parms that are being used "live" with devices
- (currently called "cfg" in the camera,sound and motion classes)
-Remove the depreceated parameters from old Motion.
-*/
+ * conf.cpp - Configuration Parameter Management
+ *
+ * This module defines and manages all configuration parameters, providing
+ * validation, default values, hot-reload capability, and runtime editing
+ * for application, camera, and sound settings.
+ *
+ * Architecture (refactored Dec 2024):
+ * - parm_registry.hpp: O(1) lookup via hash map, scoped by PARM_SCOPE_APP/CAM/SND
+ * - parm_structs.hpp: Lightweight ctx_parm_app/cam/snd structs for live device use
+ * - conf_file.hpp: Separated file I/O (cls_config_file) from parameter editing
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "logger.hpp"
@@ -851,22 +853,22 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     static const std::vector<std::string> webcontrol_auth_method_values = {"none","basic","digest"};
     if (name == "webcontrol_auth_method") return edit_generic_list(webcontrol_auth_method, parm, pact, "none", webcontrol_auth_method_values);
 
-    static const std::vector<std::string> webcontrol_authentication_values = {"noauth","user:pass"};
     if (name == "webcontrol_authentication") {
         /* Apply environment variable expansion for security */
         if (pact == PARM_ACT_SET || pact == PARM_ACT_DFLT) {
             parm = conf_expand_env(parm);
         }
-        return edit_generic_list(webcontrol_authentication, parm, pact, "noauth", webcontrol_authentication_values);
+        /* Accept any username:password format - don't validate against a list */
+        return edit_generic_string(webcontrol_authentication, parm, pact, "");
     }
 
-    static const std::vector<std::string> webcontrol_user_authentication_values = {"noauth","user:pass"};
     if (name == "webcontrol_user_authentication") {
         /* Apply environment variable expansion for security */
         if (pact == PARM_ACT_SET || pact == PARM_ACT_DFLT) {
             parm = conf_expand_env(parm);
         }
-        return edit_generic_list(webcontrol_user_authentication, parm, pact, "noauth", webcontrol_user_authentication_values);
+        /* Accept any username:password format - don't validate against a list */
+        return edit_generic_string(webcontrol_user_authentication, parm, pact, "");
     }
 
     static const std::vector<std::string> stream_preview_method_values = {"mjpeg","snapshot"};

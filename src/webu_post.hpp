@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_post.hpp - HTTP POST Handler Interface
+ *
+ * Header file defining HTTP POST request processing structures and
+ * functions for configuration updates, camera commands, and profile
+ * operations via JSON request bodies.
+ *
+ */
 
 #ifndef _INCLUDE_WEBU_POST_HPP_
 #define _INCLUDE_WEBU_POST_HPP_

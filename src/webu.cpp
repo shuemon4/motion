@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu.cpp - Web Server Infrastructure (libmicrohttpd)
+ *
+ * This module provides the embedded web server using libmicrohttpd, handling
+ * HTTP request routing, authentication, and connection management for the
+ * JSON API, MJPEG streams, and static file serving.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

@@ -15,6 +15,16 @@
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
+
+/*
+ * alg.cpp - Core Motion Detection Algorithm
+ *
+ * This module implements the primary motion detection algorithm using frame
+ * differencing, threshold analysis, and smart masking to identify motion
+ * events while filtering noise and avoiding false positives.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "conf.hpp"

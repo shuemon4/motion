@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_file.hpp - Static File Serving Interface
+ *
+ * Header file defining the static file serving class for delivering
+ * HTML, JavaScript, CSS, and other static resources for the React
+ * frontend with SPA routing support.
+ *
+ */
 
 #ifndef _INCLUDE_WEBU_FILE_HPP_
 #define _INCLUDE_WEBU_FILE_HPP_

@@ -15,6 +15,16 @@
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
+
+/*
+ * picture.cpp - Image Capture and Processing
+ *
+ * This module manages still image capture in various formats (JPEG, PNG),
+ * handling snapshots, motion-triggered images, and timelapse photography
+ * with filename formatting and database logging.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"

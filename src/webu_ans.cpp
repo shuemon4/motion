@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_ans.cpp - HTTP Response Management
+ *
+ * This module manages HTTP response construction and delivery for the
+ * web server, handling response headers, status codes, content types,
+ * and streaming responses via libmicrohttpd callbacks.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

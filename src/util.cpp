@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * util.cpp - Common Utility Functions
  *
-*/
+ * This module provides general-purpose utility functions for string
+ * manipulation, file operations, time handling, and other shared
+ * functionality used throughout the application.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

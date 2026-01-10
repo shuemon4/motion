@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_mpegts.hpp - MPEG-TS Streaming Interface
+ *
+ * Header file defining the MPEG Transport Stream class for H.264 video
+ * streaming over HTTP, providing lower-latency streams compared to MJPEG
+ * for compatible browsers and applications.
+ *
+ */
 
 #ifndef _INCLUDE_WEBU_MPEGTS_HPP_
 #define _INCLUDE_WEBU_MPEGTS_HPP_

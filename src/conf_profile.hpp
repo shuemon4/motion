@@ -16,6 +16,15 @@
  *
  */
 
+/*
+ * conf_profile.hpp - Configuration Profile Management Interface
+ *
+ * Header file defining the configuration profile class for storing and
+ * managing named camera settings profiles in SQLite, enabling quick
+ * switching between preset configurations (day/night/low-sensitivity).
+ *
+ */
+
 #ifndef _INCLUDE_CONF_PROFILE_HPP_
 #define _INCLUDE_CONF_PROFILE_HPP_
 

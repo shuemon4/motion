@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_ans.hpp - HTTP Response Management Interface
+ *
+ * Header file defining the HTTP response class for constructing and
+ * delivering responses via libmicrohttpd, handling headers, status codes,
+ * content types, and streaming callbacks.
+ *
+ */
 
 #ifndef _INCLUDE_WEBU_ANS_HPP_
 #define _INCLUDE_WEBU_ANS_HPP_

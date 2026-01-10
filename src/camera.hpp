@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * camera.hpp - Camera Class Definitions
  *
-*/
+ * Header file defining the camera class structure and interfaces for
+ * camera thread management, image capture, and motion detection processing
+ * across different camera types (V4L2, libcamera, netcam).
+ *
+ */
 
 #ifndef _INCLUDE_CAMERA_HPP_
 #define _INCLUDE_CAMERA_HPP_

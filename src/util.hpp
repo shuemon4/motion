@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * util.hpp - Common Utilities and FFmpeg Compatibility
  *
-*/
+ * Header file defining utility functions, FFmpeg API compatibility macros,
+ * and common helper functions for string manipulation, time handling,
+ * and cross-platform operations.
+ *
+ */
 
 #ifndef _INCLUDE_UTIL_HPP_
 #define _INCLUDE_UTIL_HPP_

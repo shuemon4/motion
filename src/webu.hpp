@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu.hpp - Web Server Interface Definitions
+ *
+ * Header file defining web server structures, HTTP request handling,
+ * authentication, and the web interface class for Motion's embedded
+ * HTTP server using libmicrohttpd.
+ *
+ */
 
 #ifndef _INCLUDE_WEBU_HPP_
 #define _INCLUDE_WEBU_HPP_

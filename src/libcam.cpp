@@ -14,6 +14,14 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * libcam.cpp - Raspberry Pi Camera (libcamera) Interface
+ *
+ * This module provides camera capture using libcamera API for Raspberry Pi
+ * Camera Module 3 and compatible devices, managing camera controls (ISO,
+ * white balance, focus) and efficient frame acquisition.
  *
  */
 

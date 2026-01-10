@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * allcam.cpp - Multi-Camera Coordination and All-Camera View
  *
-*/
+ * This module manages coordination across multiple cameras, providing
+ * aggregated views and synchronized operations for multi-camera
+ * installations and all-camera display functionality.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

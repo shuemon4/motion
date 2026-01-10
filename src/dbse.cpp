@@ -16,6 +16,15 @@
  *
  */
 
+/*
+ * dbse.cpp - Database Integration (SQLite/MySQL/PostgreSQL)
+ *
+ * This module provides database connectivity for logging motion events,
+ * file captures, and camera status to SQLite, MySQL, or PostgreSQL databases
+ * for external analysis and record-keeping.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"

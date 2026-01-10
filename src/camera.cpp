@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * camera.cpp - Camera Thread and Image Capture Management
  *
-*/
+ * This module implements per-camera thread execution, coordinating image
+ * acquisition from various sources (libcamera, V4L2, netcam), motion detection,
+ * event handling, and output generation (movies, images, streams).
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

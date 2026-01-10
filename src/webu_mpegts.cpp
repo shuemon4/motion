@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_mpegts.cpp - MPEG-TS Streaming Implementation
+ *
+ * This module provides H.264 video streaming in MPEG Transport Stream
+ * format over HTTP, delivering lower-latency video streams compared to
+ * MJPEG for compatible browsers and applications.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

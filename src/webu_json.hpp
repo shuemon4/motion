@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_json.hpp - JSON REST API Interface
+ *
+ * Header file defining the JSON REST API class for configuration
+ * management, camera control, status queries, and profile operations
+ * between the React frontend and Motion backend.
+ *
+ */
 
 #ifndef _INCLUDE_WEBU_JSON_HPP_
 #define _INCLUDE_WEBU_JSON_HPP_

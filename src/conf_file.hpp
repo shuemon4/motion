@@ -22,8 +22,6 @@
  * This module handles all configuration file operations, separating file I/O
  * concerns from the core cls_config parameter management class.
  *
- * Part of Phase 4 of the configuration system refactoring.
- * See doc/plans/ConfigParam-Refactor-20251211-1730.md for design details.
  */
 
 #ifndef _INCLUDE_CONF_FILE_HPP_

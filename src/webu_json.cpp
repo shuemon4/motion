@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_json.cpp - JSON REST API Implementation
+ *
+ * This module implements the JSON REST API for configuration management,
+ * camera control, status queries, and profile operations, serving as the
+ * primary interface between the React frontend and Motion backend.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

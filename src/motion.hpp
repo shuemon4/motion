@@ -14,8 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
+ */
+
+/*
+ * motion.hpp - Main Application Header
  *
-*/
+ * Primary header file containing global definitions, structures, and
+ * includes for the Motion application, defining core data types and
+ * constants used throughout the system.
+ *
+ */
 
 #ifndef _INCLUDE_MOTION_HPP_
 #define _INCLUDE_MOTION_HPP_

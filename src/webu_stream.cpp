@@ -14,7 +14,16 @@
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
-*/
+ */
+
+/*
+ * webu_stream.cpp - MJPEG Streaming Implementation
+ *
+ * This module provides real-time MJPEG video streaming over HTTP, delivering
+ * live camera feeds to web browsers with minimal latency using multipart
+ * content responses.
+ *
+ */
 
 #include "motion.hpp"
 #include "util.hpp"

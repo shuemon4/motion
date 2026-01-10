@@ -15,6 +15,16 @@
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
+
+/*
+ * logger.cpp - Logging System Implementation
+ *
+ * This module implements structured logging with configurable levels (EMG,
+ * ALR, CRT, ERR, WRN, NTC, INF, DBG) and types (COR, STR, ENC, NET, etc.),
+ * supporting output to file, syslog, and FFmpeg integration.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "conf.hpp"

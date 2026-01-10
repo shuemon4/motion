@@ -13,6 +13,16 @@
  *
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
+/*
+ * json_parse.cpp - Lightweight JSON Parser
+ *
+ * This module implements a minimal dependency-free JSON parser for
+ * parsing HTTP POST request bodies and configuration data, avoiding
+ * external JSON library dependencies.
+ *
  */
 
 #include "json_parse.hpp"

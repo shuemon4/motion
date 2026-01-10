@@ -13,12 +13,16 @@
  *
  *    You should have received a copy of the GNU General Public License
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
+ *
  */
 
 /*
- *    Minimal JSON parser for Motion configuration API
- *    Only handles flat objects with string/number/boolean values
- *    No arrays, no nested objects, no null values
+ * json_parse.hpp - Lightweight JSON Parser Interface
+ *
+ * Header file defining a minimal dependency-free JSON parser for HTTP
+ * POST request bodies. Handles flat objects with string/number/boolean
+ * values. No arrays, nested objects, or null values.
+ *
  */
 
 #ifndef _INCLUDE_JSON_PARSE_HPP_

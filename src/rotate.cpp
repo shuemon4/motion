@@ -15,6 +15,16 @@
  *    along with Motion.  If not, see <https://www.gnu.org/licenses/>.
  *
  */
+
+/*
+ * rotate.cpp - Image Rotation and Transformation
+ *
+ * This module provides efficient image rotation (90°, 180°, 270°) and
+ * flipping operations for camera orientation adjustment, supporting
+ * various pixel formats with optimized algorithms.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"
