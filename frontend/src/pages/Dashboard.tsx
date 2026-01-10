@@ -1,8 +1,10 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CameraStream } from '@/components/CameraStream'
 import { BottomSheet } from '@/components/BottomSheet'
 import { QuickSettings } from '@/components/QuickSettings'
+import { FullscreenButton } from '@/components/FullscreenButton'
+import { SettingsButton } from '@/components/SettingsButton'
 import { useCameras } from '@/api/queries'
 import { apiGet } from '@/api/client'
 import { setCsrfToken } from '@/api/csrf'
@@ -73,107 +75,6 @@ export function Dashboard() {
     // Merge: camera-specific overrides global
     return { ...defaultConfig, ...cameraConfig }
   }, [configData, selectedCameraId])
-
-  // Gear icon button component
-  const SettingsButton = ({ cameraId }: { cameraId: number }) => (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation()
-        openQuickSettings(cameraId)
-      }}
-      className="p-1.5 hover:bg-surface rounded-full transition-colors"
-      aria-label="Quick settings"
-      title="Quick settings"
-    >
-      <svg
-        className="w-5 h-5 text-gray-400 hover:text-gray-200"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-        />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-        />
-      </svg>
-    </button>
-  )
-
-  // Fullscreen button component
-  const FullscreenButton = ({ cameraId }: { cameraId: number }) => {
-    const [isFullscreen, setIsFullscreen] = useState(false)
-
-    const toggleFullscreen = (e: React.MouseEvent) => {
-      e.stopPropagation()
-      // Find the camera stream container
-      const container = document.querySelector(`[data-camera-id="${cameraId}"]`)
-      if (!container) return
-
-      if (!isFullscreen) {
-        if (container.requestFullscreen) {
-          container.requestFullscreen()
-        }
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen()
-        }
-      }
-    }
-
-    // Listen for fullscreen changes
-    useEffect(() => {
-      const handleFullscreenChange = () => {
-        setIsFullscreen(!!document.fullscreenElement)
-      }
-
-      document.addEventListener('fullscreenchange', handleFullscreenChange)
-      return () => {
-        document.removeEventListener('fullscreenchange', handleFullscreenChange)
-      }
-    }, [])
-
-    return (
-      <button
-        type="button"
-        onClick={toggleFullscreen}
-        className="p-1.5 hover:bg-surface rounded-full transition-colors"
-        aria-label="Toggle fullscreen"
-        title="Toggle fullscreen"
-      >
-        <svg
-          className="w-5 h-5 text-gray-400 hover:text-gray-200"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          {isFullscreen ? (
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"
-            />
-          ) : (
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-            />
-          )}
-        </svg>
-      </button>
-    )
-  }
 
   if (isLoading) {
     return (
@@ -254,7 +155,7 @@ export function Dashboard() {
                   </span>
                 )}
                 <FullscreenButton cameraId={camera.id} />
-                {role === 'admin' && <SettingsButton cameraId={camera.id} />}
+                {role === 'admin' && <SettingsButton cameraId={camera.id} onClick={openQuickSettings} />}
               </div>
             </div>
 
@@ -322,7 +223,7 @@ export function Dashboard() {
                     </span>
                   )}
                   <FullscreenButton cameraId={camera.id} />
-                  {role === 'admin' && <SettingsButton cameraId={camera.id} />}
+                  {role === 'admin' && <SettingsButton cameraId={camera.id} onClick={openQuickSettings} />}
                 </div>
               </div>
 

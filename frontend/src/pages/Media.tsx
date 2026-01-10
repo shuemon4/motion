@@ -6,13 +6,22 @@ import type { MediaItem } from '@/api/types'
 type MediaType = 'pictures' | 'movies'
 type ViewMode = 'all' | 'by-date'
 
+// Parse timestamp with validation
+function parseTimestamp(dateStr: string): Date | null {
+  const timestamp = parseInt(dateStr, 10)
+  if (isNaN(timestamp)) return null
+  const date = new Date(timestamp * 1000)
+  return isNaN(date.getTime()) ? null : date
+}
+
 // Group items by date (YYYY-MM-DD)
 function groupByDate(items: MediaItem[]): Map<string, MediaItem[]> {
   const groups = new Map<string, MediaItem[]>();
   for (const item of items) {
     // Convert timestamp to date string
-    const timestamp = parseInt(item.date) * 1000;
-    const dateStr = new Date(timestamp).toISOString().split('T')[0];
+    const date = parseTimestamp(item.date)
+    if (!date) continue // Skip invalid dates
+    const dateStr = date.toISOString().split('T')[0];
     if (!groups.has(dateStr)) {
       groups.set(dateStr, []);
     }
@@ -61,7 +70,8 @@ export function Media() {
   }
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(parseInt(dateStr) * 1000)
+    const date = parseTimestamp(dateStr)
+    if (!date) return 'Unknown date'
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
   }
 
@@ -91,7 +101,7 @@ export function Media() {
       if (selectedItem?.id === deleteConfirm.id) {
         setSelectedItem(null)
       }
-    } catch (err) {
+    } catch {
       addToast('Failed to delete file', 'error')
     }
   }, [deleteConfirm, mediaType, selectedCamera, deletePictureMutation, deleteMovieMutation, addToast, selectedItem])
@@ -111,8 +121,9 @@ export function Media() {
       {/* Camera and Type Selector */}
       <div className="flex gap-4 mb-6">
         <div>
-          <label className="block text-sm font-medium mb-2">Camera</label>
+          <label htmlFor="camera-select" className="block text-sm font-medium mb-2">Camera</label>
           <select
+            id="camera-select"
             value={selectedCamera}
             onChange={(e) => setSelectedCamera(parseInt(e.target.value))}
             className="px-3 py-2 bg-surface border border-surface-elevated rounded-lg"
@@ -249,16 +260,18 @@ export function Media() {
       ) : (
         <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => (
-            <div
+            <button
               key={item.id}
-              className="bg-surface-elevated rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all group relative"
+              className="bg-surface-elevated rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary focus:ring-2 focus:ring-primary focus:outline-none transition-all group relative text-left w-full"
               onClick={() => setSelectedItem(item)}
+              aria-label={`View ${item.filename}`}
             >
               {/* Delete button - appears on hover */}
               <button
                 onClick={(e) => handleDeleteClick(item, e)}
-                className="absolute top-2 right-2 z-10 p-1.5 bg-red-600/80 hover:bg-red-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-2 right-2 z-10 p-1.5 bg-red-600/80 hover:bg-red-600 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 title="Delete"
+                aria-label={`Delete ${item.filename}`}
               >
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -288,7 +301,7 @@ export function Media() {
                   <span>{formatDate(item.date)}</span>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

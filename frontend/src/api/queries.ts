@@ -74,6 +74,7 @@ export function useTemperature() {
     queryKey: queryKeys.temperature,
     queryFn: () => apiGet<TemperatureResponse>('/0/api/system/temperature'),
     refetchInterval: 30000, // Refresh every 30s
+    refetchIntervalInBackground: false, // Pause when tab inactive to save CPU
   });
 }
 
@@ -83,6 +84,7 @@ export function useSystemStatus() {
     queryKey: queryKeys.systemStatus,
     queryFn: () => apiGet<SystemStatus>('/0/api/system/status'),
     refetchInterval: 10000, // Refresh every 10s
+    refetchIntervalInBackground: false, // Pause when tab inactive to save CPU
     staleTime: 5000,
   });
 }

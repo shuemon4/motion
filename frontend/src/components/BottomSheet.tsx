@@ -18,6 +18,7 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
 
   const { handlers, style } = useSheetGestures({
     isOpen,
@@ -25,7 +26,7 @@ export function BottomSheet({
     sheetRef,
   })
 
-  // Handle escape key
+  // Handle escape key and focus trap
   useEffect(() => {
     if (!isOpen) return
 
@@ -35,8 +36,41 @@ export function BottomSheet({
       }
     }
 
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !sheetRef.current) return
+
+      // Get all focusable elements within the sheet
+      const focusableElements = sheetRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+
+      const firstElement = focusableElements[0]
+      const lastElement = focusableElements[focusableElements.length - 1]
+
+      if (!firstElement) return
+
+      // Trap focus within modal
+      if (e.shiftKey) {
+        // Shift+Tab: moving backwards
+        if (document.activeElement === firstElement) {
+          e.preventDefault()
+          lastElement?.focus()
+        }
+      } else {
+        // Tab: moving forwards
+        if (document.activeElement === lastElement) {
+          e.preventDefault()
+          firstElement?.focus()
+        }
+      }
+    }
+
     document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
+    document.addEventListener('keydown', handleTab)
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.removeEventListener('keydown', handleTab)
+    }
   }, [isOpen, onClose])
 
   // Prevent body scroll when sheet is open
@@ -48,6 +82,31 @@ export function BottomSheet({
     }
     return () => {
       document.body.style.overflow = ''
+    }
+  }, [isOpen])
+
+  // Focus management: focus modal on open, restore focus on close
+  useEffect(() => {
+    if (isOpen) {
+      // Save current focus
+      previousFocusRef.current = document.activeElement as HTMLElement
+
+      // Focus the first focusable element in the sheet
+      setTimeout(() => {
+        if (sheetRef.current) {
+          const focusableElements = sheetRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+          if (focusableElements.length > 0) {
+            focusableElements[0].focus()
+          }
+        }
+      }, 100) // Small delay to allow animation
+    } else {
+      // Restore focus when closing
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus()
+      }
     }
   }, [isOpen])
 

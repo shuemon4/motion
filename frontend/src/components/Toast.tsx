@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -6,6 +6,7 @@ interface Toast {
   id: string
   message: string
   type: ToastType
+  timeoutId?: ReturnType<typeof setTimeout>
 }
 
 interface ToastContextType {
@@ -21,17 +22,35 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = Math.random().toString(36).slice(2)
-    setToasts((prev) => [...prev, { id, message, type }])
 
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
+    // Auto-remove after 5 seconds and store timeout ID
+    const timeoutId = setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
     }, 5000)
+
+    setToasts((prev) => [...prev, { id, message, type, timeoutId }])
   }, [])
 
   const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
+    setToasts((prev) => {
+      const toast = prev.find((t) => t.id === id)
+      if (toast?.timeoutId) {
+        clearTimeout(toast.timeoutId)
+      }
+      return prev.filter((t) => t.id !== id)
+    })
   }, [])
+
+  // Cleanup all timeouts on unmount
+  useEffect(() => {
+    return () => {
+      toasts.forEach((toast) => {
+        if (toast.timeoutId) {
+          clearTimeout(toast.timeoutId)
+        }
+      })
+    }
+  }, [toasts])
 
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>

@@ -59,21 +59,7 @@ export function Settings() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const [isSaving, setIsSaving] = useState(false)
 
-  // Require admin access
-  if (role !== 'admin') {
-    return (
-      <div className="p-4 sm:p-6">
-        <div className="bg-surface-elevated rounded-lg p-8 text-center max-w-2xl mx-auto">
-          <svg className="w-16 h-16 mx-auto text-yellow-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <h1 className="text-2xl font-bold mb-2">Admin Access Required</h1>
-          <p className="text-gray-400">You must be logged in as an administrator to access settings.</p>
-        </div>
-      </div>
-    )
-  }
-
+  // All hooks must be called before any conditional returns
   const queryClient = useQueryClient()
   const { data: config, isLoading, error } = useQuery({
     queryKey: ['config'],
@@ -90,6 +76,8 @@ export function Settings() {
   const batchUpdateConfigMutation = useBatchUpdateConfig()
 
   // Clear changes and errors when camera selection changes
+  // This prevents race conditions where settings from one camera could be
+  // applied to another if the user switches cameras before saving
   useEffect(() => {
     setChanges({})
     setValidationErrors({})
@@ -103,6 +91,7 @@ export function Settings() {
     setValidationErrors((prev) => {
       if (result.success) {
         // Remove error if validation passes
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { [param]: _, ...rest } = prev
         return rest
       } else {
@@ -292,6 +281,21 @@ export function Settings() {
   // Helper to get error for a parameter
   const getError = (param: string): string | undefined => {
     return validationErrors[param]
+  }
+
+  // Require admin access - check after all hooks
+  if (role !== 'admin') {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="bg-surface-elevated rounded-lg p-8 text-center max-w-2xl mx-auto">
+          <svg className="w-16 h-16 mx-auto text-yellow-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h1 className="text-2xl font-bold mb-2">Admin Access Required</h1>
+          <p className="text-gray-400">You must be logged in as an administrator to access settings.</p>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {

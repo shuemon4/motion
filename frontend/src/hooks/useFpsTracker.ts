@@ -4,45 +4,33 @@ import { useRef, useEffect, useState } from 'react';
  * FPS Tracker Hook
  *
  * Calculates client-side FPS for MJPEG streams by tracking frame updates.
+ * Uses image onload events to track actual frame arrivals instead of RAF.
  * Returns the current FPS as a rolling average over the last second.
  */
 export function useFpsTracker(imgRef: React.RefObject<HTMLImageElement | null>) {
   const [fps, setFps] = useState(0);
   const frameTimestamps = useRef<number[]>([]);
-  const lastUpdateTime = useRef<number>(0);
 
   useEffect(() => {
-    if (!imgRef.current) return;
+    const img = imgRef.current;
+    if (!img) return;
 
-    let animationFrameId: number;
-
-    const trackFrame = () => {
+    const handleLoad = () => {
       const now = performance.now();
+      frameTimestamps.current.push(now);
 
-      // Only track if image has actually updated (src changed)
-      if (now - lastUpdateTime.current > 16) { // ~60fps max sampling
-        frameTimestamps.current.push(now);
-        lastUpdateTime.current = now;
-
-        // Keep only timestamps from the last second
-        const oneSecondAgo = now - 1000;
-        frameTimestamps.current = frameTimestamps.current.filter(
-          (timestamp) => timestamp > oneSecondAgo
-        );
-
-        // Calculate FPS as number of frames in the last second
-        const currentFps = frameTimestamps.current.length;
-        setFps(currentFps);
+      // Keep only frames from last second
+      const oneSecondAgo = now - 1000;
+      while (frameTimestamps.current.length > 0 && frameTimestamps.current[0] < oneSecondAgo) {
+        frameTimestamps.current.shift();
       }
 
-      animationFrameId = requestAnimationFrame(trackFrame);
+      setFps(frameTimestamps.current.length);
     };
 
-    // Start tracking
-    animationFrameId = requestAnimationFrame(trackFrame);
-
+    img.addEventListener('load', handleLoad);
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      img.removeEventListener('load', handleLoad);
       frameTimestamps.current = [];
     };
   }, [imgRef]);

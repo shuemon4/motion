@@ -24,6 +24,10 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('ErrorBoundary caught:', error, errorInfo)
   }
 
+  handleReset = () => {
+    this.setState({ hasError: false, error: undefined })
+  }
+
   render() {
     if (this.state.hasError) {
       return (
@@ -36,12 +40,20 @@ export class ErrorBoundary extends Component<Props, State> {
               <p className="text-gray-400 mb-4">
                 {this.state.error?.message || 'An unexpected error occurred'}
               </p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-primary hover:bg-primary-hover rounded text-white"
-              >
-                Reload page
-              </button>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={this.handleReset}
+                  className="px-4 py-2 bg-primary hover:bg-primary-hover rounded text-white"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-surface-elevated hover:bg-surface rounded text-white"
+                >
+                  Reload Page
+                </button>
+              </div>
             </div>
           </div>
         )

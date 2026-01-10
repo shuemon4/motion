@@ -77,6 +77,13 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
     [config, localChanges]
   )
 
+  // Cancel pending updates when camera changes
+  useEffect(() => {
+    // Clear all debounce timers when cameraId changes
+    Object.values(debounceTimers.current).forEach(clearTimeout)
+    debounceTimers.current = {}
+  }, [cameraId])
+
   // Debounced change handler for sliders
   const handleChange = useCallback(
     (param: string, value: string | number | boolean) => {
@@ -88,10 +95,11 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
         clearTimeout(debounceTimers.current[param])
       }
 
-      // Debounce API call
+      // Debounce API call - capture cameraId in closure
+      const currentCameraId = cameraId
       debounceTimers.current[param] = setTimeout(() => {
         updateConfig(
-          { camId: cameraId, changes: { [param]: value } },
+          { camId: currentCameraId, changes: { [param]: value } },
           {
             onSuccess: () => {
               setLastApplied(param)

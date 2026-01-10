@@ -15,6 +15,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useAuth } from '@/api/queries'
+import { setAuthErrorCallback } from '@/api/client'
 
 interface AuthState {
   isAuthenticated: boolean
@@ -55,6 +56,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isAuthenticated = authData?.authenticated ?? false
   const authMethod = authData?.auth_method ?? null
   const role = authData?.role ?? null
+
+  // Register auth error callback to receive 401/403 notifications from API client
+  useEffect(() => {
+    setAuthErrorCallback(() => {
+      setAuthRequired(true)
+    })
+    return () => setAuthErrorCallback(null)
+  }, [])
 
   // Auto-show login modal if auth is required but user isn't authenticated
   useEffect(() => {

@@ -67,7 +67,7 @@ export function LoginModal() {
         } else {
           setError(`Authentication failed (${response.status})`)
         }
-      } catch (err) {
+      } catch {
         setError('Connection failed. Please try again.')
       } finally {
         setIsLoading(false)

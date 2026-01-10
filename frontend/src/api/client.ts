@@ -1,6 +1,11 @@
 import { getCsrfToken, setCsrfToken, invalidateCsrfToken } from './csrf';
 
-const API_TIMEOUT = 10000; // 10 seconds
+/**
+ * Request timeout in milliseconds
+ * Set to 10 seconds to balance responsiveness vs slow network conditions
+ * Can be overridden via VITE_API_TIMEOUT environment variable
+ */
+const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT ?? '10000', 10);
 const MAX_RETRIES = 1; // Max retries for transient failures
 
 /**
@@ -45,6 +50,29 @@ class ApiClientError extends Error {
     this.status = status;
     // User-friendly message
     this.userMessage = status ? (ERROR_MESSAGES[status] ?? message) : message;
+  }
+}
+
+/**
+ * Safely parse JSON from response, wrapping parse errors in ApiClientError
+ */
+async function safeJsonParse<T>(response: Response): Promise<T> {
+  try {
+    return await response.json();
+  } catch {
+    throw new ApiClientError('Invalid JSON response from server', response.status);
+  }
+}
+
+/**
+ * Safely parse JSON text, wrapping parse errors in ApiClientError
+ */
+function safeParseText<T>(text: string, status?: number): T {
+  if (!text) return {} as T;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiClientError('Invalid JSON response from server', status);
   }
 }
 
@@ -94,7 +122,7 @@ export async function apiGet<T>(endpoint: string, retryCount = 0): Promise<T> {
       throw new ApiClientError(`HTTP ${response.status}: ${response.statusText}`, response.status);
     }
 
-    return response.json();
+    return safeJsonParse<T>(response);
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof ApiClientError) throw error;
@@ -140,14 +168,16 @@ export async function apiPost<T>(
     if (response.status === 403) {
       invalidateCsrfToken();
 
-      // Refetch config to get new token
-      const configResponse = await fetch('/0/api/config');
+      // Refetch config to get new token (use same controller for timeout)
+      const configResponse = await fetch('/0/api/config', {
+        signal: controller.signal,
+      });
       if (configResponse.ok) {
-        const config = await configResponse.json();
+        const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
         if (config.csrf_token) {
           setCsrfToken(config.csrf_token);
 
-          // Retry with new token
+          // Retry with new token (use same controller for timeout)
           const retryResponse = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -157,6 +187,7 @@ export async function apiPost<T>(
             },
             credentials: 'same-origin',
             body: JSON.stringify(data),
+            signal: controller.signal,
           });
 
           if (!retryResponse.ok) {
@@ -168,7 +199,7 @@ export async function apiPost<T>(
           }
 
           const text = await retryResponse.text();
-          return text ? JSON.parse(text) : ({} as T);
+          return safeParseText<T>(text, retryResponse.status);
         }
       }
       throw new ApiClientError('CSRF validation failed', 403);
@@ -186,7 +217,7 @@ export async function apiPost<T>(
 
     // Some endpoints return empty response
     const text = await response.text();
-    return text ? JSON.parse(text) : ({} as T);
+    return safeParseText<T>(text, response.status);
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof ApiClientError) throw error;
@@ -235,14 +266,16 @@ export async function apiPatch<T>(
     if (response.status === 403) {
       invalidateCsrfToken();
 
-      // Refetch config to get new token
-      const configResponse = await fetch('/0/api/config');
+      // Refetch config to get new token (use same controller for timeout)
+      const configResponse = await fetch('/0/api/config', {
+        signal: controller.signal,
+      });
       if (configResponse.ok) {
-        const config = await configResponse.json();
+        const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
         if (config.csrf_token) {
           setCsrfToken(config.csrf_token);
 
-          // Retry with new token
+          // Retry with new token (use same controller for timeout)
           const retryResponse = await fetch(endpoint, {
             method: 'PATCH',
             headers: {
@@ -252,6 +285,7 @@ export async function apiPatch<T>(
             },
             credentials: 'same-origin',
             body: JSON.stringify(data),
+            signal: controller.signal,
           });
 
           if (!retryResponse.ok) {
@@ -263,7 +297,7 @@ export async function apiPatch<T>(
           }
 
           const text = await retryResponse.text();
-          return text ? JSON.parse(text) : ({} as T);
+          return safeParseText<T>(text, retryResponse.status);
         }
       }
       throw new ApiClientError('CSRF validation failed', 403);
@@ -280,7 +314,7 @@ export async function apiPatch<T>(
     }
 
     const text = await response.text();
-    return text ? JSON.parse(text) : ({} as T);
+    return safeParseText<T>(text, response.status);
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof ApiClientError) throw error;
@@ -323,10 +357,12 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
     if (response.status === 403) {
       invalidateCsrfToken();
 
-      // Refetch config to get new token, then retry
-      const configResponse = await fetch('/0/api/config');
+      // Refetch config to get new token, then retry (use same controller for timeout)
+      const configResponse = await fetch('/0/api/config', {
+        signal: controller.signal,
+      });
       if (configResponse.ok) {
-        const config = await configResponse.json();
+        const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
         if (config.csrf_token) {
           setCsrfToken(config.csrf_token);
 
@@ -337,6 +373,7 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
               'X-CSRF-Token': config.csrf_token,
             },
             credentials: 'same-origin',
+            signal: controller.signal,
           });
 
           if (!retryResponse.ok) {
@@ -344,7 +381,7 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
           }
 
           const text = await retryResponse.text();
-          return text ? JSON.parse(text) : ({} as T);
+          return safeParseText<T>(text, retryResponse.status);
         }
       }
       throw new ApiClientError('CSRF validation failed', 403);
@@ -355,7 +392,7 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
     }
 
     const text = await response.text();
-    return text ? JSON.parse(text) : ({} as T);
+    return safeParseText<T>(text, response.status);
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof ApiClientError) throw error;
