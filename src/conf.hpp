@@ -404,6 +404,7 @@
             void edit_device_id(std::string &parm, enum PARM_ACT pact);
             void edit_pause(std::string &parm, enum PARM_ACT pact);
             void edit_target_dir(std::string &parm, enum PARM_ACT pact);
+            void edit_webcontrol_html_path(std::string &parm, enum PARM_ACT pact);
 
 
 

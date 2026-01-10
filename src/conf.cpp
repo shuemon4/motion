@@ -523,6 +523,26 @@ void cls_config::edit_target_dir(std::string &parm, enum PARM_ACT pact)
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","target_dir",_("target_dir"));
 }
 
+void cls_config::edit_webcontrol_html_path(std::string &parm, enum PARM_ACT pact)
+{
+    if (pact == PARM_ACT_DFLT) {
+        webcontrol_html_path = std::string( configdir ) + std::string("/webui");
+    } else if (pact == PARM_ACT_SET) {
+        if (parm == "") {
+            webcontrol_html_path = "";
+        } else if (parm.substr(parm.length()-1,1) == "/") {
+            webcontrol_html_path = parm.substr(0, parm.length()-1);
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,"Removing trailing '/' from webcontrol_html_path");
+        } else {
+            webcontrol_html_path = parm;
+        }
+    } else if (pact == PARM_ACT_GET) {
+        parm = webcontrol_html_path;
+    }
+    return;
+    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","webcontrol_html_path",_("webcontrol_html_path"));
+}
+
 void cls_config::edit_text_changes(std::string &parm, enum PARM_ACT pact)
 {
     if (pact == PARM_ACT_DFLT) {
@@ -781,7 +801,6 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "webcontrol_headers") return edit_generic_string(webcontrol_headers, parm, pact, "");
     if (name == "webcontrol_lock_script") return edit_generic_string(webcontrol_lock_script, parm, pact, "");
     if (name == "webcontrol_trusted_proxies") return edit_generic_string(webcontrol_trusted_proxies, parm, pact, "");
-    if (name == "webcontrol_html_path") return edit_generic_string(webcontrol_html_path, parm, pact, "./data/webui");
     if (name == "stream_preview_params") return edit_generic_string(stream_preview_params, parm, pact, "");
     if (name == "database_dbname") return edit_generic_string(database_dbname, parm, pact, "motion");
     if (name == "database_host") return edit_generic_string(database_host, parm, pact, "");
@@ -887,6 +906,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     // CUSTOM HANDLERS (preserved - contain special logic)
     if (name == "log_file") return edit_log_file(parm, pact);
     if (name == "target_dir") return edit_target_dir(parm, pact);
+    if (name == "webcontrol_html_path") return edit_webcontrol_html_path(parm, pact);
     if (name == "text_changes") return edit_text_changes(parm, pact);
     if (name == "picture_filename") return edit_picture_filename(parm, pact);
     if (name == "movie_filename") return edit_movie_filename(parm, pact);
