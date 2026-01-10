@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAuthStatus } from '@/api/auth';
-import { isAuthenticated, restoreSession } from '@/api/session';
+import { restoreSession } from '@/api/session';
 import { LoginPage } from './LoginPage';
 
 interface AuthGateProps {
@@ -56,8 +56,8 @@ export function AuthGate({ children }: AuthGateProps) {
     return <>{children}</>;
   }
 
-  // Auth required - check if authenticated
-  if (!authStatus?.authenticated || !isAuthenticated()) {
+  // Auth required - check if authenticated (trust the query result)
+  if (!authStatus?.authenticated) {
     return <LoginPage onSuccess={handleLoginSuccess} />;
   }
 

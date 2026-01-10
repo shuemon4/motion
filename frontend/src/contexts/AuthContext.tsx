@@ -1,8 +1,8 @@
 /**
  * Authentication Context for React UI
  *
- * Provides authentication state management for the application.
- * Uses session-based authentication with server-side token storage.
+ * Provides reactive authentication state management for the application.
+ * Uses TanStack Query to automatically update when auth state changes.
  */
 
 import {
@@ -10,13 +10,17 @@ import {
   useContext,
   type ReactNode,
 } from 'react'
-import { isAuthenticated, getRole } from '@/api/session'
+import { useQuery } from '@tanstack/react-query'
+import { getAuthStatus } from '@/api/auth'
+import { isAuthenticated as checkSession, getRole as getSessionRole } from '@/api/session'
 
 interface AuthContextValue {
   /** Whether user is currently authenticated */
   isAuthenticated: boolean
   /** User role (admin or user) or null if not authenticated */
   role: 'admin' | 'user' | null
+  /** Whether auth status is still loading */
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -26,12 +30,24 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const authenticated = isAuthenticated()
-  const role = getRole()
+  // Use TanStack Query - automatically updates when queries are invalidated
+  // This fixes the reactivity issue where auth state wasn't updating after login
+  const { data: authStatus, isLoading } = useQuery({
+    queryKey: ['auth', 'status'],
+    queryFn: getAuthStatus,
+    staleTime: 30000,
+    // Use session data as placeholder while loading
+    placeholderData: () => ({
+      auth_required: true,
+      authenticated: checkSession(),
+      role: getSessionRole() ?? undefined,
+    }),
+  })
 
   const value: AuthContextValue = {
-    isAuthenticated: authenticated,
-    role,
+    isAuthenticated: authStatus?.authenticated ?? false,
+    role: authStatus?.role ?? null,
+    isLoading,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { Outlet, Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSystemStatus } from '@/api/queries'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { logout } from '@/api/auth'
 
 export function Layout() {
+  const queryClient = useQueryClient()
   const { data: status } = useSystemStatus()
   const { isAuthenticated, role } = useAuthContext()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleLogout = async () => {
     await logout()
-    // Reload the page to trigger AuthGate to show login
-    window.location.reload()
+    // Invalidate auth queries - this triggers AuthContext and AuthGate to update
+    queryClient.invalidateQueries({ queryKey: ['auth'] })
   }
 
   const formatBytes = (bytes: number) => {
