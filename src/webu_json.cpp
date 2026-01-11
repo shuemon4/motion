@@ -1341,10 +1341,10 @@ void cls_webu_json::api_system_reboot()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token */
+    /* Validate CSRF token (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("CSRF token validation failed for reboot from %s"), webua->clientip.c_str());
         webua->resp_page = "{\"error\":\"CSRF validation failed\"}";
@@ -1398,10 +1398,10 @@ void cls_webu_json::api_system_shutdown()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token */
+    /* Validate CSRF token (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("CSRF token validation failed for shutdown from %s"), webua->clientip.c_str());
         webua->resp_page = "{\"error\":\"CSRF validation failed\"}";
@@ -1522,10 +1522,10 @@ void cls_webu_json::api_config_patch()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token */
+    /* Validate CSRF token (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("CSRF token validation failed for PATCH from %s"), webua->clientip.c_str());
         webua->resp_page = "{\"status\":\"error\",\"message\":\"CSRF validation failed\"}";
@@ -1728,10 +1728,10 @@ void cls_webu_json::api_mask_post()
         return;
     }
 
-    /* Validate CSRF */
+    /* Validate CSRF (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         webua->resp_page = "{\"error\":\"CSRF validation failed\"}";
         return;
     }
@@ -1907,10 +1907,10 @@ void cls_webu_json::api_mask_delete()
         return;
     }
 
-    /* Validate CSRF */
+    /* Validate CSRF (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         webua->resp_page = "{\"error\":\"CSRF validation failed\"}";
         return;
     }
@@ -2074,10 +2074,10 @@ void cls_webu_json::api_profiles_create()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token */
+    /* Validate CSRF token (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("CSRF token validation failed for profile create from %s"), webua->clientip.c_str());
         webua->resp_page = "{\"status\":\"error\",\"message\":\"CSRF validation failed\"}";
@@ -2152,10 +2152,10 @@ void cls_webu_json::api_profiles_update()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token */
+    /* Validate CSRF token (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("CSRF token validation failed for profile update from %s"), webua->clientip.c_str());
         webua->resp_page = "{\"status\":\"error\",\"message\":\"CSRF validation failed\"}";
@@ -2214,10 +2214,10 @@ void cls_webu_json::api_profiles_delete()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token */
+    /* Validate CSRF token (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("CSRF token validation failed for profile delete from %s"), webua->clientip.c_str());
         webua->resp_page = "{\"status\":\"error\",\"message\":\"CSRF validation failed\"}";
@@ -2260,10 +2260,10 @@ void cls_webu_json::api_profiles_apply()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token */
+    /* Validate CSRF token (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("CSRF token validation failed for profile apply from %s"), webua->clientip.c_str());
         webua->resp_page = "{\"status\":\"error\",\"message\":\"CSRF validation failed\"}";
@@ -2320,10 +2320,10 @@ void cls_webu_json::api_profiles_set_default()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token */
+    /* Validate CSRF token (supports both session and global tokens) */
     const char* csrf_token = MHD_lookup_connection_value(
         webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("CSRF token validation failed for set default from %s"), webua->clientip.c_str());
         webua->resp_page = "{\"status\":\"error\",\"message\":\"CSRF validation failed\"}";

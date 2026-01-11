@@ -1057,10 +1057,10 @@ void cls_webu_ans::answer_delete()
             webu_json = new cls_webu_json(this);
         }
 
-        /* Validate CSRF token for DELETE requests */
+        /* Validate CSRF token for DELETE requests (supports both session and global tokens) */
         const char* csrf_token = MHD_lookup_connection_value(
             connection, MHD_HEADER_KIND, "X-CSRF-Token");
-        if (csrf_token == nullptr || !webu->csrf_validate(std::string(csrf_token))) {
+        if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", session_token)) {
             MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
                 _("CSRF token validation failed for DELETE from %s"), clientip.c_str());
             resp_type = WEBUI_RESP_JSON;

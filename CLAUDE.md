@@ -16,7 +16,7 @@ This project combines Motion and MotionEye into a single, efficient application:
 1. **Motion** (C++ daemon) - Updated for 64-bit systems and optimized from the original Motion project
 2. **MotionEye** (React UI) - Complete rebuild using modern, efficient code. The original Python-based MotionEye at `/Users/tshuey/Documents/GitHub/motioneye/` is used as feature reference only
 3. **No Python backend** - React talks directly to Motion's C++ API via libmicrohttpd
-4. **Legacy UI removal** - Motion's original embedded HTML UI will be removed (task TBD)
+4. **Legacy UI removal** - Motion's original embedded HTML UI will be removed (task complete)
 
 ## Core Principles
 
@@ -49,7 +49,7 @@ This project combines Motion and MotionEye into a single, efficient application:
 ## Project Structure
 
 ```
-motion-motioneye/
+motion/
 ├── src/                    # Motion C++ backend
 │   ├── webu_file.cpp       # Static file serving + SPA support
 │   ├── webu_json.cpp       # JSON API endpoints
@@ -65,7 +65,8 @@ motion-motioneye/
 └── doc/                   # Documentation
     ├── project/            # Architecture and patterns
     ├── plans/              # Implementation plans (REQUIRED)
-    └── scratchpads/        # Working documents
+    ├── scratchpads/        # Working documents
+    └── ...
 ```
 
 ## Quick Navigation
@@ -77,6 +78,8 @@ motion-motioneye/
 | Code patterns | `doc/project/PATTERNS.md` |
 | How to modify | `doc/project/MODIFICATION_GUIDE.md` |
 | Agent quick-ref | `doc/project/AGENT_GUIDE.md` |
+| **Deploy UI to Pi5** | `~/motion-deploy-pi5.sh` |
+| Deployment guide | `doc/project/DEPLOYMENT.md` |
 
 ## Key Files
 

@@ -924,7 +924,8 @@ mhdrslt cls_webu_post::processor_start(const char *upload_data, size_t *upload_d
             }
         }
 
-        if (!webu->csrf_validate(csrf_token_received)) {
+        /* Validate CSRF token (supports both session and global tokens) */
+        if (!webu->csrf_validate_request(csrf_token_received, webua->session_token)) {
             MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
                 _("CSRF token validation failed from %s"), webua->clientip.c_str());
             webua->resp_page = "<html><body><h1>403 Forbidden</h1>"

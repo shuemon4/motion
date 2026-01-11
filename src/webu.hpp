@@ -145,6 +145,7 @@
             void shutdown();
             void csrf_generate();
             bool csrf_validate(const std::string &token);
+            bool csrf_validate_request(const std::string &csrf_token, const std::string &session_token);
 
             /* Session management functions */
             std::string session_generate_token();

@@ -595,6 +595,38 @@ bool cls_webu::csrf_validate(const std::string &token)
     return result == 0;
 }
 
+/* Validate CSRF token for a request, checking both session and global tokens.
+ * This is the main validation method that should be used by all endpoints.
+ * - If session_token is provided, first checks against session-specific CSRF token
+ * - Falls back to global CSRF token for backward compatibility with HTTP Basic/Digest auth
+ */
+bool cls_webu::csrf_validate_request(const std::string &csrf_token_received, const std::string &session_token)
+{
+    if (csrf_token_received.empty()) {
+        return false;
+    }
+
+    /* If using session authentication, check session-specific CSRF token first */
+    if (!session_token.empty()) {
+        std::string session_csrf = session_get_csrf(session_token);
+        if (!session_csrf.empty()) {
+            /* Use constant-time comparison for session CSRF */
+            if (session_csrf.length() == csrf_token_received.length()) {
+                volatile int result = 0;
+                for (size_t i = 0; i < session_csrf.length(); i++) {
+                    result |= (session_csrf[i] ^ csrf_token_received[i]);
+                }
+                if (result == 0) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    /* Fall back to global CSRF token (for HTTP Basic/Digest auth) */
+    return csrf_validate(csrf_token_received);
+}
+
 /* Generate cryptographically secure session token (64 hex chars) */
 std::string cls_webu::session_generate_token()
 {
