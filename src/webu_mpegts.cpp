@@ -39,7 +39,13 @@
 
 /****** Callback functions for MHD ****************************************/
 
+#ifdef FF_API_AVIO_WRITE_NONCONST
+/* FFmpeg 6.x and earlier - write_packet callback uses non-const uint8_t* */
+static int webu_mpegts_avio_buf(void *opaque, uint8_t *buf, int buf_size)
+#else
+/* FFmpeg 7.0+ - write_packet callback uses const uint8_t* */
 static int webu_mpegts_avio_buf(void *opaque, const uint8_t *buf, int buf_size)
+#endif
 {
     cls_webu_mpegts *webu_mpegts;
     webu_mpegts =(cls_webu_mpegts *)opaque;
@@ -230,7 +236,13 @@ int cls_webu_mpegts::getimg()
     return 0;
 }
 
+#ifdef FF_API_AVIO_WRITE_NONCONST
+/* FFmpeg 6.x and earlier - write_packet callback uses non-const uint8_t* */
+int cls_webu_mpegts::avio_buf(uint8_t *buf, int buf_size)
+#else
+/* FFmpeg 7.0+ - write_packet callback uses const uint8_t* */
 int cls_webu_mpegts::avio_buf(const uint8_t *buf, int buf_size)
+#endif
 {
     if (webus->resp_size < (size_t)buf_size + webus->resp_used) {
         webus->resp_size = (size_t)buf_size + webus->resp_used;
