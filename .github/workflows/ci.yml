@@ -86,6 +86,9 @@ jobs:
         uses: actions/checkout@main
 
       - name: Configure build
+        env:
+          # Workaround for Alpine OpenEXR/Imath version mismatch (see doc/KNOWN-ISSUES.md)
+          LIBS: ${{ matrix.libc == 'musl' && '-lImath' || '' }}
         run: |
           autoreconf -fiv
           CONFIG_SHELL=/bin/bash ./configure CC=${{ matrix.cc }} CXX=${{ matrix.cxx }}
