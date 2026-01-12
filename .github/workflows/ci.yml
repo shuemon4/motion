@@ -72,6 +72,8 @@ jobs:
             v4l-utils-libs
             libcamera-dev
             opencv-dev
+            openexr-dev
+            imath-dev
             ffmpeg-dev
             libmicrohttpd-dev
             sqlite-dev
