@@ -34,6 +34,7 @@ doc/reviews/
 doc/scratchpads/
 doc/sub-agent-summaries/
 doc/summaries/
+doc/aar/
 
 #data
 data/motion-dist.service
