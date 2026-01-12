@@ -684,13 +684,13 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
         for (int indx = 0; indx < app->cam_cnt; indx++) {
             app->cam_list[indx]->cfg->edit_set(parm_name, parm_val);
 
-            /* Apply libcam brightness/contrast/ISO/AWB changes immediately */
+            /* Apply libcam brightness/contrast/gain/AWB changes immediately */
             if (parm_name == "libcam_brightness") {
                 app->cam_list[indx]->set_libcam_brightness(atof(parm_val.c_str()));
             } else if (parm_name == "libcam_contrast") {
                 app->cam_list[indx]->set_libcam_contrast(atof(parm_val.c_str()));
-            } else if (parm_name == "libcam_iso") {
-                app->cam_list[indx]->set_libcam_iso(atof(parm_val.c_str()));
+            } else if (parm_name == "libcam_gain") {
+                app->cam_list[indx]->set_libcam_gain(atof(parm_val.c_str()));
             } else if (parm_name == "libcam_awb_enable") {
                 app->cam_list[indx]->set_libcam_awb_enable(parm_val == "true" || parm_val == "1");
             } else if (parm_name == "libcam_awb_mode") {
@@ -728,13 +728,13 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
         /* Update specific camera only */
         webua->cam->cfg->edit_set(parm_name, parm_val);
 
-        /* Apply libcam brightness/contrast/ISO/AWB changes immediately */
+        /* Apply libcam brightness/contrast/gain/AWB changes immediately */
         if (parm_name == "libcam_brightness") {
             webua->cam->set_libcam_brightness(atof(parm_val.c_str()));
         } else if (parm_name == "libcam_contrast") {
             webua->cam->set_libcam_contrast(atof(parm_val.c_str()));
-        } else if (parm_name == "libcam_iso") {
-            webua->cam->set_libcam_iso(atof(parm_val.c_str()));
+        } else if (parm_name == "libcam_gain") {
+            webua->cam->set_libcam_gain(atof(parm_val.c_str()));
         } else if (parm_name == "libcam_awb_enable") {
             webua->cam->set_libcam_awb_enable(parm_val == "true" || parm_val == "1");
         } else if (parm_name == "libcam_awb_mode") {

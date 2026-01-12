@@ -51,12 +51,12 @@
             int buffer_idx;
         };
 
-        /* Pending runtime control updates (hot-reload brightness/contrast/ISO/AWB) */
+        /* Pending runtime control updates (hot-reload brightness/contrast/gain/AWB) */
         struct ctx_pending_controls {
             mutable std::mutex mtx;     // Protects all members below
             float brightness = 0.0f;
             float contrast = 1.0f;
-            float iso = 100.0f;  // ISO 100-6400 (converted to AnalogueGain)
+            float gain = 1.0f;  // AnalogueGain (0=auto, 1.0-16.0 manual)
             // AWB controls
             bool awb_enable = true;
             int awb_mode = 0;           // libcamera native: 0=Auto
@@ -82,7 +82,7 @@
                 void noimage();
                 void set_brightness(float value);
                 void set_contrast(float value);
-                void set_iso(float value);
+                void set_gain(float value);
                 void set_awb_enable(bool value);
                 void set_awb_mode(int value);
                 void set_awb_locked(bool value);
@@ -161,7 +161,7 @@
                 void noimage();
                 void set_brightness(float value);
                 void set_contrast(float value);
-                void set_iso(float value);
+                void set_gain(float value);
                 void set_awb_enable(bool value);
                 void set_awb_mode(int value);
                 void set_awb_locked(bool value);

@@ -50,14 +50,14 @@ export function LibcameraSettings({ config, onChange, getError }: LibcameraSetti
       />
 
       <FormSlider
-        label="Gain (ISO)"
-        value={Number(getValue('libcam_iso', 0))}
-        onChange={(val) => onChange('libcam_iso', val)}
+        label="Gain"
+        value={Number(getValue('libcam_gain', 1))}
+        onChange={(val) => onChange('libcam_gain', val)}
         min={0}
-        max={1000}
-        step={10}
-        helpText="ISO sensitivity (0=auto, 10-1000) — Gain 1.0 ~ ISO 100"
-        error={getError?.('libcam_iso')}
+        max={10}
+        step={0.1}
+        helpText="Analog gain (0=auto, 1.0-10.0)"
+        error={getError?.('libcam_gain')}
       />
 
       {/* Auto White Balance */}

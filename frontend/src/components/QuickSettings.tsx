@@ -203,14 +203,13 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
         />
 
         <FormSlider
-          label="Gain (ISO)"
-          value={Number(getValue('libcam_iso', 0))}
-          onChange={(val) => handleChange('libcam_iso', val)}
+          label="Gain"
+          value={Number(getValue('libcam_gain', 1))}
+          onChange={(val) => handleChange('libcam_gain', val)}
           min={0}
-          max={6400}
-          step={100}
-          scale="logarithmic"
-          helpText="ISO sensitivity (0=auto)"
+          max={10}
+          step={0.1}
+          helpText="Analog gain (0=auto, 1.0-10.0)"
         />
       </QuickSection>
 

@@ -12,7 +12,7 @@ export const DIRECT_MAPPINGS = {
   // libcamera controls
   brightness: 'libcam_brightness',
   contrast: 'libcam_contrast',
-  iso: 'libcam_iso',
+  gain: 'libcam_gain',
   awb_enable: 'libcam_awb_enable',
   awb_mode: 'libcam_awb_mode',
   awb_locked: 'libcam_awb_locked',

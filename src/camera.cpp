@@ -2110,10 +2110,10 @@ void cls_camera::set_libcam_contrast(float value)
     }
 }
 
-void cls_camera::set_libcam_iso(float value)
+void cls_camera::set_libcam_gain(float value)
 {
     if (libcam != nullptr) {
-        libcam->set_iso(value);
+        libcam->set_gain(value);
     }
 }
 

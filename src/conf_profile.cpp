@@ -213,7 +213,7 @@ bool cls_config_profile::is_profileable_param(const std::string &param_name)
 {
     /* Libcamera controls (14 params) */
     if (param_name == "libcam_brightness" || param_name == "libcam_contrast" ||
-        param_name == "libcam_iso" || param_name == "libcam_awb_enable" ||
+        param_name == "libcam_gain" || param_name == "libcam_awb_enable" ||
         param_name == "libcam_awb_mode" || param_name == "libcam_awb_locked" ||
         param_name == "libcam_colour_temp" || param_name == "libcam_colour_gain_r" ||
         param_name == "libcam_colour_gain_b" || param_name == "libcam_af_mode" ||
@@ -629,7 +629,7 @@ std::map<std::string, std::string> cls_config_profile::snapshot_config(cls_confi
     /* Libcamera controls - stored as virtual params in config */
     params["libcam_brightness"] = to_str(cfg->parm_cam.libcam_brightness);
     params["libcam_contrast"] = to_str(cfg->parm_cam.libcam_contrast);
-    params["libcam_iso"] = to_str(cfg->parm_cam.libcam_iso);
+    params["libcam_gain"] = to_str(cfg->parm_cam.libcam_gain);
     params["libcam_awb_enable"] = to_str(cfg->parm_cam.libcam_awb_enable);
     params["libcam_awb_mode"] = to_str(cfg->parm_cam.libcam_awb_mode);
     params["libcam_awb_locked"] = to_str(cfg->parm_cam.libcam_awb_locked);
