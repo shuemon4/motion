@@ -128,7 +128,6 @@ export function useApplyProfile() {
     onSuccess: () => {
       // Invalidate config cache to trigger re-fetch of current settings
       // This ensures the UI reflects the newly applied profile settings
-      queryClient.invalidateQueries({ queryKey: ['config-quick'] });
       queryClient.invalidateQueries({ queryKey: ['config'] });
     },
   });

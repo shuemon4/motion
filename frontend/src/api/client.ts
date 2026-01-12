@@ -1,5 +1,4 @@
-import { getCsrfToken as getAppCsrfToken, setCsrfToken, invalidateCsrfToken } from './csrf';
-import { getSessionToken, getCsrfToken as getSessionCsrfToken, clearSession } from './session';
+import { getSessionToken, getCsrfToken, clearSession, updateSessionCsrf } from './session';
 
 /**
  * Request timeout in milliseconds
@@ -148,7 +147,7 @@ export async function apiPost<T>(
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   const sessionToken = getSessionToken();
-  const csrfToken = sessionToken ? getSessionCsrfToken() : getAppCsrfToken();
+  const csrfToken = getCsrfToken();
 
   try {
     const response = await fetch(endpoint, {
@@ -173,52 +172,61 @@ export async function apiPost<T>(
       throw new ApiClientError('Session expired', 401);
     }
 
-    // Handle 403 - token may be stale (Motion restarted)
+    // Handle 403 - CSRF token may be stale
     if (response.status === 403) {
-      // If using session auth, session is invalid
-      if (sessionToken) {
-        clearSession();
-        authErrorCallback?.(403);
-        throw new ApiClientError('CSRF validation failed', 403);
-      }
+      // Don't clear session! CSRF mismatch doesn't mean session is invalid.
+      // Fetch fresh CSRF token from config endpoint
+      try {
+        const configResponse = await fetch('/0/api/config', {
+          headers: {
+            'Accept': 'application/json',
+            ...(sessionToken && { 'X-Session-Token': sessionToken }),
+          },
+          signal: controller.signal,
+        });
 
-      // Fallback to old CSRF token refresh for HTTP Basic/Digest auth
-      invalidateCsrfToken();
+        if (configResponse.ok) {
+          const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
+          if (config.csrf_token) {
+            // Update session's CSRF token
+            updateSessionCsrf(config.csrf_token);
 
-      // Refetch config to get new token (use same controller for timeout)
-      const configResponse = await fetch('/0/api/config', {
-        signal: controller.signal,
-      });
-      if (configResponse.ok) {
-        const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
-        if (config.csrf_token) {
-          setCsrfToken(config.csrf_token);
+            // Retry with new CSRF token AND session token
+            const retryResponse = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...(sessionToken && { 'X-Session-Token': sessionToken }),
+                'X-CSRF-Token': config.csrf_token,
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify(data),
+              signal: controller.signal,
+            });
 
-          // Retry with new token (use same controller for timeout)
-          const retryResponse = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-CSRF-Token': config.csrf_token,
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify(data),
-            signal: controller.signal,
-          });
+            if (retryResponse.ok) {
+              const text = await retryResponse.text();
+              return safeParseText<T>(text, retryResponse.status);
+            }
 
-          if (!retryResponse.ok) {
-            // If still failing, could be an auth issue
+            // Retry failed - now we can report the error
             if (retryResponse.status === 401 || retryResponse.status === 403) {
+              // Session is truly invalid
+              clearSession();
               authErrorCallback?.(retryResponse.status);
             }
-            throw new ApiClientError('CSRF validation failed after retry', 403);
+            throw new ApiClientError('Request failed after CSRF refresh', retryResponse.status);
           }
-
-          const text = await retryResponse.text();
-          return safeParseText<T>(text, retryResponse.status);
         }
+      } catch (refreshError) {
+        // If CSRF refresh itself fails, report original 403
+        if (refreshError instanceof ApiClientError) throw refreshError;
       }
+
+      // Couldn't refresh CSRF - session may be invalid
+      clearSession();
+      authErrorCallback?.(403);
       throw new ApiClientError('CSRF validation failed', 403);
     }
 
@@ -257,7 +265,7 @@ export async function apiPatch<T>(
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   const sessionToken = getSessionToken();
-  const csrfToken = sessionToken ? getSessionCsrfToken() : getAppCsrfToken();
+  const csrfToken = getCsrfToken();
 
   try {
     const response = await fetch(endpoint, {
@@ -282,44 +290,61 @@ export async function apiPatch<T>(
       throw new ApiClientError('Session expired', 401);
     }
 
-    // Handle 403 - token may be stale (Motion restarted)
+    // Handle 403 - CSRF token may be stale
     if (response.status === 403) {
-      invalidateCsrfToken();
+      // Don't clear session! CSRF mismatch doesn't mean session is invalid.
+      // Fetch fresh CSRF token from config endpoint
+      try {
+        const configResponse = await fetch('/0/api/config', {
+          headers: {
+            'Accept': 'application/json',
+            ...(sessionToken && { 'X-Session-Token': sessionToken }),
+          },
+          signal: controller.signal,
+        });
 
-      // Refetch config to get new token (use same controller for timeout)
-      const configResponse = await fetch('/0/api/config', {
-        signal: controller.signal,
-      });
-      if (configResponse.ok) {
-        const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
-        if (config.csrf_token) {
-          setCsrfToken(config.csrf_token);
+        if (configResponse.ok) {
+          const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
+          if (config.csrf_token) {
+            // Update session's CSRF token
+            updateSessionCsrf(config.csrf_token);
 
-          // Retry with new token (use same controller for timeout)
-          const retryResponse = await fetch(endpoint, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-CSRF-Token': config.csrf_token,
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify(data),
-            signal: controller.signal,
-          });
+            // Retry with new CSRF token AND session token
+            const retryResponse = await fetch(endpoint, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...(sessionToken && { 'X-Session-Token': sessionToken }),
+                'X-CSRF-Token': config.csrf_token,
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify(data),
+              signal: controller.signal,
+            });
 
-          if (!retryResponse.ok) {
-            // If still failing, could be an auth issue
+            if (retryResponse.ok) {
+              const text = await retryResponse.text();
+              return safeParseText<T>(text, retryResponse.status);
+            }
+
+            // Retry failed - now we can report the error
             if (retryResponse.status === 401 || retryResponse.status === 403) {
+              // Session is truly invalid
+              clearSession();
               authErrorCallback?.(retryResponse.status);
             }
-            throw new ApiClientError('CSRF validation failed after retry', 403);
+            throw new ApiClientError('Request failed after CSRF refresh', retryResponse.status);
           }
-
-          const text = await retryResponse.text();
-          return safeParseText<T>(text, retryResponse.status);
         }
+      } catch (refreshError) {
+        // If CSRF refresh itself fails, report original 403
+        if (refreshError instanceof ApiClientError) throw refreshError;
       }
+
+      // Couldn't refresh CSRF - session may be invalid
+      clearSession();
+      authErrorCallback?.(403);
       throw new ApiClientError('CSRF validation failed', 403);
     }
 
@@ -353,7 +378,7 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   const sessionToken = getSessionToken();
-  const csrfToken = sessionToken ? getSessionCsrfToken() : getAppCsrfToken();
+  const csrfToken = getCsrfToken();
 
   try {
     const response = await fetch(endpoint, {
@@ -376,37 +401,59 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
       throw new ApiClientError('Session expired', 401);
     }
 
-    // Handle 403 - token may be stale
+    // Handle 403 - CSRF token may be stale
     if (response.status === 403) {
-      invalidateCsrfToken();
+      // Don't clear session! CSRF mismatch doesn't mean session is invalid.
+      // Fetch fresh CSRF token from config endpoint
+      try {
+        const configResponse = await fetch('/0/api/config', {
+          headers: {
+            'Accept': 'application/json',
+            ...(sessionToken && { 'X-Session-Token': sessionToken }),
+          },
+          signal: controller.signal,
+        });
 
-      // Refetch config to get new token, then retry (use same controller for timeout)
-      const configResponse = await fetch('/0/api/config', {
-        signal: controller.signal,
-      });
-      if (configResponse.ok) {
-        const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
-        if (config.csrf_token) {
-          setCsrfToken(config.csrf_token);
+        if (configResponse.ok) {
+          const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
+          if (config.csrf_token) {
+            // Update session's CSRF token
+            updateSessionCsrf(config.csrf_token);
 
-          const retryResponse = await fetch(endpoint, {
-            method: 'DELETE',
-            headers: {
-              'Accept': 'application/json',
-              'X-CSRF-Token': config.csrf_token,
-            },
-            credentials: 'same-origin',
-            signal: controller.signal,
-          });
+            // Retry with new CSRF token AND session token
+            const retryResponse = await fetch(endpoint, {
+              method: 'DELETE',
+              headers: {
+                'Accept': 'application/json',
+                ...(sessionToken && { 'X-Session-Token': sessionToken }),
+                'X-CSRF-Token': config.csrf_token,
+              },
+              credentials: 'same-origin',
+              signal: controller.signal,
+            });
 
-          if (!retryResponse.ok) {
-            throw new ApiClientError('Delete failed after retry', retryResponse.status);
+            if (retryResponse.ok) {
+              const text = await retryResponse.text();
+              return safeParseText<T>(text, retryResponse.status);
+            }
+
+            // Retry failed - now we can report the error
+            if (retryResponse.status === 401 || retryResponse.status === 403) {
+              // Session is truly invalid
+              clearSession();
+              authErrorCallback?.(retryResponse.status);
+            }
+            throw new ApiClientError('Request failed after CSRF refresh', retryResponse.status);
           }
-
-          const text = await retryResponse.text();
-          return safeParseText<T>(text, retryResponse.status);
         }
+      } catch (refreshError) {
+        // If CSRF refresh itself fails, report original 403
+        if (refreshError instanceof ApiClientError) throw refreshError;
       }
+
+      // Couldn't refresh CSRF - session may be invalid
+      clearSession();
+      authErrorCallback?.(403);
       throw new ApiClientError('CSRF validation failed', 403);
     }
 

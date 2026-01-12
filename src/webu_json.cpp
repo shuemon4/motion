@@ -776,8 +776,11 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
 
 
 /*
- * React UI API: Authentication status
- * Returns current authentication state with role
+ * External API: Authentication status for HTTP Basic/Digest clients
+ * GET /0/api/auth/me
+ *
+ * This endpoint is used by external API clients (curl, scripts, automation tools)
+ * that authenticate via HTTP Basic/Digest. The React UI uses /0/api/auth/status instead.
  */
 void cls_webu_json::api_auth_me()
 {
@@ -788,11 +791,11 @@ void cls_webu_json::api_auth_me()
         webua->resp_page += "\"authenticated\":true,";
         webua->resp_page += "\"auth_method\":\"digest\",";
 
-        /* Include role if user is authenticated */
+        /* Include role from HTTP Basic/Digest auth */
         if (webua->auth_role != "") {
             webua->resp_page += "\"role\":\"" + webua->auth_role + "\"";
         } else {
-            /* Authenticated but role not set yet - assume admin for backward compatibility */
+            /* Default to admin if role not determined */
             webua->resp_page += "\"role\":\"admin\"";
         }
     } else {
@@ -949,7 +952,7 @@ void cls_webu_json::api_auth_status()
             webua->resp_page += ",\"authenticated\":false";
         }
     } else if (!webua->auth_role.empty()) {
-        /* HTTP Basic/Digest auth (backward compatibility) */
+        /* HTTP Basic/Digest auth for external API clients (curl, scripts, etc.) */
         webua->resp_page += ",\"authenticated\":true";
         webua->resp_page += ",\"role\":\"" + webua->auth_role + "\"";
         webua->resp_page += ",\"csrf_token\":\"" + webu->csrf_token + "\"";

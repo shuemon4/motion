@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, applyRestartRequiredChanges } from '@/api/client'
-import { setCsrfToken } from '@/api/csrf'
+import { updateSessionCsrf } from '@/api/session'
 import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form'
 import { useToast } from '@/components/Toast'
 import { useBatchUpdateConfig } from '@/api/queries'
@@ -65,9 +65,9 @@ export function Settings() {
     queryKey: ['config'],
     queryFn: async () => {
       const cfg = await apiGet<MotionConfig & { csrf_token?: string }>('/0/api/config')
-      // Store CSRF token for subsequent PATCH requests
+      // Update session CSRF token when config responses include new tokens
       if (cfg.csrf_token) {
-        setCsrfToken(cfg.csrf_token)
+        updateSessionCsrf(cfg.csrf_token)
       }
       return cfg
     },

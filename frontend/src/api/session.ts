@@ -60,6 +60,26 @@ export function getCsrfToken(): string | null {
 }
 
 /**
+ * Update the session's CSRF token
+ * Called when config responses include a newer CSRF token
+ */
+export function updateSessionCsrf(newCsrfToken: string): void {
+  if (!session) return;
+
+  session.csrfToken = newCsrfToken;
+
+  // Persist if using sessionStorage
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
  * Get user role
  */
 export function getRole(): 'admin' | 'user' | null {

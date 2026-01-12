@@ -597,8 +597,13 @@ bool cls_webu::csrf_validate(const std::string &token)
 
 /* Validate CSRF token for a request, checking both session and global tokens.
  * This is the main validation method that should be used by all endpoints.
- * - If session_token is provided, first checks against session-specific CSRF token
- * - Falls back to global CSRF token for backward compatibility with HTTP Basic/Digest auth
+ *
+ * Authentication modes:
+ * 1. Session tokens (React UI): Uses per-session CSRF tokens
+ * 2. HTTP Basic/Digest (external API clients): Uses global CSRF token
+ *
+ * The global CSRF fallback supports external clients (curl, scripts, automation tools)
+ * that authenticate via HTTP Basic/Digest instead of session tokens.
  */
 bool cls_webu::csrf_validate_request(const std::string &csrf_token_received, const std::string &session_token)
 {
@@ -623,7 +628,7 @@ bool cls_webu::csrf_validate_request(const std::string &csrf_token_received, con
         }
     }
 
-    /* Fall back to global CSRF token (for HTTP Basic/Digest auth) */
+    /* Global CSRF token for external API clients using HTTP Basic/Digest auth */
     return csrf_validate(csrf_token_received);
 }
 

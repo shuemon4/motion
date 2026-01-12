@@ -909,19 +909,11 @@ mhdrslt cls_webu_post::processor_start(const char *upload_data, size_t *upload_d
         /* Validate CSRF token before processing any state-changing operations */
         std::string csrf_token_received = "";
 
-        /* Check X-CSRF-Token header first (React UI) */
+        /* Get CSRF token from X-CSRF-Token header */
         const char* header_token = MHD_lookup_connection_value(
             webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
         if (header_token != nullptr) {
             csrf_token_received = std::string(header_token);
-        } else {
-            /* Fall back to form data (legacy HTML UI) */
-            for (int indx = 0; indx < post_sz; indx++) {
-                if (mystreq(post_info[indx].key_nm, "csrf_token")) {
-                    csrf_token_received = std::string(post_info[indx].key_val);
-                    break;
-                }
-            }
         }
 
         /* Validate CSRF token (supports both session and global tokens) */

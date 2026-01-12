@@ -7,7 +7,7 @@ import { FullscreenButton } from '@/components/FullscreenButton'
 import { SettingsButton } from '@/components/SettingsButton'
 import { useCameras } from '@/api/queries'
 import { apiGet } from '@/api/client'
-import { setCsrfToken } from '@/api/csrf'
+import { updateSessionCsrf } from '@/api/session'
 import { useAuthContext } from '@/contexts/AuthContext'
 
 interface ConfigParam {
@@ -34,11 +34,12 @@ export function Dashboard() {
 
   // Fetch config when sheet is open
   const { data: configData } = useQuery({
-    queryKey: ['config-quick'],
+    queryKey: ['config'],
     queryFn: async () => {
       const cfg = await apiGet<DashboardConfig>('/0/api/config')
+      // Update session CSRF token when config responses include new tokens
       if (cfg.csrf_token) {
-        setCsrfToken(cfg.csrf_token)
+        updateSessionCsrf(cfg.csrf_token)
       }
       return cfg
     },

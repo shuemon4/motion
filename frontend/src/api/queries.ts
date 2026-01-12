@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiDelete, apiPatch } from './client';
-import { setCsrfToken } from './csrf';
+import { updateSessionCsrf } from './session';
 import type {
   MotionConfig,
   Camera,
@@ -26,9 +26,9 @@ export function useMotionConfig() {
     queryKey: queryKeys.config(0),
     queryFn: async () => {
       const config = await apiGet<MotionConfig>('/0/api/config');
-      // Store CSRF token from config response
+      // Update session CSRF token when config responses include new tokens
       if (config.csrf_token) {
-        setCsrfToken(config.csrf_token);
+        updateSessionCsrf(config.csrf_token);
       }
       return config;
     },
