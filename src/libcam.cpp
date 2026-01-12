@@ -1088,10 +1088,10 @@ int cls_libcam::req_add(Request *request)
 
             pending_ctrls.dirty = false;
             MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
-                , "Applied controls: brightness=%.2f, contrast=%.2f, iso=%.0f, "
+                , "Applied controls: brightness=%.2f, contrast=%.2f, gain=%.2f, "
                   "awb_enable=%s, awb_mode=%d, af_mode=%d, lens_pos=%.2f"
                 , pending_ctrls.brightness, pending_ctrls.contrast
-                , pending_ctrls.iso
+                , pending_ctrls.gain
                 , pending_ctrls.awb_enable ? "true" : "false"
                 , pending_ctrls.awb_mode
                 , pending_ctrls.af_mode
@@ -1570,8 +1570,8 @@ void cls_libcam::apply_pending_controls()
     std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
     if (pending_ctrls.dirty) {
         MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO
-            , "Brightness/Contrast/ISO update pending: brightness=%.2f, contrast=%.2f, iso=%.0f"
-            , pending_ctrls.brightness, pending_ctrls.contrast, pending_ctrls.iso);
+            , "Brightness/Contrast/Gain update pending: brightness=%.2f, contrast=%.2f, gain=%.2f"
+            , pending_ctrls.brightness, pending_ctrls.contrast, pending_ctrls.gain);
     }
 }
 
