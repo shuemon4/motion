@@ -1328,6 +1328,43 @@ void cls_webu_json::api_system_status()
         webua->resp_page += "},";
     }
 
+    /* Device Model (Raspberry Pi) */
+    file = fopen("/proc/device-tree/model", "r");
+    if (file != nullptr) {
+        if (fgets(buffer, sizeof(buffer), file)) {
+            /* Remove trailing newline/null */
+            size_t len = strlen(buffer);
+            while (len > 0 && (buffer[len-1] == '\n' || buffer[len-1] == '\0' || buffer[len-1] == '\r')) {
+                buffer[--len] = '\0';
+            }
+            webua->resp_page += "\"device_model\":\"" + escstr(buffer) + "\",";
+
+            /* Detect Pi generation */
+            if (strstr(buffer, "Pi 5") != nullptr) {
+                webua->resp_page += "\"pi_generation\":5,";
+            } else if (strstr(buffer, "Pi 4") != nullptr) {
+                webua->resp_page += "\"pi_generation\":4,";
+            } else if (strstr(buffer, "Pi 3") != nullptr) {
+                webua->resp_page += "\"pi_generation\":3,";
+            } else {
+                webua->resp_page += "\"pi_generation\":0,";
+            }
+        }
+        fclose(file);
+    }
+
+    /* Hardware Encoder Availability */
+    {
+        const AVCodec *codec_check;
+        webua->resp_page += "\"hardware_encoders\":{";
+
+        /* Check for V4L2 M2M H.264 encoder (Pi 4 only) */
+        codec_check = avcodec_find_encoder_by_name("h264_v4l2m2m");
+        webua->resp_page += "\"h264_v4l2m2m\":" + std::string(codec_check ? "true" : "false");
+
+        webua->resp_page += "},";
+    }
+
     /* Motion Version */
     webua->resp_page += "\"version\":\"" + escstr(VERSION) + "\"";
 

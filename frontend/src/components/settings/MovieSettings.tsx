@@ -7,6 +7,7 @@ import {
   isHighCpuCodec
 } from '@/utils/parameterMappings';
 import { recordingModeToMotion, motionToRecordingMode } from '@/utils/translations';
+import { useDeviceInfo, isPi5, isPi4, hasHardwareEncoder, isHighTemperature } from '@/hooks/useDeviceInfo';
 
 export interface MovieSettingsProps {
   config: Record<string, { value: string | number | boolean }>;
@@ -15,6 +16,8 @@ export interface MovieSettingsProps {
 }
 
 export function MovieSettings({ config, onChange, getError }: MovieSettingsProps) {
+  const { data: deviceInfo } = useDeviceInfo();
+
   const getValue = (param: string, defaultValue: string | number | boolean = '') => {
     return config[param]?.value ?? defaultValue;
   };
@@ -130,14 +133,30 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
               helpText="Video container format. Hardware options only work on Pi 4."
             />
 
-            {/* Hardware encoding info */}
-            {isHardwareCodec(containerValue) && (
+            {/* Hardware encoding info - when hardware codec is selected */}
+            {isHardwareCodec(containerValue) && hasHardwareEncoder(deviceInfo) && (
+              <div className="text-xs text-green-400 bg-green-950/30 p-3 rounded mt-2">
+                <strong>Hardware Encoding Active:</strong> Using Pi 4's built-in H.264 encoder
+                for ~10% CPU usage instead of 40-70%.
+              </div>
+            )}
+
+            {/* Hardware codec selected but no hardware encoder available */}
+            {isHardwareCodec(containerValue) && deviceInfo && !hasHardwareEncoder(deviceInfo) && (
+              <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded mt-2">
+                <strong>Hardware Encoder Not Available:</strong> The h264_v4l2m2m hardware encoder
+                is not available on this device. Motion will fall back to software encoding.
+                {isPi5(deviceInfo) && ' Pi 5 does not have a hardware H.264 encoder.'}
+              </div>
+            )}
+
+            {/* Hardware codec selected but device info not yet loaded */}
+            {isHardwareCodec(containerValue) && !deviceInfo && (
               <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
                 <strong>Hardware Encoding:</strong> Uses Pi 4's built-in H.264 encoder
                 for ~10% CPU usage instead of 40-70%. Only available on Raspberry Pi 4.
-                <br />
-                <span className="text-amber-400">Note: Pi 5 does not have a hardware encoder.
-                This will fall back to software encoding on Pi 5.</span>
+                <span className="text-amber-400"> Pi 5 does not have a hardware encoder
+                and will fall back to software encoding.</span>
               </div>
             )}
 
@@ -150,8 +169,19 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
               </div>
             )}
 
-            {/* Software encoding tip */}
-            {!isHardwareCodec(containerValue) && !getValue('movie_passthrough', false) &&
+            {/* Pi 4 tip for hardware encoding - shown when software codec is selected on Pi 4 */}
+            {isPi4(deviceInfo) && hasHardwareEncoder(deviceInfo) &&
+             !isHardwareCodec(containerValue) && !getValue('movie_passthrough', false) &&
+             !containerValue.includes('webm') && !isHighCpuCodec(containerValue) && (
+              <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
+                <strong>Pi 4 Hardware Encoding Available:</strong> Your Pi 4 has a hardware
+                H.264 encoder. Select "MKV - H.264 Hardware (Pi 4)" or "MP4 - H.264 Hardware (Pi 4)"
+                to reduce CPU from ~40-70% to ~10%.
+              </div>
+            )}
+
+            {/* Generic software encoding tip (shown when device info unavailable) */}
+            {!deviceInfo && !isHardwareCodec(containerValue) && !getValue('movie_passthrough', false) &&
              !containerValue.includes('webm') && !isHighCpuCodec(containerValue) && (
               <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded mt-2">
                 <strong>Tip:</strong> If using Raspberry Pi 4, consider selecting
@@ -214,7 +244,35 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
           </div>
         </div>
 
-        {selectedMode === 'continuous' && (
+        {/* Pi 5 specific warning for continuous recording */}
+        {selectedMode === 'continuous' && isPi5(deviceInfo) && !getValue('movie_passthrough', false) && (
+          <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded">
+            <strong>Pi 5 CPU Warning:</strong> Pi 5 does not have a hardware H.264 encoder.
+            Continuous recording uses software encoding (~35-60% CPU constant).
+            <ul className="list-disc ml-4 mt-1">
+              <li>Use encoder preset "Ultrafast" to reduce CPU by ~30%</li>
+              <li>Add active cooling (fan) to prevent thermal throttling</li>
+              <li>Enable passthrough if source is already H.264</li>
+            </ul>
+          </div>
+        )}
+
+        {/* Pi 4 specific info for continuous recording with hardware encoder */}
+        {selectedMode === 'continuous' && isPi4(deviceInfo) && hasHardwareEncoder(deviceInfo) && (
+          <div className="text-xs text-green-400 bg-green-950/30 p-3 rounded">
+            <strong>Continuous Recording on Pi 4:</strong> Camera will record 24/7.
+            {isHardwareCodec(containerValue) ? (
+              <span> Using hardware encoder - expect ~10% CPU usage.</span>
+            ) : getValue('movie_passthrough', false) ? (
+              <span> Passthrough mode enabled - expect ~5-10% CPU usage.</span>
+            ) : (
+              <span> Consider using hardware encoder (MKV/MP4 H.264 Hardware) for ~10% CPU instead of ~40-70%.</span>
+            )}
+          </div>
+        )}
+
+        {/* Generic continuous recording warning (fallback when no device info) */}
+        {selectedMode === 'continuous' && !deviceInfo && (
           <div className="text-xs text-yellow-200 bg-yellow-600/10 border border-yellow-600/30 p-3 rounded">
             <strong>Continuous Recording:</strong> Camera will record 24/7 regardless of motion.
             Expected CPU usage on Raspberry Pi:
@@ -223,6 +281,14 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
               <li><strong>Pi 5 or Pi 4 software encoding:</strong> ~35-60% CPU depending on preset</li>
               <li><strong>Passthrough mode:</strong> ~5-10% CPU (if source is H.264)</li>
             </ul>
+          </div>
+        )}
+
+        {/* Temperature warning */}
+        {isHighTemperature(deviceInfo) && (
+          <div className="text-xs text-red-400 bg-red-950/30 p-3 rounded">
+            <strong>High Temperature Warning:</strong> Device is running at {deviceInfo?.temperature?.celsius.toFixed(1)}°C.
+            Consider reducing encoding quality or adding active cooling.
           </div>
         )}
       </div>
