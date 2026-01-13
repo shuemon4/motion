@@ -68,6 +68,8 @@ export const DIRECT_MAPPINGS = {
   movie_max_time: 'movie_max_time',
   movie_passthrough: 'movie_passthrough',
   movie_container: 'movie_container',
+  movie_encoder_preset: 'movie_encoder_preset',
+  emulate_motion: 'emulate_motion',
 
   // Scripts/hooks
   on_event_start: 'on_event_start',
@@ -107,15 +109,17 @@ export const ROTATION_OPTIONS = [
   { value: 270, label: '270°' },
 ];
 
-// libcamera AWB modes
+// libcamera AWB modes - values must match libcamera::controls::AwbModeEnum
+// Source: https://libcamera.org/api-html/namespacelibcamera_1_1controls.html
 export const AWB_MODES = [
   { value: 0, label: 'Auto' },
-  { value: 1, label: 'Tungsten' },
-  { value: 2, label: 'Fluorescent' },
-  { value: 3, label: 'Indoor' },
-  { value: 4, label: 'Daylight' },
-  { value: 5, label: 'Cloudy' },
-  { value: 6, label: 'Custom' },
+  { value: 1, label: 'Incandescent' },
+  { value: 2, label: 'Tungsten' },
+  { value: 3, label: 'Fluorescent' },
+  { value: 4, label: 'Indoor' },
+  { value: 5, label: 'Daylight' },
+  { value: 6, label: 'Cloudy' },
+  { value: 7, label: 'Custom' },
 ];
 
 // libcamera autofocus modes
@@ -147,11 +151,61 @@ export const PICTURE_OUTPUT_MODES = [
   { value: 'center', label: 'Center frame' },
 ];
 
-// Movie container formats
+// Movie container formats with optional codec specification
+// Format: container or container:codec
+// Backend parses colon-separated format in movie.cpp
 export const MOVIE_CONTAINERS = [
-  { value: 'mkv', label: 'MKV (Matroska)' },
-  { value: 'mp4', label: 'MP4' },
-  { value: '3gp', label: '3GP' },
+  // === Basic Containers (auto-select codec) ===
+  { value: 'mkv', label: 'MKV (Matroska)', group: 'basic' },
+  { value: 'mp4', label: 'MP4', group: 'basic' },
+  { value: 'mov', label: 'MOV (QuickTime)', group: 'basic' },
+  { value: '3gp', label: '3GP (Mobile)', group: 'basic' },
+
+  // === Hardware Encoding (Pi 4 only, ~10% CPU) ===
+  { value: 'mkv:h264_v4l2m2m', label: 'MKV - H.264 Hardware (Pi 4)', group: 'hardware' },
+  { value: 'mp4:h264_v4l2m2m', label: 'MP4 - H.264 Hardware (Pi 4)', group: 'hardware' },
+
+  // === Software H.264 (explicit) ===
+  { value: 'mkv:libx264', label: 'MKV - H.264 Software', group: 'software' },
+  { value: 'mp4:libx264', label: 'MP4 - H.264 Software', group: 'software' },
+
+  // === H.265/HEVC (high CPU warning) ===
+  { value: 'mkv:libx265', label: 'MKV - H.265 Software (high CPU)', group: 'hevc' },
+  { value: 'hevc', label: 'HEVC/H.265 in MP4 (high CPU)', group: 'hevc' },
+
+  // === WebM/VP8 ===
+  { value: 'webm', label: 'WebM (VP8)', group: 'webm' },
+];
+
+// Check if container uses hardware encoding
+export function isHardwareCodec(container: string): boolean {
+  return container.includes('v4l2m2m');
+}
+
+// Check if container uses high-CPU codec
+export function isHighCpuCodec(container: string): boolean {
+  return container.includes('libx265') || container === 'hevc';
+}
+
+// Get container base (before colon)
+export function getContainerBase(container: string): string {
+  const colonPos = container.indexOf(':');
+  return colonPos === -1 ? container : container.substring(0, colonPos);
+}
+
+// Encoder presets for software encoding (libx264/libx265)
+// Affects CPU usage vs quality tradeoff
+// Note: Does NOT apply to hardware encoding or passthrough
+export const ENCODER_PRESETS = [
+  { value: 'ultrafast', label: 'Ultrafast', description: 'Lowest CPU (~35-40%), lowest quality' },
+  { value: 'superfast', label: 'Superfast', description: 'Very low CPU' },
+  { value: 'veryfast', label: 'Very Fast', description: 'Low CPU' },
+  { value: 'faster', label: 'Faster', description: 'Below average CPU' },
+  { value: 'fast', label: 'Fast', description: 'Slightly below average CPU' },
+  { value: 'medium', label: 'Medium (Default)', description: 'Balanced CPU/quality (~50-60%)' },
+  { value: 'slow', label: 'Slow', description: 'Above average quality' },
+  { value: 'slower', label: 'Slower', description: 'High quality' },
+  { value: 'veryslow', label: 'Very Slow', description: 'Highest quality (~70-80%), highest CPU' },
 ];
 
 // Auth method options

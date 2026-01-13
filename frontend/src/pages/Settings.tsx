@@ -23,6 +23,7 @@ import { UploadSettings } from '@/components/settings/UploadSettings'
 import { ProfileManager } from '@/components/settings/ProfileManager'
 import { ConfigurationPresets } from '@/components/ConfigurationPresets'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { useCameraCapabilities } from '@/hooks/useCameraCapabilities'
 
 interface ConfigParam {
   value: string | number | boolean
@@ -74,6 +75,9 @@ export function Settings() {
   })
 
   const batchUpdateConfigMutation = useBatchUpdateConfig()
+
+  // Fetch camera capabilities for conditional UI rendering (e.g., autofocus controls)
+  const { data: capabilities } = useCameraCapabilities(Number(selectedCamera))
 
   // Clear changes and errors when camera selection changes
   // This prevents race conditions where settings from one camera could be
@@ -392,6 +396,7 @@ export function Settings() {
             config={activeConfig}
             onChange={handleChange}
             getError={getError}
+            capabilities={capabilities}
           />
 
           <OverlaySettings

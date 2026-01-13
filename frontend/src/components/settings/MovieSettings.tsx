@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { FormSection, FormInput, FormSelect, FormToggle, FormSlider } from '@/components/form';
-import { MOVIE_CONTAINERS } from '@/utils/parameterMappings';
+import {
+  MOVIE_CONTAINERS,
+  ENCODER_PRESETS,
+  isHardwareCodec,
+  isHighCpuCodec
+} from '@/utils/parameterMappings';
 import { recordingModeToMotion, motionToRecordingMode } from '@/utils/translations';
 
 export interface MovieSettingsProps {
@@ -17,7 +22,8 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
   // Determine current recording mode
   const movieOutput = getValue('movie_output', false) as boolean;
   const movieOutputMotion = getValue('movie_output_motion', true) as boolean;
-  const currentMode = motionToRecordingMode(movieOutput, movieOutputMotion);
+  const emulateMotion = getValue('emulate_motion', false) as boolean;
+  const currentMode = motionToRecordingMode(movieOutput, movieOutputMotion, emulateMotion);
 
   const [selectedMode, setSelectedMode] = useState(currentMode);
 
@@ -29,6 +35,10 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
     onChange('movie_output', motionParams.movie_output);
     if (motionParams.movie_output_motion !== undefined) {
       onChange('movie_output_motion', motionParams.movie_output_motion);
+    }
+    // Set emulate_motion for continuous recording
+    if (motionParams.emulate_motion !== undefined) {
+      onChange('emulate_motion', motionParams.emulate_motion);
     }
   };
 
@@ -51,6 +61,23 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
     '%$ - Camera name',
   ].join(', ');
 
+  // Current container value for conditional warnings
+  const containerValue = String(getValue('movie_container', 'mp4'));
+
+  // Encoder preset only applies to software encoding, not:
+  // - Passthrough mode
+  // - Hardware encoding (h264_v4l2m2m)
+  // - VP8/VP9 (webm)
+  const showEncoderPreset = () => {
+    const passthrough = getValue('movie_passthrough', false);
+
+    if (passthrough) return false;
+    if (isHardwareCodec(containerValue)) return false;
+    if (containerValue === 'webm') return false;
+
+    return true;
+  };
+
   return (
     <FormSection
       title="Movie Settings"
@@ -71,6 +98,7 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
         <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded">
           <strong>Current settings:</strong> movie_output={String(movieOutput)}
           {movieOutput && `, movie_output_motion=${String(movieOutputMotion)}`}
+          {movieOutput && `, emulate_motion=${String(emulateMotion)}`}
         </div>
 
         {selectedMode !== 'off' && (
@@ -99,8 +127,59 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
               value={String(getValue('movie_container', 'mkv'))}
               onChange={(val) => onChange('movie_container', val)}
               options={MOVIE_CONTAINERS}
-              helpText="Video container format. MKV recommended for reliability."
+              helpText="Video container format. Hardware options only work on Pi 4."
             />
+
+            {/* Hardware encoding info */}
+            {isHardwareCodec(containerValue) && (
+              <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
+                <strong>Hardware Encoding:</strong> Uses Pi 4's built-in H.264 encoder
+                for ~10% CPU usage instead of 40-70%. Only available on Raspberry Pi 4.
+                <br />
+                <span className="text-amber-400">Note: Pi 5 does not have a hardware encoder.
+                This will fall back to software encoding on Pi 5.</span>
+              </div>
+            )}
+
+            {/* High CPU warning for HEVC */}
+            {isHighCpuCodec(containerValue) && (
+              <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded mt-2">
+                <strong>High CPU Warning:</strong> H.265/HEVC software encoding uses
+                80-100% CPU on Raspberry Pi. Not recommended for continuous recording.
+                Consider H.264 for better performance.
+              </div>
+            )}
+
+            {/* Software encoding tip */}
+            {!isHardwareCodec(containerValue) && !getValue('movie_passthrough', false) &&
+             !containerValue.includes('webm') && !isHighCpuCodec(containerValue) && (
+              <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded mt-2">
+                <strong>Tip:</strong> If using Raspberry Pi 4, consider selecting
+                "MKV - H.264 Hardware (Pi 4)" or "MP4 - H.264 Hardware (Pi 4)" for ~10% CPU
+                instead of ~40-70% with software encoding.
+              </div>
+            )}
+
+            {/* WebM format info */}
+            {containerValue === 'webm' && (
+              <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
+                <strong>WebM Format:</strong> Uses VP8 codec, optimized for web streaming.
+                Encoder preset setting does not apply to VP8.
+              </div>
+            )}
+
+            {showEncoderPreset() && (
+              <FormSelect
+                label="Encoder Preset"
+                value={String(getValue('movie_encoder_preset', 'medium'))}
+                onChange={(val) => onChange('movie_encoder_preset', val)}
+                options={ENCODER_PRESETS.map(p => ({
+                  value: p.value,
+                  label: p.label,
+                }))}
+                helpText="Tradeoff between CPU usage and video quality. Lower presets use less CPU but produce lower quality video. Requires restart to take effect."
+              />
+            )}
 
             <FormInput
               label="Max Duration (seconds)"
@@ -137,8 +216,13 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
 
         {selectedMode === 'continuous' && (
           <div className="text-xs text-yellow-200 bg-yellow-600/10 border border-yellow-600/30 p-3 rounded">
-            <strong>⚠️ CPU Warning:</strong> Continuous recording uses significant CPU for encoding.
-            Consider enabling passthrough mode or reducing quality/resolution on resource-constrained devices.
+            <strong>Continuous Recording:</strong> Camera will record 24/7 regardless of motion.
+            Expected CPU usage on Raspberry Pi:
+            <ul className="list-disc ml-4 mt-1">
+              <li><strong>Pi 4 with hardware encoder:</strong> ~10% CPU</li>
+              <li><strong>Pi 5 or Pi 4 software encoding:</strong> ~35-60% CPU depending on preset</li>
+              <li><strong>Passthrough mode:</strong> ~5-10% CPU (if source is H.264)</li>
+            </ul>
           </div>
         )}
       </div>

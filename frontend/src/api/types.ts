@@ -100,3 +100,36 @@ export interface ApiError {
   message: string;
   status?: number;
 }
+
+// Camera control capabilities from supportedControls in status.json
+export interface CameraCapabilities {
+  // Autofocus
+  AfMode?: boolean;
+  LensPosition?: boolean;
+  AfTrigger?: boolean;
+  AfRange?: boolean;
+  AfSpeed?: boolean;
+  AfMetering?: boolean;
+  // Exposure
+  ExposureTime?: boolean;
+  ExposureValue?: boolean;
+  AnalogueGain?: boolean;
+  AeEnable?: boolean;
+  AeMeteringMode?: boolean;
+  AeConstraintMode?: boolean;
+  AeExposureMode?: boolean;
+  // White Balance
+  AwbEnable?: boolean;
+  AwbMode?: boolean;
+  AwbLocked?: boolean;
+  ColourGains?: boolean;
+  ColourTemperature?: boolean;
+  // Image Controls
+  Brightness?: boolean;
+  Contrast?: boolean;
+  Saturation?: boolean;
+  Sharpness?: boolean;
+  // Other
+  DigitalGain?: boolean;
+  ScalerCrop?: boolean;
+}

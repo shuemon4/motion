@@ -126,32 +126,41 @@ export function captureModeToMotion(mode: string): CaptureMode {
 
 /**
  * Recording mode mappings
+ * emulate_motion=true makes Motion act as if motion is always detected,
+ * enabling continuous 24/7 recording regardless of actual motion
  */
-export const RECORDING_MODE_MAP = {
-  'motion-triggered': { movie_output: true, movie_output_motion: true },
-  continuous: { movie_output: true, movie_output_motion: false },
-  off: { movie_output: false },
-} as const;
+export interface RecordingMode {
+  movie_output: boolean;
+  movie_output_motion?: boolean;
+  emulate_motion?: boolean;
+}
+
+export const RECORDING_MODE_MAP: Record<string, RecordingMode> = {
+  'motion-triggered': { movie_output: true, movie_output_motion: true, emulate_motion: false },
+  continuous: { movie_output: true, movie_output_motion: false, emulate_motion: true },
+  off: { movie_output: false, emulate_motion: false },
+};
 
 /**
  * Determine recording mode from Motion parameters
+ * emulate_motion=true indicates continuous recording mode
  */
 export function motionToRecordingMode(
   movieOutput: boolean,
-  movieOutputMotion: boolean
+  movieOutputMotion: boolean,
+  emulateMotion: boolean = false
 ): string {
   if (!movieOutput) return 'off';
-  return movieOutputMotion ? 'motion-triggered' : 'continuous';
+  if (emulateMotion) return 'continuous';
+  return movieOutputMotion ? 'motion-triggered' : 'motion-triggered';
 }
 
 /**
  * Convert recording mode to Motion parameters
  */
-export function recordingModeToMotion(
-  mode: string
-): { movie_output: boolean; movie_output_motion?: boolean } {
+export function recordingModeToMotion(mode: string): RecordingMode {
   return (
-    RECORDING_MODE_MAP[mode as keyof typeof RECORDING_MODE_MAP] || { movie_output: false }
+    RECORDING_MODE_MAP[mode] || { movie_output: false, emulate_motion: false }
   );
 }
 

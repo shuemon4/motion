@@ -5,14 +5,16 @@ import {
   AUTOFOCUS_RANGES,
   AUTOFOCUS_SPEEDS,
 } from '@/utils/parameterMappings';
+import type { CameraCapabilities } from '@/api/types';
 
 export interface LibcameraSettingsProps {
   config: Record<string, { value: string | number | boolean }>;
   onChange: (param: string, value: string | number | boolean) => void;
   getError?: (param: string) => string | undefined;
+  capabilities?: CameraCapabilities;
 }
 
-export function LibcameraSettings({ config, onChange, getError }: LibcameraSettingsProps) {
+export function LibcameraSettings({ config, onChange, getError, capabilities }: LibcameraSettingsProps) {
   const getValue = (param: string, defaultValue: string | number | boolean = '') => {
     return config[param]?.value ?? defaultValue;
   };
@@ -130,19 +132,78 @@ export function LibcameraSettings({ config, onChange, getError }: LibcameraSetti
         </>
       )}
 
-      {/* Autofocus */}
-      <FormSelect
-        label="Autofocus Mode"
-        value={String(getValue('libcam_af_mode', 0))}
-        onChange={(val) => onChange('libcam_af_mode', Number(val))}
-        options={AUTOFOCUS_MODES.map((mode) => ({
-          value: String(mode.value),
-          label: mode.label,
-        }))}
-        helpText="Focus control mode"
-      />
+      {/* Autofocus Section - conditional based on capabilities */}
+      {capabilities?.AfMode ? (
+        <>
+          <FormSelect
+            label="Autofocus Mode"
+            value={String(getValue('libcam_af_mode', 0))}
+            onChange={(val) => onChange('libcam_af_mode', Number(val))}
+            options={AUTOFOCUS_MODES.map((mode) => ({
+              value: String(mode.value),
+              label: mode.label,
+            }))}
+            helpText="Focus control mode"
+          />
 
-      {Number(getValue('libcam_af_mode', 0)) === 0 && (
+          {Number(getValue('libcam_af_mode', 0)) === 0 && capabilities?.LensPosition && (
+            <FormSlider
+              label="Lens Position"
+              value={Number(getValue('libcam_lens_position', 0))}
+              onChange={(val) => onChange('libcam_lens_position', val)}
+              min={0}
+              max={15}
+              step={0.5}
+              unit=" dioptres"
+              helpText="Manual focus position (0.0-15.0 dioptres)"
+              error={getError?.('libcam_lens_position')}
+            />
+          )}
+
+          {Number(getValue('libcam_af_mode', 0)) > 0 && (
+            <>
+              {capabilities?.AfRange && (
+                <FormSelect
+                  label="Autofocus Range"
+                  value={String(getValue('libcam_af_range', 0))}
+                  onChange={(val) => onChange('libcam_af_range', Number(val))}
+                  options={AUTOFOCUS_RANGES.map((range) => ({
+                    value: String(range.value),
+                    label: range.label,
+                  }))}
+                  helpText="Focus range preference"
+                />
+              )}
+
+              {capabilities?.AfSpeed && (
+                <FormSelect
+                  label="Autofocus Speed"
+                  value={String(getValue('libcam_af_speed', 0))}
+                  onChange={(val) => onChange('libcam_af_speed', Number(val))}
+                  options={AUTOFOCUS_SPEEDS.map((speed) => ({
+                    value: String(speed.value),
+                    label: speed.label,
+                  }))}
+                  helpText="Focus adjustment speed"
+                />
+              )}
+            </>
+          )}
+        </>
+      ) : capabilities !== undefined ? (
+        // Capabilities loaded but AF not supported
+        <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded">
+          <strong>Autofocus:</strong> Not supported on this camera.
+          {capabilities?.LensPosition ? (
+            <span> Manual focus (lens position) is available.</span>
+          ) : (
+            <span> This camera has fixed focus.</span>
+          )}
+        </div>
+      ) : null}
+
+      {/* Manual Focus without Autofocus (rare: motorized lens but no AF) */}
+      {!capabilities?.AfMode && capabilities?.LensPosition && (
         <FormSlider
           label="Lens Position"
           value={Number(getValue('libcam_lens_position', 0))}
@@ -154,32 +215,6 @@ export function LibcameraSettings({ config, onChange, getError }: LibcameraSetti
           helpText="Manual focus position (0.0-15.0 dioptres)"
           error={getError?.('libcam_lens_position')}
         />
-      )}
-
-      {Number(getValue('libcam_af_mode', 0)) > 0 && (
-        <>
-          <FormSelect
-            label="Autofocus Range"
-            value={String(getValue('libcam_af_range', 0))}
-            onChange={(val) => onChange('libcam_af_range', Number(val))}
-            options={AUTOFOCUS_RANGES.map((range) => ({
-              value: String(range.value),
-              label: range.label,
-            }))}
-            helpText="Focus range preference"
-          />
-
-          <FormSelect
-            label="Autofocus Speed"
-            value={String(getValue('libcam_af_speed', 0))}
-            onChange={(val) => onChange('libcam_af_speed', Number(val))}
-            options={AUTOFOCUS_SPEEDS.map((speed) => ({
-              value: String(speed.value),
-              label: speed.label,
-            }))}
-            helpText="Focus adjustment speed"
-          />
-        </>
       )}
 
       {/* Buffer Settings */}

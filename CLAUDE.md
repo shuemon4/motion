@@ -166,7 +166,7 @@ SSH keys configured for passwordless access from the development Mac.
 
 2. **Build on Pi:**
    ```bash
-   ssh admin@192.168.1.176 "cd ~/motion-motioneye && autoreconf -fiv && ./configure --with-libcam --with-sqlite3 && make -j4"
+   ssh admin@192.168.1.176 "cd ~/motion && autoreconf -fiv && ./configure --with-libcam --with-sqlite3 && make -j4"
    ```
 
 3. **Restart service:**

@@ -76,10 +76,11 @@ frontend/
 │   │   └── AuthContext.tsx  # Authentication state management
 │   │
 │   ├── hooks/               # Custom React hooks
-│   │   ├── useCameraStream.ts # MJPEG stream URL management
-│   │   ├── useFpsTracker.ts   # Real-time FPS calculation
-│   │   ├── useProfiles.ts     # Profile CRUD operations
-│   │   └── useSheetGestures.ts # Touch gestures for bottom sheet
+│   │   ├── useCameraStream.ts      # MJPEG stream URL management
+│   │   ├── useCameraCapabilities.ts # Camera hardware capability detection
+│   │   ├── useFpsTracker.ts        # Real-time FPS calculation
+│   │   ├── useProfiles.ts          # Profile CRUD operations
+│   │   └── useSheetGestures.ts     # Touch gestures for bottom sheet
 │   │
 │   ├── lib/                 # Utility libraries
 │   │   └── validation.ts    # Zod schemas for form validation
@@ -211,10 +212,10 @@ Settings panels organized by category:
 | Component | Motion Parameters |
 |-----------|------------------|
 | `DeviceSettings` | `device_name`, `width`, `height`, `framerate`, `rotate` |
-| `LibcameraSettings` | `libcam_brightness`, `libcam_contrast`, `libcam_iso`, AWB, AF |
+| `LibcameraSettings` | `libcam_brightness`, `libcam_contrast`, `libcam_gain`, AWB, AF (conditional on camera capabilities) |
 | `MotionSettings` | `threshold`, `noise_level`, `event_gap`, masks |
 | `StreamSettings` | `stream_quality`, `stream_maxrate`, `stream_motion` |
-| `MovieSettings` | `movie_output`, `movie_quality`, `movie_container` |
+| `MovieSettings` | `movie_output`, `movie_quality`, `movie_container`, `movie_encoder_preset`, hardware encoding options |
 | `PictureSettings` | `picture_output`, `picture_quality`, `snapshot_interval` |
 | `OverlaySettings` | `text_left`, `text_right`, `text_scale` |
 | `StorageSettings` | `target_dir` |
@@ -246,6 +247,24 @@ Profile management (save/load/delete configuration presets):
 ```typescript
 const { profiles, saveProfile, loadProfile, deleteProfile } = useProfiles(1)
 ```
+
+### `useCameraCapabilities(cameraId)`
+
+Fetches camera hardware capabilities from `status.json`. Used to conditionally render controls based on camera features (e.g., hide autofocus for Pi Camera v2):
+
+```typescript
+const { data: capabilities } = useCameraCapabilities(1)
+
+// Check specific capabilities
+if (capabilities?.AfMode) {
+  // Show autofocus controls
+}
+```
+
+Capabilities include:
+- `AfMode`, `LensPosition`, `AfRange`, `AfSpeed` - Autofocus
+- `AwbEnable`, `AwbMode`, `ColourGains` - White balance
+- `Brightness`, `Contrast`, `Saturation`, `Sharpness` - Image controls
 
 ## Styling
 
