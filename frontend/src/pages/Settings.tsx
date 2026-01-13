@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, applyRestartRequiredChanges } from '@/api/client'
 import { updateSessionCsrf } from '@/api/session'
-import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form'
+import { FormSection } from '@/components/form'
 import { useToast } from '@/components/Toast'
 import { useBatchUpdateConfig } from '@/api/queries'
 import { validateConfigParam } from '@/lib/validation'
+import { SystemSettings } from '@/components/settings/SystemSettings'
 import { DeviceSettings } from '@/components/settings/DeviceSettings'
 import { LibcameraSettings } from '@/components/settings/LibcameraSettings'
 import { OverlaySettings } from '@/components/settings/OverlaySettings'
@@ -21,7 +22,6 @@ import { NotificationSettings } from '@/components/settings/NotificationSettings
 import { UploadSettings } from '@/components/settings/UploadSettings'
 import { ProfileManager } from '@/components/settings/ProfileManager'
 import { ConfigurationPresets } from '@/components/ConfigurationPresets'
-import { systemReboot, systemShutdown } from '@/api/system'
 import { useAuthContext } from '@/contexts/AuthContext'
 
 interface ConfigParam {
@@ -100,24 +100,6 @@ export function Settings() {
       }
     })
   }, [])
-
-  const getValue = (param: string, defaultValue: string | number | boolean = '') => {
-    // If there's a pending change, use that
-    if (param in changes) {
-      return changes[param]
-    }
-
-    // For camera-specific settings, read from cam{id} config with fallback to default
-    if (selectedCamera !== '0') {
-      const camConfig = config?.configuration[`cam${selectedCamera}`]
-      if (camConfig && param in camConfig) {
-        return camConfig[param]?.value ?? defaultValue
-      }
-    }
-
-    // Fall back to global default
-    return config?.configuration.default[param]?.value ?? defaultValue
-  }
 
   const isDirty = Object.keys(changes).length > 0
   const hasValidationErrors = Object.keys(validationErrors).length > 0
@@ -379,196 +361,101 @@ export function Settings() {
         </div>
       </div>
 
-      {/* Quick Profile Switch - only shown when a camera is selected (not global) */}
-      {selectedCamera !== '0' && (
-        <div className="bg-surface-elevated rounded-lg p-4 mb-6">
-          <ConfigurationPresets cameraId={Number(selectedCamera)} readOnly={false} />
-        </div>
-      )}
-
-      <DeviceSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <LibcameraSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <OverlaySettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <StreamSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <MotionSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      {/* Mask Editor - only shown when a camera is selected */}
-      {selectedCamera !== '0' && (
-        <MaskEditor cameraId={parseInt(selectedCamera, 10)} />
-      )}
-
-      <PictureSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <MovieSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <StorageSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <ScheduleSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <NotificationSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <UploadSettings
-        config={activeConfig}
-        onChange={handleChange}
-        getError={getError}
-      />
-
-      <PreferencesSettings />
-
-      <ProfileManager cameraId={Number(selectedCamera)} />
-
-      <FormSection
-        title="System"
-        description="Core Motion daemon settings and device controls"
-        collapsible
-        defaultOpen={false}
-      >
-        <FormToggle
-          label="Run as Daemon"
-          value={getValue('daemon', false) as boolean}
-          onChange={(val) => handleChange('daemon', val)}
-          helpText="Run Motion in background mode"
-        />
-        <FormInput
-          label="Log File"
-          value={String(getValue('log_file', ''))}
-          onChange={(val) => handleChange('log_file', val)}
-          helpText="Path to Motion log file"
-          error={getError('log_file')}
-        />
-        <FormSelect
-          label="Log Level"
-          value={String(getValue('log_level', '6'))}
-          onChange={(val) => handleChange('log_level', val)}
-          options={[
-            { value: '1', label: 'Emergency' },
-            { value: '2', label: 'Alert' },
-            { value: '3', label: 'Critical' },
-            { value: '4', label: 'Error' },
-            { value: '5', label: 'Warning' },
-            { value: '6', label: 'Notice' },
-            { value: '7', label: 'Info' },
-            { value: '8', label: 'Debug' },
-            { value: '9', label: 'All' },
-          ]}
-          helpText="Verbosity level for logging"
-          error={getError('log_level')}
-        />
-
-        <div className="border-t border-surface-elevated pt-4 mt-4">
-          <h4 className="font-medium mb-3 text-sm">Authentication</h4>
-          <p className="text-xs text-gray-400 mb-4">
-            Configure web interface authentication. Format: username:password or username:ha1hash
-          </p>
-          <FormInput
-            label="Admin Credentials"
-            value={String(getValue('webcontrol_authentication', ''))}
-            onChange={(val) => handleChange('webcontrol_authentication', val)}
-            type="password"
-            helpText="Administrator username:password (full access to all settings)"
-            error={getError('webcontrol_authentication')}
-          />
-          <FormInput
-            label="User Credentials"
-            value={String(getValue('webcontrol_user_authentication', ''))}
-            onChange={(val) => handleChange('webcontrol_user_authentication', val)}
-            type="password"
-            helpText="View-only username:password (can view streams but not change settings)"
-            error={getError('webcontrol_user_authentication')}
-          />
-        </div>
-
-        <div className="border-t border-surface-elevated pt-4 mt-4">
-          <h4 className="font-medium mb-3 text-sm">Device Controls</h4>
-          <div className="flex gap-3">
-            <button
-              onClick={async () => {
-                if (window.confirm('Are you sure you want to reboot the Pi? The system will restart and be unavailable for about a minute.')) {
-                  try {
-                    await systemReboot()
-                    addToast('Rebooting... The system will be back online shortly.', 'info')
-                  } catch (error: unknown) {
-                    const err = error as { message?: string }
-                    addToast(
-                      err.message || 'Failed to reboot. Power control may be disabled in config.',
-                      'error'
-                    )
-                  }
-                }
-              }}
-              className="px-4 py-2 bg-yellow-600/20 text-yellow-300 hover:bg-yellow-600/30 rounded-lg text-sm transition-colors"
-            >
-              Restart Pi
-            </button>
-            <button
-              onClick={async () => {
-                if (window.confirm('Are you sure you want to shutdown the Pi? You will need to physically power it back on.')) {
-                  try {
-                    await systemShutdown()
-                    addToast('Shutting down... The system will power off.', 'warning')
-                  } catch (error: unknown) {
-                    const err = error as { message?: string }
-                    addToast(
-                      err.message || 'Failed to shutdown. Power control may be disabled in config.',
-                      'error'
-                    )
-                  }
-                }
-              }}
-              className="px-4 py-2 bg-red-600/20 text-red-300 hover:bg-red-600/30 rounded-lg text-sm transition-colors"
-            >
-              Shutdown Pi
-            </button>
+      {/* Global-only sections - show when selectedCamera === '0' */}
+      {selectedCamera === '0' && (
+        <>
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+            <p className="text-sm text-blue-200">
+              Global settings apply to the Motion daemon and web server.
+              To configure camera-specific settings, select a camera from the dropdown above.
+            </p>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Requires <code className="text-xs bg-surface-base px-1 rounded">webcontrol_actions power=on</code> in config
-          </p>
-        </div>
-      </FormSection>
+          <SystemSettings config={activeConfig} onChange={handleChange} getError={getError} />
+        </>
+      )}
+
+      {/* Camera-specific sections - show when selectedCamera !== '0' */}
+      {selectedCamera !== '0' && (
+        <>
+          {/* Quick Profile Switch */}
+          <div className="bg-surface-elevated rounded-lg p-4 mb-6">
+            <ConfigurationPresets cameraId={Number(selectedCamera)} readOnly={false} />
+          </div>
+
+          <DeviceSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <LibcameraSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <OverlaySettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <StreamSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <MotionSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <MaskEditor cameraId={parseInt(selectedCamera, 10)} />
+
+          <PictureSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <MovieSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <StorageSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <ScheduleSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <NotificationSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <UploadSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          <ProfileManager cameraId={Number(selectedCamera)} />
+        </>
+      )}
+
+      {/* Always visible */}
+      <PreferencesSettings />
 
       <FormSection
         title="About"
