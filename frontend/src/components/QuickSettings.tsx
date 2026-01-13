@@ -62,7 +62,9 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
   }, [])
 
   // Reset local changes when config prop changes (e.g., after API update)
+  // This is a sync effect: local overrides should clear when server config updates
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalChanges({})
   }, [config])
 

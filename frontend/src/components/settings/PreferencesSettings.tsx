@@ -1,9 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { FormSection, FormSelect, FormToggle, FormSlider } from '@/components/form';
-
-export interface PreferencesSettingsProps {
-  // No config needed - these are localStorage-only settings
-}
 
 interface Preferences {
   gridColumns: number;
@@ -23,21 +19,21 @@ const DEFAULT_PREFERENCES: Preferences = {
   theme: 'dark',
 };
 
-export function PreferencesSettings({}: PreferencesSettingsProps) {
-  const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
-
-  // Load preferences from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('motion-ui-preferences');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setPreferences({ ...DEFAULT_PREFERENCES, ...parsed });
-      } catch (e) {
-        console.error('Failed to parse preferences:', e);
-      }
+function loadPreferences(): Preferences {
+  const stored = localStorage.getItem('motion-ui-preferences');
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      return { ...DEFAULT_PREFERENCES, ...parsed };
+    } catch (e) {
+      console.error('Failed to parse preferences:', e);
     }
-  }, []);
+  }
+  return DEFAULT_PREFERENCES;
+}
+
+export function PreferencesSettings() {
+  const [preferences, setPreferences] = useState<Preferences>(loadPreferences);
 
   // Save preferences to localStorage when they change
   const updatePreference = <K extends keyof Preferences>(

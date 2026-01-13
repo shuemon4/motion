@@ -1,8 +1,11 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAuthStatus } from '@/api/auth';
 import { restoreSession } from '@/api/session';
 import { LoginPage } from './LoginPage';
+
+// Restore session synchronously on module load
+restoreSession();
 
 interface AuthGateProps {
   children: ReactNode;
@@ -10,13 +13,6 @@ interface AuthGateProps {
 
 export function AuthGate({ children }: AuthGateProps) {
   const queryClient = useQueryClient();
-  const [initializing, setInitializing] = useState(true);
-
-  // Try to restore session on mount
-  useEffect(() => {
-    restoreSession();
-    setInitializing(false);
-  }, []);
 
   // Check auth status from server
   const { data: authStatus, isLoading, error } = useQuery({
@@ -31,8 +27,8 @@ export function AuthGate({ children }: AuthGateProps) {
     queryClient.invalidateQueries({ queryKey: ['auth'] });
   };
 
-  // Still initializing
-  if (initializing || isLoading) {
+  // Still loading
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="animate-pulse text-text-secondary">Loading...</div>

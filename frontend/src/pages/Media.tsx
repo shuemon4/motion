@@ -48,7 +48,13 @@ export function Media() {
   const deleteMovieMutation = useDeleteMovie()
 
   const isLoading = mediaType === 'pictures' ? picturesLoading : moviesLoading
-  const allItems = mediaType === 'pictures' ? picturesData?.pictures ?? [] : moviesData?.movies ?? []
+
+  // Memoize allItems to prevent unstable references from conditional/nullish coalescing
+  const allItems = useMemo(() => {
+    return mediaType === 'pictures'
+      ? picturesData?.pictures ?? []
+      : moviesData?.movies ?? []
+  }, [mediaType, picturesData?.pictures, moviesData?.movies])
 
   // Group items by date
   const groupedItems = useMemo(() => groupByDate(allItems), [allItems])
