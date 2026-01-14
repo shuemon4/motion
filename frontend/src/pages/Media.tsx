@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useCameras, usePictures, useMovies, useDeletePicture, useDeleteMovie } from '@/api/queries'
 import { useToast } from '@/components/Toast'
 import type { MediaItem } from '@/api/types'
@@ -39,14 +39,6 @@ export function Media() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<MediaItem | null>(null)
-
-  // DEBUG: Track Media lifecycle
-  console.log('[Media] render')
-
-  useEffect(() => {
-    console.log('[Media] mounted')
-    return () => console.log('[Media] unmounting')
-  }, [])
 
   const { data: cameras } = useCameras()
   const { data: picturesData, isLoading: picturesLoading } = usePictures(selectedCamera)

@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
 
 // Lazy-load route components for code splitting
@@ -17,15 +17,6 @@ function PageSkeleton() {
 }
 
 function App() {
-  const location = useLocation()
-
-  // DEBUG: Track route changes at App level
-  console.log('[App] render at:', location.pathname)
-
-  useEffect(() => {
-    console.log('[App] location changed to:', location.pathname)
-  }, [location.pathname])
-
   return (
     <Suspense fallback={<PageSkeleton />}>
       <Routes>

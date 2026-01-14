@@ -59,14 +59,6 @@ export function Settings() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const [isSaving, setIsSaving] = useState(false)
 
-  // DEBUG: Track Settings lifecycle
-  console.log('[Settings] render')
-
-  useEffect(() => {
-    console.log('[Settings] mounted')
-    return () => console.log('[Settings] unmounting')
-  }, [])
-
   // All hooks must be called before any conditional returns
   const queryClient = useQueryClient()
   const { data: config, isLoading, error } = useQuery({

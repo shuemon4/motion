@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react'
 import { useCameraStream } from '@/hooks/useCameraStream'
 import { useFpsTracker } from '@/hooks/useFpsTracker'
 
@@ -20,12 +20,17 @@ export function CameraStream({
   const imgRef = useRef<HTMLImageElement>(null)
   const fps = useFpsTracker(imgRef)
 
-  // Notify parent of FPS changes
+  // Store callback in ref to avoid triggering effect when callback reference changes
+  // This prevents render loops when parent passes inline arrow functions
+  const onFpsChangeRef = useRef(onFpsChange)
+  useLayoutEffect(() => {
+    onFpsChangeRef.current = onFpsChange
+  })
+
+  // Notify parent of FPS changes - only triggers when fps actually changes
   useEffect(() => {
-    if (onFpsChange) {
-      onFpsChange(fps)
-    }
-  }, [fps, onFpsChange])
+    onFpsChangeRef.current?.(fps)
+  }, [fps])
 
   const openFullscreen = useCallback(() => {
     if (onFullscreenRequest) {

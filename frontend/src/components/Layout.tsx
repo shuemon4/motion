@@ -1,5 +1,5 @@
-import { useState, useEffect, memo } from 'react'
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { useState, memo } from 'react'
+import { Outlet, Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { logout } from '@/api/auth'
@@ -7,16 +7,8 @@ import { SystemStatus, VersionDisplay } from '@/components/SystemStatus'
 
 export const Layout = memo(function Layout() {
   const queryClient = useQueryClient()
-  const location = useLocation()
   const { isAuthenticated, role } = useAuthContext()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  // DEBUG: Track Layout renders and route changes
-  console.log('[Layout] render at:', location.pathname)
-
-  useEffect(() => {
-    console.log('[Layout] route changed to:', location.pathname)
-  }, [location.pathname])
 
   const handleLogout = async () => {
     await logout()

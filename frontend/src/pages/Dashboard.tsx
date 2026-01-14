@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CameraStream } from '@/components/CameraStream'
 import { BottomSheet } from '@/components/BottomSheet'
@@ -31,14 +31,6 @@ export function Dashboard() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null)
   const [cameraFps, setCameraFps] = useState<Record<number, number>>({})
-
-  // DEBUG: Track Dashboard lifecycle
-  console.log('[Dashboard] render')
-
-  useEffect(() => {
-    console.log('[Dashboard] mounted')
-    return () => console.log('[Dashboard] unmounting')
-  }, [])
 
   // Fetch config when sheet is open
   const { data: configData } = useQuery({
