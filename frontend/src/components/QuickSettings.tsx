@@ -1,8 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { FormSlider, FormToggle } from '@/components/form'
+import { FormSlider, FormToggle, FormSelect } from '@/components/form'
 import { ConfigurationPresets } from '@/components/ConfigurationPresets'
 import { useBatchUpdateConfig } from '@/api/queries'
 import { percentToPixels, pixelsToPercent } from '@/utils/translations'
+import { useCameraCapabilities } from '@/hooks/useCameraCapabilities'
+import { AUTOFOCUS_MODES } from '@/utils/parameterMappings'
 
 interface QuickSettingsProps {
   cameraId: number
@@ -53,6 +55,9 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
   const [lastApplied, setLastApplied] = useState<string | null>(null)
   const [localChanges, setLocalChanges] = useState<Record<string, string | number | boolean>>({})
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  // Fetch camera capabilities for conditional UI rendering (e.g., autofocus controls)
+  const { data: capabilities } = useCameraCapabilities(cameraId)
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -173,13 +178,6 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
           unit=" fps"
           helpText="Maximum stream framerate"
         />
-
-        <FormToggle
-          label="Show Motion Boxes"
-          value={Boolean(getValue('stream_motion', false))}
-          onChange={(val) => handleImmediateChange('stream_motion', val)}
-          helpText="Display motion detection boxes"
-        />
       </QuickSection>
 
       {/* Image/Camera Settings (libcamera) */}
@@ -213,6 +211,56 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
           step={0.1}
           helpText="Analog gain (0=auto, 1.0-10.0)"
         />
+
+        <FormToggle
+          label="Auto White Balance"
+          value={Boolean(getValue('libcam_awb_enable', true))}
+          onChange={(val) => handleImmediateChange('libcam_awb_enable', val)}
+          helpText="Enable automatic white balance"
+        />
+
+        {/* Autofocus controls - conditional based on capabilities */}
+        {capabilities?.AfMode && (
+          <>
+            <FormSelect
+              label="Autofocus Mode"
+              value={String(getValue('libcam_af_mode', 0))}
+              onChange={(val) => handleImmediateChange('libcam_af_mode', Number(val))}
+              options={AUTOFOCUS_MODES.map((mode) => ({
+                value: String(mode.value),
+                label: mode.label,
+              }))}
+              helpText="Focus control mode"
+            />
+
+            {Number(getValue('libcam_af_mode', 0)) === 0 && capabilities?.LensPosition && (
+              <FormSlider
+                label="Lens Position"
+                value={Number(getValue('libcam_lens_position', 0))}
+                onChange={(val) => handleChange('libcam_lens_position', val)}
+                min={0}
+                max={15}
+                step={0.5}
+                unit=" dioptres"
+                helpText="Manual focus position (0.0-15.0 dioptres)"
+              />
+            )}
+          </>
+        )}
+
+        {/* Manual Focus without Autofocus (rare: motorized lens but no AF) */}
+        {!capabilities?.AfMode && capabilities?.LensPosition && (
+          <FormSlider
+            label="Lens Position"
+            value={Number(getValue('libcam_lens_position', 0))}
+            onChange={(val) => handleChange('libcam_lens_position', val)}
+            min={0}
+            max={15}
+            step={0.5}
+            unit=" dioptres"
+            helpText="Manual focus position (0.0-15.0 dioptres)"
+          />
+        )}
       </QuickSection>
 
       {/* Motion Detection */}
@@ -242,19 +290,6 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
           value={Boolean(getValue('noise_tune', false))}
           onChange={(val) => handleImmediateChange('noise_tune', val)}
           helpText="Automatically adjust noise level"
-        />
-      </QuickSection>
-
-      {/* Overlay Settings */}
-      <QuickSection title="Overlay" defaultOpen={false}>
-        <FormSlider
-          label="Text Scale"
-          value={Number(getValue('text_scale', 1))}
-          onChange={(val) => handleChange('text_scale', val)}
-          min={1}
-          max={10}
-          unit="x"
-          helpText="Overlay text size"
         />
       </QuickSection>
 

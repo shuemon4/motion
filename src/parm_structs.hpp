@@ -229,6 +229,8 @@ struct ctx_parm_cam {
     std::string     picture_filename;
     int             snapshot_interval;
     std::string     snapshot_filename;
+    int             picture_max_per_event;  /* Maximum pictures per motion event (0=unlimited) */
+    int             picture_min_interval;   /* Minimum milliseconds between pictures (0=no limit) */
 
     /* Movie output parameters (PARM_CAT_10) */
     bool            movie_output;

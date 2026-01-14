@@ -78,14 +78,14 @@ export function StreamSettings({ config, onChange, getError }: StreamSettingsPro
           />
 
           <FormSelect
-            label="Authentication Method"
+            label="Direct Stream Access Security"
             value={String(getValue('webcontrol_auth_method', 0))}
             onChange={(val) => onChange('webcontrol_auth_method', Number(val))}
             options={AUTH_METHODS.map((method) => ({
               value: String(method.value),
               label: method.label,
             }))}
-            helpText="Require authentication for stream access"
+            helpText="Authentication when streams are accessed directly (embedded in other websites, VLC, home automation). None = open access on trusted networks only. Basic = use with HTTPS. Digest = recommended."
           />
 
           <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded mt-4">

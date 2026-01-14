@@ -380,17 +380,19 @@ export function Settings() {
       {/* Camera-specific sections - show when selectedCamera !== '0' */}
       {selectedCamera !== '0' && (
         <>
-          {/* Quick Profile Switch */}
+          {/* 1. Configuration Presets */}
           <div className="bg-surface-elevated rounded-lg p-4 mb-6">
             <ConfigurationPresets cameraId={Number(selectedCamera)} readOnly={false} />
           </div>
 
+          {/* 2. Device Settings */}
           <DeviceSettings
             config={activeConfig}
             onChange={handleChange}
             getError={getError}
           />
 
+          {/* 3. libcamera Controls */}
           <LibcameraSettings
             config={activeConfig}
             onChange={handleChange}
@@ -398,56 +400,66 @@ export function Settings() {
             capabilities={capabilities}
           />
 
-          <OverlaySettings
-            config={activeConfig}
-            onChange={handleChange}
-            getError={getError}
-          />
-
-          <StreamSettings
-            config={activeConfig}
-            onChange={handleChange}
-            getError={getError}
-          />
-
-          <MotionSettings
-            config={activeConfig}
-            onChange={handleChange}
-            getError={getError}
-          />
-
-          <MaskEditor cameraId={parseInt(selectedCamera, 10)} />
-
-          <PictureSettings
-            config={activeConfig}
-            onChange={handleChange}
-            getError={getError}
-          />
-
+          {/* 4. Movie Settings */}
           <MovieSettings
             config={activeConfig}
             onChange={handleChange}
             getError={getError}
           />
 
-          <StorageSettings
+          {/* 5. Video Streaming */}
+          <StreamSettings
             config={activeConfig}
             onChange={handleChange}
             getError={getError}
           />
 
+          {/* 6. Picture Settings */}
+          <PictureSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          {/* 7. Motion Detection */}
+          <MotionSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          {/* 8. Mask Editor */}
+          <MaskEditor cameraId={parseInt(selectedCamera, 10)} />
+
+          {/* 9. Schedule */}
           <ScheduleSettings
             config={activeConfig}
             onChange={handleChange}
             getError={getError}
           />
 
+          {/* 10. Storage */}
+          <StorageSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          {/* 11. Text Overlay */}
+          <OverlaySettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          {/* 12. Notification & Scripts */}
           <NotificationSettings
             config={activeConfig}
             onChange={handleChange}
             getError={getError}
           />
 
+          {/* 13. Cloud Upload */}
           <UploadSettings
             config={activeConfig}
             onChange={handleChange}

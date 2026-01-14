@@ -77,6 +77,39 @@ export function PictureSettings({ config, onChange, getError }: PictureSettingsP
           {snapshotInterval > 0 && `, snapshot_interval=${snapshotInterval}s`}
         </div>
 
+        {/* Warning and limits for all-frames mode */}
+        {selectedMode === 'motion-triggered' && (
+          <>
+            <div className="text-xs text-yellow-300 bg-yellow-900/30 border border-yellow-700 p-3 rounded">
+              <strong>Warning:</strong> This mode captures every frame during motion. At 15fps,
+              continuous motion can generate 900+ pictures per minute. Configure limits below
+              to prevent runaway capture.
+            </div>
+
+            <FormInput
+              label="Max Pictures Per Event"
+              value={String(getValue('picture_max_per_event', 0))}
+              onChange={(val) => onChange('picture_max_per_event', Number(val))}
+              type="number"
+              min="0"
+              max="100000"
+              helpText="Maximum pictures per motion event (0 = unlimited)"
+              error={getError?.('picture_max_per_event')}
+            />
+
+            <FormInput
+              label="Min Interval Between Pictures (ms)"
+              value={String(getValue('picture_min_interval', 0))}
+              onChange={(val) => onChange('picture_min_interval', Number(val))}
+              type="number"
+              min="0"
+              max="60000"
+              helpText="Minimum milliseconds between captures (0 = no limit). 1000ms = 1 picture/second."
+              error={getError?.('picture_min_interval')}
+            />
+          </>
+        )}
+
         {selectedMode === 'interval-snapshots' && (
           <FormInput
             label="Snapshot Interval (seconds)"

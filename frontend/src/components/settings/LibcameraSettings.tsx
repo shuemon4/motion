@@ -52,13 +52,13 @@ export function LibcameraSettings({ config, onChange, getError, capabilities }: 
       />
 
       <FormSlider
-        label="Gain"
+        label="Gain (ISO)"
         value={Number(getValue('libcam_gain', 1))}
         onChange={(val) => onChange('libcam_gain', val)}
         min={0}
         max={10}
         step={0.1}
-        helpText="Analog gain (0=auto, 1.0-10.0)"
+        helpText="Analog gain (0=auto, 1.0-10.0) (Gain 1.0 ~ ISO 100)"
         error={getError?.('libcam_gain')}
       />
 
@@ -238,7 +238,7 @@ export function LibcameraSettings({ config, onChange, getError, capabilities }: 
         value={String(getValue('libcam_buffer_count', 4))}
         onChange={(val) => onChange('libcam_buffer_count', Number(val))}
         type="number"
-        helpText="Number of camera buffers (2-8, higher = smoother but more memory)"
+        helpText="Frame buffers for capture (2-8). Higher values reduce frame drops under load but use more memory. Default 4 works for most setups; increase to 6-8 if seeing drops at high framerates."
         error={getError?.('libcam_buffer_count')}
       />
     </FormSection>

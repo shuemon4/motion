@@ -67,6 +67,17 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
   // Current container value for conditional warnings
   const containerValue = String(getValue('movie_container', 'mp4'));
 
+  // Filter container options based on hardware encoder availability
+  const getAvailableContainers = () => {
+    // If device info not loaded or hardware encoder available, show all options
+    if (!deviceInfo || hasHardwareEncoder(deviceInfo)) {
+      return MOVIE_CONTAINERS;
+    }
+
+    // Filter out hardware encoding options when no hardware encoder
+    return MOVIE_CONTAINERS.filter(container => !isHardwareCodec(container.value));
+  };
+
   // Encoder preset only applies to software encoding, not:
   // - Passthrough mode
   // - Hardware encoding (h264_v4l2m2m)
@@ -97,13 +108,6 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
           helpText="When to record video. Motion Triggered = only during events, Continuous = always record."
         />
 
-        {/* Show conversion explanation */}
-        <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded">
-          <strong>Current settings:</strong> movie_output={String(movieOutput)}
-          {movieOutput && `, movie_output_motion=${String(movieOutputMotion)}`}
-          {movieOutput && `, emulate_motion=${String(emulateMotion)}`}
-        </div>
-
         <FormSlider
           label="Movie Quality"
           value={Number(getValue('movie_quality', 75))}
@@ -127,7 +131,7 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
           label="Container Format"
           value={String(getValue('movie_container', 'mkv'))}
           onChange={(val) => onChange('movie_container', val)}
-          options={MOVIE_CONTAINERS}
+          options={getAvailableContainers()}
           helpText="Video container format. Hardware encoding requires v4l2m2m support."
         />
 
@@ -139,12 +143,12 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
           </div>
         )}
 
-        {/* Hardware codec selected but no hardware encoder available */}
-        {isHardwareCodec(containerValue) && deviceInfo && !hasHardwareEncoder(deviceInfo) && (
-          <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded mt-2">
-            <strong>Hardware Encoder Not Available:</strong> The h264_v4l2m2m hardware encoder
-            is not available on this device. Motion will fall back to software encoding.
-            {isPi5(deviceInfo) && ' Pi 5 does not have a hardware H.264 encoder.'}
+        {/* Hardware encoder not available - explain why hardware options aren't shown */}
+        {deviceInfo && !hasHardwareEncoder(deviceInfo) && (
+          <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
+            <strong>Hardware Encoding Not Available:</strong> This device does not have a hardware H.264 encoder.
+            {isPi5(deviceInfo) && ' Pi 5 does not include a hardware encoder.'}
+            {' '}Hardware encoding options (h264_v4l2m2m) are hidden. Using software encoding (~40-70% CPU).
           </div>
         )}
 

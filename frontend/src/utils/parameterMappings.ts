@@ -59,6 +59,8 @@ export const DIRECT_MAPPINGS = {
   picture_quality: 'picture_quality',
   picture_filename: 'picture_filename',
   snapshot_interval: 'snapshot_interval',
+  picture_max_per_event: 'picture_max_per_event',
+  picture_min_interval: 'picture_min_interval',
 
   // Movies
   movie_output: 'movie_output',

@@ -46,6 +46,8 @@ export function DeviceSettings({ config, onChange, getError }: DeviceSettingsPro
     <FormSection
       title="Device Settings"
       description="Basic camera configuration and identification"
+      collapsible
+      defaultOpen={false}
     >
       <FormInput
         label="Camera Name"

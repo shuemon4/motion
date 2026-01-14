@@ -72,6 +72,25 @@ void cls_picture::process_norm()
     char filename[PATH_MAX];
 
     if (cam->cfg->picture_output == "on") {
+        /* Check max pictures per event limit */
+        if ((cam->cfg->picture_max_per_event > 0) &&
+            (cam->picture_event_count >= cam->cfg->picture_max_per_event)) {
+            return;  /* Limit reached for this event */
+        }
+
+        /* Check minimum interval between pictures */
+        if (cam->cfg->picture_min_interval > 0) {
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            long elapsed_ms = (now.tv_sec - cam->picture_last_ts.tv_sec) * 1000 +
+                              (now.tv_nsec - cam->picture_last_ts.tv_nsec) / 1000000;
+            if ((cam->picture_last_ts.tv_sec > 0) &&
+                (elapsed_ms < cam->cfg->picture_min_interval)) {
+                return;  /* Not enough time has passed */
+            }
+            cam->picture_last_ts = now;
+        }
+
         picname(filename,"%s/%s.%s"
             , cam->cfg->picture_filename
             , cam->cfg->picture_type);
@@ -84,6 +103,8 @@ void cls_picture::process_norm()
         cam->app->dbse->exec(cam, filename, "pic_save");
         cam->app->dbse->filelist_add(cam, &cam->current_image->imgts
             ,"pic", file_nm, full_nm, file_dir);
+
+        cam->picture_event_count++;  /* Increment picture counter */
     }
 }
 

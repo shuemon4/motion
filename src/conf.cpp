@@ -163,6 +163,8 @@ ctx_parm config_parms[] = {
     {"picture_filename",          PARM_TYP_STRING, PARM_CAT_09, PARM_LEVEL_LIMITED,  true},
     {"snapshot_interval",         PARM_TYP_INT,    PARM_CAT_09, PARM_LEVEL_LIMITED,  true},
     {"snapshot_filename",         PARM_TYP_STRING, PARM_CAT_09, PARM_LEVEL_LIMITED,  true},
+    {"picture_max_per_event",     PARM_TYP_INT,    PARM_CAT_09, PARM_LEVEL_LIMITED,  true},
+    {"picture_min_interval",      PARM_TYP_INT,    PARM_CAT_09, PARM_LEVEL_LIMITED,  true},
 
     /* Category 10 - Movie parameters - mostly NOT hot reloadable */
     {"movie_output",              PARM_TYP_BOOL,   PARM_CAT_10, PARM_LEVEL_LIMITED,  false},  /* Recording state */
@@ -703,6 +705,8 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "post_capture") return edit_generic_int(post_capture, parm, pact, 10, 0, 2147483647);
     if (name == "picture_quality") return edit_generic_int(picture_quality, parm, pact, 75, 1, 100);
     if (name == "snapshot_interval") return edit_generic_int(snapshot_interval, parm, pact, 0, 0, 2147483647);
+    if (name == "picture_max_per_event") return edit_generic_int(picture_max_per_event, parm, pact, 0, 0, 100000);
+    if (name == "picture_min_interval") return edit_generic_int(picture_min_interval, parm, pact, 0, 0, 60000);
     if (name == "movie_max_time") return edit_generic_int(movie_max_time, parm, pact, 120, 0, 2147483647);
     if (name == "movie_bps") return edit_generic_int(movie_bps, parm, pact, 400000, 0, INT_MAX);
     if (name == "movie_quality") return edit_generic_int(movie_quality, parm, pact, 60, 1, 100);

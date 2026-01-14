@@ -211,6 +211,9 @@ class cls_camera {
         bool    event_stop;  /* Boolean for whether to stop a event */
         bool    event_user;  /* Boolean for whether to user triggered an event */
 
+        int                     picture_event_count;    /* pictures saved in current event */
+        struct timespec         picture_last_ts;        /* timestamp of last picture saved */
+
         enum DEVICE_STATUS      device_status;
         enum CAMERA_TYPE        camera_type;
         struct timespec         connectionlosttime;

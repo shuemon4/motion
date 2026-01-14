@@ -227,6 +227,10 @@
             int&            snapshot_interval       = parm_cam.snapshot_interval;
             std::string&    snapshot_filename       = parm_cam.snapshot_filename;
 
+            /* Picture limits (-> parm_cam) */
+            int&            picture_max_per_event   = parm_cam.picture_max_per_event;
+            int&            picture_min_interval    = parm_cam.picture_min_interval;
+
             /* Movie output parameters (-> parm_cam) */
             bool&           movie_output            = parm_cam.movie_output;
             bool&           movie_output_motion     = parm_cam.movie_output_motion;

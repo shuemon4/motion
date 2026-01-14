@@ -72,6 +72,12 @@ on_event_end
 ;*************************************************
 picture_output off
 picture_filename %v-%Y%m%d%H%M%S-%q
+; Maximum pictures per motion event (0 = unlimited)
+; Prevents runaway capture when picture_output=on
+picture_max_per_event 0
+; Minimum milliseconds between picture captures (0 = no limit)
+; Set to 1000 for max 1 picture/second, 500 for 2 pictures/second, etc.
+picture_min_interval 0
 
 ;*************************************************
 ;*****   Movie

@@ -66,7 +66,7 @@ export function SystemSettings({ config, onChange, getError }: SystemSettingsPro
             { value: '1', label: 'Basic - Simple username/password' },
             { value: '2', label: 'Digest - More secure hash-based' },
           ]}
-          helpText="Authentication method for web interface access"
+          helpText="Authentication for direct stream access and external API clients. The web UI uses session login instead."
           error={getError?.('webcontrol_auth_method')}
         />
         <FormInput

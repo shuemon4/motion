@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { getAuthStatus } from '@/api/auth';
 import { restoreSession } from '@/api/session';
 import { LoginPage } from './LoginPage';
@@ -13,6 +14,7 @@ interface AuthGateProps {
 
 export function AuthGate({ children }: AuthGateProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Check auth status from server
   const { data: authStatus, isLoading, error } = useQuery({
@@ -22,9 +24,10 @@ export function AuthGate({ children }: AuthGateProps) {
     staleTime: 30000,  // 30 seconds
   });
 
-  // Handle successful login
+  // Handle successful login - redirect to Dashboard
   const handleLoginSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['auth'] });
+    navigate('/');  // Redirect to Dashboard after login
   };
 
   // Still loading

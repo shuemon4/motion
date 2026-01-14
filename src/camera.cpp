@@ -241,6 +241,7 @@ void cls_camera::detected_trigger()
             info_reset();
             event_prev_nbr = event_curr_nbr;
             movie_nbr = 0;
+            picture_event_count = 0;  /* Reset picture counter for new event */
 
             algsec->detected = false;
 
@@ -644,6 +645,8 @@ void cls_camera::init_values()
     event_user = false;
     lasttime = frame_curr_ts.tv_sec;
     postcap = 0;
+    picture_event_count = 0;
+    picture_last_ts = {0, 0};
     event_stop = false;
     text_scale = cfg->text_scale;
     connectionlosttime.tv_sec = 0;
