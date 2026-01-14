@@ -10,6 +10,7 @@ import { useRef, useEffect, useState } from 'react';
 export function useFpsTracker(imgRef: React.RefObject<HTMLImageElement | null>) {
   const [fps, setFps] = useState(0);
   const frameTimestamps = useRef<number[]>([]);
+  const lastUpdateTime = useRef(0);
 
   useEffect(() => {
     const img = imgRef.current;
@@ -25,7 +26,12 @@ export function useFpsTracker(imgRef: React.RefObject<HTMLImageElement | null>) 
         frameTimestamps.current.shift();
       }
 
-      setFps(frameTimestamps.current.length);
+      // Only update FPS state once per second to avoid excessive re-renders
+      // This prevents render loops when parent components respond to FPS changes
+      if (now - lastUpdateTime.current >= 1000) {
+        setFps(frameTimestamps.current.length);
+        lastUpdateTime.current = now;
+      }
     };
 
     img.addEventListener('load', handleLoad);

@@ -20,7 +20,6 @@ import { PreferencesSettings } from '@/components/settings/PreferencesSettings'
 import { MaskEditor } from '@/components/settings/MaskEditor'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { UploadSettings } from '@/components/settings/UploadSettings'
-import { ProfileManager } from '@/components/settings/ProfileManager'
 import { ConfigurationPresets } from '@/components/ConfigurationPresets'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useCameraCapabilities } from '@/hooks/useCameraCapabilities'
@@ -59,6 +58,14 @@ export function Settings() {
   const [changes, setChanges] = useState<ConfigChanges>({})
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const [isSaving, setIsSaving] = useState(false)
+
+  // DEBUG: Track Settings lifecycle
+  console.log('[Settings] render')
+
+  useEffect(() => {
+    console.log('[Settings] mounted')
+    return () => console.log('[Settings] unmounting')
+  }, [])
 
   // All hooks must be called before any conditional returns
   const queryClient = useQueryClient()
@@ -454,8 +461,6 @@ export function Settings() {
             onChange={handleChange}
             getError={getError}
           />
-
-          <ProfileManager cameraId={Number(selectedCamera)} />
         </>
       )}
 

@@ -161,9 +161,9 @@ export const MOVIE_CONTAINERS = [
   { value: 'mov', label: 'MOV (QuickTime)', group: 'basic' },
   { value: '3gp', label: '3GP (Mobile)', group: 'basic' },
 
-  // === Hardware Encoding (Pi 4 only, ~10% CPU) ===
-  { value: 'mkv:h264_v4l2m2m', label: 'MKV - H.264 Hardware (Pi 4)', group: 'hardware' },
-  { value: 'mp4:h264_v4l2m2m', label: 'MP4 - H.264 Hardware (Pi 4)', group: 'hardware' },
+  // === Hardware Encoding (requires v4l2m2m support, ~10% CPU) ===
+  { value: 'mkv:h264_v4l2m2m', label: 'MKV - H.264 Hardware', group: 'hardware' },
+  { value: 'mp4:h264_v4l2m2m', label: 'MP4 - H.264 Hardware', group: 'hardware' },
 
   // === Software H.264 (explicit) ===
   { value: 'mkv:libx264', label: 'MKV - H.264 Software', group: 'software' },

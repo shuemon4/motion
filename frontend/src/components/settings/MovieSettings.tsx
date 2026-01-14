@@ -104,131 +104,125 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
           {movieOutput && `, emulate_motion=${String(emulateMotion)}`}
         </div>
 
-        {selectedMode !== 'off' && (
-          <>
-            <FormSlider
-              label="Movie Quality"
-              value={Number(getValue('movie_quality', 75))}
-              onChange={(val) => onChange('movie_quality', val)}
-              min={1}
-              max={100}
-              unit="%"
-              helpText="Video encoding quality (1-100). Higher = better quality, larger files, more CPU."
-              error={getError?.('movie_quality')}
-            />
+        <FormSlider
+          label="Movie Quality"
+          value={Number(getValue('movie_quality', 75))}
+          onChange={(val) => onChange('movie_quality', val)}
+          min={1}
+          max={100}
+          unit="%"
+          helpText="Video encoding quality (1-100). Higher = better quality, larger files, more CPU."
+          error={getError?.('movie_quality')}
+        />
 
-            <FormInput
-              label="Movie Filename Pattern"
-              value={String(getValue('movie_filename', '%Y%m%d%H%M%S'))}
-              onChange={(val) => onChange('movie_filename', val)}
-              helpText={`Format codes: ${formatCodes}`}
-              error={getError?.('movie_filename')}
-            />
+        <FormInput
+          label="Movie Filename Pattern"
+          value={String(getValue('movie_filename', '%Y%m%d%H%M%S'))}
+          onChange={(val) => onChange('movie_filename', val)}
+          helpText={`Format codes: ${formatCodes}`}
+          error={getError?.('movie_filename')}
+        />
 
-            <FormSelect
-              label="Container Format"
-              value={String(getValue('movie_container', 'mkv'))}
-              onChange={(val) => onChange('movie_container', val)}
-              options={MOVIE_CONTAINERS}
-              helpText="Video container format. Hardware options only work on Pi 4."
-            />
+        <FormSelect
+          label="Container Format"
+          value={String(getValue('movie_container', 'mkv'))}
+          onChange={(val) => onChange('movie_container', val)}
+          options={MOVIE_CONTAINERS}
+          helpText="Video container format. Hardware encoding requires v4l2m2m support."
+        />
 
-            {/* Hardware encoding info - when hardware codec is selected */}
-            {isHardwareCodec(containerValue) && hasHardwareEncoder(deviceInfo) && (
-              <div className="text-xs text-green-400 bg-green-950/30 p-3 rounded mt-2">
-                <strong>Hardware Encoding Active:</strong> Using Pi 4's built-in H.264 encoder
-                for ~10% CPU usage instead of 40-70%.
-              </div>
-            )}
-
-            {/* Hardware codec selected but no hardware encoder available */}
-            {isHardwareCodec(containerValue) && deviceInfo && !hasHardwareEncoder(deviceInfo) && (
-              <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded mt-2">
-                <strong>Hardware Encoder Not Available:</strong> The h264_v4l2m2m hardware encoder
-                is not available on this device. Motion will fall back to software encoding.
-                {isPi5(deviceInfo) && ' Pi 5 does not have a hardware H.264 encoder.'}
-              </div>
-            )}
-
-            {/* Hardware codec selected but device info not yet loaded */}
-            {isHardwareCodec(containerValue) && !deviceInfo && (
-              <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
-                <strong>Hardware Encoding:</strong> Uses Pi 4's built-in H.264 encoder
-                for ~10% CPU usage instead of 40-70%. Only available on Raspberry Pi 4.
-                <span className="text-amber-400"> Pi 5 does not have a hardware encoder
-                and will fall back to software encoding.</span>
-              </div>
-            )}
-
-            {/* High CPU warning for HEVC */}
-            {isHighCpuCodec(containerValue) && (
-              <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded mt-2">
-                <strong>High CPU Warning:</strong> H.265/HEVC software encoding uses
-                80-100% CPU on Raspberry Pi. Not recommended for continuous recording.
-                Consider H.264 for better performance.
-              </div>
-            )}
-
-            {/* Pi 4 tip for hardware encoding - shown when software codec is selected on Pi 4 */}
-            {isPi4(deviceInfo) && hasHardwareEncoder(deviceInfo) &&
-             !isHardwareCodec(containerValue) && !getValue('movie_passthrough', false) &&
-             !containerValue.includes('webm') && !isHighCpuCodec(containerValue) && (
-              <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
-                <strong>Pi 4 Hardware Encoding Available:</strong> Your Pi 4 has a hardware
-                H.264 encoder. Select "MKV - H.264 Hardware (Pi 4)" or "MP4 - H.264 Hardware (Pi 4)"
-                to reduce CPU from ~40-70% to ~10%.
-              </div>
-            )}
-
-            {/* Generic software encoding tip (shown when device info unavailable) */}
-            {!deviceInfo && !isHardwareCodec(containerValue) && !getValue('movie_passthrough', false) &&
-             !containerValue.includes('webm') && !isHighCpuCodec(containerValue) && (
-              <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded mt-2">
-                <strong>Tip:</strong> If using Raspberry Pi 4, consider selecting
-                "MKV - H.264 Hardware (Pi 4)" or "MP4 - H.264 Hardware (Pi 4)" for ~10% CPU
-                instead of ~40-70% with software encoding.
-              </div>
-            )}
-
-            {/* WebM format info */}
-            {containerValue === 'webm' && (
-              <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
-                <strong>WebM Format:</strong> Uses VP8 codec, optimized for web streaming.
-                Encoder preset setting does not apply to VP8.
-              </div>
-            )}
-
-            {showEncoderPreset() && (
-              <FormSelect
-                label="Encoder Preset"
-                value={String(getValue('movie_encoder_preset', 'medium'))}
-                onChange={(val) => onChange('movie_encoder_preset', val)}
-                options={ENCODER_PRESETS.map(p => ({
-                  value: p.value,
-                  label: p.label,
-                }))}
-                helpText="Tradeoff between CPU usage and video quality. Lower presets use less CPU but produce lower quality video. Requires restart to take effect."
-              />
-            )}
-
-            <FormInput
-              label="Max Duration (seconds)"
-              value={String(getValue('movie_max_time', 0))}
-              onChange={(val) => onChange('movie_max_time', Number(val))}
-              type="number"
-              min="0"
-              helpText="Maximum movie length (0 = unlimited). Splits long events into multiple files."
-              error={getError?.('movie_max_time')}
-            />
-
-            <FormToggle
-              label="Passthrough Mode"
-              value={getValue('movie_passthrough', false) as boolean}
-              onChange={(val) => onChange('movie_passthrough', val)}
-              helpText="Copy codec without re-encoding. Reduces CPU but may cause compatibility issues."
-            />
-          </>
+        {/* Hardware encoding info - when hardware codec is selected */}
+        {isHardwareCodec(containerValue) && hasHardwareEncoder(deviceInfo) && (
+          <div className="text-xs text-green-400 bg-green-950/30 p-3 rounded mt-2">
+            <strong>Hardware Encoding Active:</strong> Using h264_v4l2m2m hardware encoder
+            for ~10% CPU usage instead of 40-70%.
+          </div>
         )}
+
+        {/* Hardware codec selected but no hardware encoder available */}
+        {isHardwareCodec(containerValue) && deviceInfo && !hasHardwareEncoder(deviceInfo) && (
+          <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded mt-2">
+            <strong>Hardware Encoder Not Available:</strong> The h264_v4l2m2m hardware encoder
+            is not available on this device. Motion will fall back to software encoding.
+            {isPi5(deviceInfo) && ' Pi 5 does not have a hardware H.264 encoder.'}
+          </div>
+        )}
+
+        {/* Hardware codec selected but device info not yet loaded */}
+        {isHardwareCodec(containerValue) && !deviceInfo && (
+          <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
+            <strong>Hardware Encoding:</strong> Uses h264_v4l2m2m hardware encoder
+            for ~10% CPU usage instead of 40-70%. Only available on devices with v4l2m2m support.
+          </div>
+        )}
+
+        {/* High CPU warning for HEVC */}
+        {isHighCpuCodec(containerValue) && (
+          <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded mt-2">
+            <strong>High CPU Warning:</strong> H.265/HEVC software encoding uses
+            80-100% CPU on Raspberry Pi. Not recommended for continuous recording.
+            Consider H.264 for better performance.
+          </div>
+        )}
+
+        {/* Hardware encoding tip - shown when software codec is selected on device with hardware encoder */}
+        {hasHardwareEncoder(deviceInfo) &&
+         !isHardwareCodec(containerValue) && !getValue('movie_passthrough', false) &&
+         !containerValue.includes('webm') && !isHighCpuCodec(containerValue) && (
+          <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
+            <strong>Hardware Encoding Available:</strong> This device has a hardware
+            H.264 encoder. Select "MKV - H.264 Hardware" or "MP4 - H.264 Hardware"
+            to reduce CPU from ~40-70% to ~10%.
+          </div>
+        )}
+
+        {/* Generic software encoding tip (shown when device info unavailable) */}
+        {!deviceInfo && !isHardwareCodec(containerValue) && !getValue('movie_passthrough', false) &&
+         !containerValue.includes('webm') && !isHighCpuCodec(containerValue) && (
+          <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded mt-2">
+            <strong>Tip:</strong> If your device has hardware encoding support (e.g., Raspberry Pi 4),
+            consider selecting "MKV - H.264 Hardware" or "MP4 - H.264 Hardware" for ~10% CPU
+            instead of ~40-70% with software encoding.
+          </div>
+        )}
+
+        {/* WebM format info */}
+        {containerValue === 'webm' && (
+          <div className="text-xs text-blue-400 bg-blue-950/30 p-3 rounded mt-2">
+            <strong>WebM Format:</strong> Uses VP8 codec, optimized for web streaming.
+            Encoder preset setting does not apply to VP8.
+          </div>
+        )}
+
+        {showEncoderPreset() && (
+          <FormSelect
+            label="Encoder Preset"
+            value={String(getValue('movie_encoder_preset', 'medium'))}
+            onChange={(val) => onChange('movie_encoder_preset', val)}
+            options={ENCODER_PRESETS.map(p => ({
+              value: p.value,
+              label: p.label,
+            }))}
+            helpText="Tradeoff between CPU usage and video quality. Lower presets use less CPU but produce lower quality video. Requires restart to take effect."
+          />
+        )}
+
+        <FormInput
+          label="Max Duration (seconds)"
+          value={String(getValue('movie_max_time', 0))}
+          onChange={(val) => onChange('movie_max_time', Number(val))}
+          type="number"
+          min="0"
+          helpText="Maximum movie length (0 = unlimited). Splits long events into multiple files."
+          error={getError?.('movie_max_time')}
+        />
+
+        <FormToggle
+          label="Passthrough Mode"
+          value={getValue('movie_passthrough', false) as boolean}
+          onChange={(val) => onChange('movie_passthrough', val)}
+          helpText="Copy codec without re-encoding. Reduces CPU but may cause compatibility issues."
+        />
 
         <div className="border-t border-surface-elevated pt-4">
           <h4 className="font-medium mb-2 text-sm">Format Code Reference</h4>

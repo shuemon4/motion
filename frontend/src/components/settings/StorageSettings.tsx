@@ -27,16 +27,16 @@ export function StorageSettings({ config, onChange, getError }: StorageSettingsP
   return (
     <FormSection
       title="Storage"
-      description="Configure where and how Motion saves files"
+      description="Base directory and periodic snapshot settings for this camera"
       collapsible
       defaultOpen={false}
     >
       <div className="space-y-4">
         <FormInput
-          label="Target Directory"
+          label="Base Storage Directory"
           value={String(getValue('target_dir', '/var/lib/motion'))}
           onChange={(val) => onChange('target_dir', val)}
-          helpText="Directory where files are saved. Ensure sufficient space and write permissions."
+          helpText="Root directory for ALL camera files. Picture and movie filename patterns (configured in their sections) create paths relative to this directory."
           error={getError?.('target_dir')}
         />
 
@@ -61,8 +61,9 @@ export function StorageSettings({ config, onChange, getError }: StorageSettingsP
           <h4 className="font-medium mb-3 text-sm">Format Code Reference</h4>
           <div className="text-xs text-gray-400 space-y-1">
             <p>Available codes: {formatCodes}</p>
-            <p className="mt-2 text-yellow-200">
-              <strong>Note:</strong> Picture and movie filename patterns are configured in their respective settings sections.
+            <p className="mt-2 text-blue-200">
+              <strong>How it works:</strong> The Base Storage Directory above sets where files go.
+              Picture and Movie sections set filename patterns (which can include subdirectories like <code>%Y-%m-%d/</code>).
             </p>
           </div>
         </div>

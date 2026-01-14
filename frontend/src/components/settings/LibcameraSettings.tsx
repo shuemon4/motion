@@ -83,29 +83,36 @@ export function LibcameraSettings({ config, onChange, getError, capabilities }: 
             helpText="White balance mode"
           />
 
-          <FormToggle
-            label="Lock AWB"
-            value={Boolean(getValue('libcam_awb_locked', false))}
-            onChange={(val) => onChange('libcam_awb_locked', val)}
-            helpText="Lock white balance settings"
-          />
+          {/* AWB Lock - only show if camera supports it (NoIR cameras don't) */}
+          {capabilities?.AwbLocked !== false && (
+            <FormToggle
+              label="Lock AWB"
+              value={Boolean(getValue('libcam_awb_locked', false))}
+              onChange={(val) => onChange('libcam_awb_locked', val)}
+              helpText="Lock white balance settings"
+            />
+          )}
         </>
       )}
 
       {!awbEnabled && (
         <>
-          <FormSlider
-            label="Color Temperature"
-            value={Number(getValue('libcam_colour_temp', 0))}
-            onChange={(val) => onChange('libcam_colour_temp', val)}
-            min={0}
-            max={10000}
-            step={100}
-            unit=" K"
-            helpText="Manual color temperature in Kelvin (0-10000)"
-            error={getError?.('libcam_colour_temp')}
-          />
+          {/* Color Temperature - only show if camera supports it (NoIR cameras don't) */}
+          {capabilities?.ColourTemperature !== false && (
+            <FormSlider
+              label="Color Temperature"
+              value={Number(getValue('libcam_colour_temp', 0))}
+              onChange={(val) => onChange('libcam_colour_temp', val)}
+              min={0}
+              max={10000}
+              step={100}
+              unit=" K"
+              helpText="Manual color temperature in Kelvin (0-10000)"
+              error={getError?.('libcam_colour_temp')}
+            />
+          )}
 
+          {/* Color Gains - always show when AWB is disabled */}
           <div className="grid grid-cols-2 gap-4">
             <FormSlider
               label="Red Gain"
@@ -129,6 +136,14 @@ export function LibcameraSettings({ config, onChange, getError, capabilities }: 
               error={getError?.('libcam_colour_gain_b')}
             />
           </div>
+
+          {/* NoIR camera info - only show when capabilities indicate no ColourTemperature */}
+          {capabilities?.ColourTemperature === false && (
+            <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded">
+              <strong>Note:</strong> Color Temperature control is not available on this camera.
+              NoIR cameras and some other sensors don't support this feature. Use Red/Blue Gain for manual white balance.
+            </div>
+          )}
         </>
       )}
 
