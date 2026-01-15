@@ -196,6 +196,7 @@ class cls_camera {
         int     pipe;
         int     mpipe;
         bool    pause;
+        bool    picture_pause;
         std::string user_pause;
         int     missing_frame_counter;
 
@@ -205,6 +206,7 @@ class cls_camera {
         int         info_sdev_max;
         uint64_t    info_sdev_tot;
         std::vector<std::vector<ctx_schedule_data>> schedule;
+        std::vector<std::vector<ctx_schedule_data>> picture_schedule;
         ctx_cleandir    *cleandir;
 
         bool    action_snapshot;    /* Make a snapshot */
@@ -289,6 +291,7 @@ class cls_camera {
         void init_cam_start();
         void init_ref();
         void init_schedule();
+        void init_picture_schedule();
         void init_cleandir_runtime();
         void init_cleandir_default();
         void init_cleandir();
@@ -309,6 +312,7 @@ class cls_camera {
         void timelapse();
         void loopback();
         void check_schedule();
+        void check_picture_schedule();
         void frametiming();
 };
 

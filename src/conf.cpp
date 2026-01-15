@@ -60,6 +60,7 @@ ctx_parm config_parms[] = {
     {"device_tmo",                PARM_TYP_INT,    PARM_CAT_01, PARM_LEVEL_LIMITED,  false},
     {"pause",                     PARM_TYP_LIST,   PARM_CAT_01, PARM_LEVEL_LIMITED,  true},   /* Runtime control */
     {"schedule_params",           PARM_TYP_PARAMS, PARM_CAT_01, PARM_LEVEL_LIMITED,  false},
+    {"picture_schedule_params",   PARM_TYP_PARAMS, PARM_CAT_01, PARM_LEVEL_LIMITED,  false},
     {"cleandir_params",           PARM_TYP_PARAMS, PARM_CAT_01, PARM_LEVEL_LIMITED,  false},
     {"target_dir",                PARM_TYP_STRING, PARM_CAT_01, PARM_LEVEL_ADVANCED, false},
     {"watchdog_tmo",              PARM_TYP_INT,    PARM_CAT_01, PARM_LEVEL_LIMITED,  false},
@@ -773,6 +774,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "libcam_device") return edit_generic_string(libcam_device, parm, pact, "auto");
     if (name == "libcam_params") return edit_generic_string(libcam_params, parm, pact, "");
     if (name == "schedule_params") return edit_generic_string(schedule_params, parm, pact, "");
+    if (name == "picture_schedule_params") return edit_generic_string(picture_schedule_params, parm, pact, "");
     if (name == "cleandir_params") return edit_generic_string(cleandir_params, parm, pact, "");
     if (name == "config_dir") return edit_generic_string(config_dir, parm, pact, "");
     if (name == "text_left") return edit_generic_string(text_left, parm, pact, "");

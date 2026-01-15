@@ -153,6 +153,8 @@ void cls_webu_json::parms_item_detail(cls_config *conf, std::string pNm)
         util_parms_parse(params, pNm, conf->libcam_params);
     } else if (pNm == "schedule_params") {
         util_parms_parse(params, pNm, conf->schedule_params);
+    } else if (pNm == "picture_schedule_params") {
+        util_parms_parse(params, pNm, conf->picture_schedule_params);
     } else if (pNm == "cleandir_params") {
         util_parms_parse(params, pNm, conf->cleandir_params);
     } else if (pNm == "secondary_params") {
@@ -1168,6 +1170,14 @@ void cls_webu_json::api_delete_movie()
         return;
     }
 
+    /* Delete associated thumbnail */
+    std::string thumb_path = full_path + ".thumb.jpg";
+    if (remove(thumb_path.c_str()) != 0 && errno != ENOENT) {
+        MOTION_LOG(NTC, TYPE_STREAM, SHOW_ERRNO,
+            _("Could not delete thumbnail: %s"), thumb_path.c_str());
+        /* Non-fatal - continue with database deletion */
+    }
+
     /* Delete from database */
     sql  = "delete from motion where record_id = " + std::to_string(file_id);
     app->dbse->exec_sql(sql);
@@ -1215,6 +1225,15 @@ void cls_webu_json::api_media_movies()
         webua->resp_page += "\"date\":\"" + std::to_string(flst[i].file_dtl) + "\",";
         webua->resp_page += "\"time\":\"" + escstr(flst[i].file_tml) + "\",";
         webua->resp_page += "\"size\":" + std::to_string(flst[i].file_sz);
+
+        /* Add thumbnail path if exists */
+        std::string thumb_path = flst[i].full_nm + ".thumb.jpg";
+        struct stat st;
+        if (stat(thumb_path.c_str(), &st) == 0) {
+            webua->resp_page += ",\"thumbnail\":\"/" + cam_id + "/movies/" +
+                                escstr(flst[i].file_nm) + ".thumb.jpg\"";
+        }
+
         webua->resp_page += "}";
     }
     webua->resp_page += "]}";

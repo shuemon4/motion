@@ -49,6 +49,7 @@ motion_SOURCES = \
 	picture.hpp        picture.cpp \
 	rotate.hpp         rotate.cpp \
 	sound.hpp          sound.cpp \
+	thumbnail.hpp      thumbnail.cpp \
 	util.hpp           util.cpp \
 	video_v4l2.hpp     video_v4l2.cpp \
 	video_convert.hpp  video_convert.cpp \

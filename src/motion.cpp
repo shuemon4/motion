@@ -39,6 +39,7 @@
 #include "video_v4l2.hpp"
 #include "movie.hpp"
 #include "netcam.hpp"
+#include "thumbnail.hpp"
 
 volatile enum MOTION_SIGNAL motsignal;
 
@@ -555,6 +556,7 @@ void cls_motapp::init(int p_argc, char *p_argv[])
     webu = new cls_webu(this);
     allcam = new cls_allcam(this);
     schedule = new cls_schedule(this);
+    thumbnail = new cls_thumbnail(this);
 
     if ((cam_cnt > 0) || (snd_cnt > 0)) {
         for (indx=0; indx<cam_cnt; indx++) {
@@ -584,6 +586,7 @@ void cls_motapp::deinit()
     mydelete(dbse);
     mydelete(allcam)
     mydelete(schedule)
+    mydelete(thumbnail)
     mydelete(conf_src);
     mydelete(cfg);
 

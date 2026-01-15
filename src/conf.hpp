@@ -140,6 +140,7 @@
             int&            device_tmo              = parm_cam.device_tmo;
             std::string&    pause                   = parm_cam.pause;
             std::string&    schedule_params         = parm_cam.schedule_params;
+            std::string&    picture_schedule_params = parm_cam.picture_schedule_params;
             std::string&    cleandir_params         = parm_cam.cleandir_params;
 
             /* Source parameters (-> parm_cam) */

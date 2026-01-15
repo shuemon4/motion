@@ -1158,6 +1158,137 @@ void cls_camera::init_schedule()
     mydelete(params);
 }
 
+void cls_camera::init_picture_schedule()
+{
+    int indx, indx1;
+    bool dflt_capture, rev_capture;
+    ctx_params  *params;
+    std::string  pnm, pvl, tst, action;
+    std::vector<ctx_schedule_data> sched_day;
+    ctx_schedule_data sched_itm;
+
+    if (cfg->picture_schedule_params == "") {
+        return;
+    }
+
+    params = new ctx_params;
+    util_parms_parse(params, "picture_schedule_params", cfg->picture_schedule_params);
+
+    if (params->params_cnt == 0) {
+        mydelete(params);
+        return;
+    }
+
+    action = "pause";
+    dflt_capture = true;
+    for (indx=0; indx<params->params_cnt; indx++) {
+        pnm = params->params_array[indx].param_name;
+        pvl = params->params_array[indx].param_value;
+        if (pnm == "default") {
+            dflt_capture = mtob(params->params_array[indx].param_value);
+        }
+        if (pnm == "action") {
+            if (pvl == "stop") {
+                action = "stop";
+            } else {
+                action = "pause";
+            }
+        }
+    }
+
+    if (dflt_capture) {
+        rev_capture = false;
+    } else {
+        rev_capture = true;
+    }
+
+    for (indx=0; indx<7; indx++) {
+        sched_day.clear();
+
+        sched_itm.st_hr = 0;
+        sched_itm.st_min = 0;
+        sched_itm.en_hr = 23;
+        sched_itm.en_min = 59;
+        sched_itm.action = action;
+        sched_itm.detect = dflt_capture;
+        sched_day.push_back(sched_itm);
+
+        sched_itm.st_hr = -1;
+        sched_itm.st_min = -1;
+        sched_itm.en_hr = -1;
+        sched_itm.en_min = -1;
+        sched_itm.action = action;
+        sched_itm.detect = rev_capture;
+
+        if (indx == 0) {        tst = "sun";
+        } else if (indx == 1) { tst = "mon";
+        } else if (indx == 2) { tst = "tue";
+        } else if (indx == 3) { tst = "wed";
+        } else if (indx == 4) { tst = "thu";
+        } else if (indx == 5) { tst = "fri";
+        } else if (indx == 6) { tst = "sat";
+        }
+        for (indx1=0; indx1<params->params_cnt; indx1++) {
+            pnm = params->params_array[indx1].param_name;
+            pvl = params->params_array[indx1].param_value;
+            if ((pnm == tst) || (pnm == "sun-sat") ||
+                ((pnm == "mon-fri") && (indx>=1) && (indx<=5))) {
+                sched_itm.st_hr = mtoi(pvl.substr(0,2));
+                sched_itm.st_min = mtoi(pvl.substr(2,2));
+                sched_itm.en_hr = mtoi(pvl.substr(5,2));
+                sched_itm.en_min = mtoi(pvl.substr(7,2));
+                sched_itm.action = action;
+                sched_itm.detect = rev_capture;
+                if ((sched_itm.st_hr  < 0) || (sched_itm.st_hr  > 23) ||
+                    (sched_itm.st_min < 0) || (sched_itm.st_min > 59) ||
+                    (sched_itm.en_hr  < 0) || (sched_itm.en_hr  > 23) ||
+                    (sched_itm.en_min < 0) || (sched_itm.en_min > 59) ||
+                    (sched_itm.st_hr  > sched_itm.en_hr) ||
+                    (pvl.length() != 9)) {
+                    MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
+                        ,_("Invalid picture schedule parameter: %s %s")
+                        , pnm.c_str(), pvl.c_str());
+                } else {
+                    sched_day.push_back(sched_itm);
+                }
+            }
+        }
+        picture_schedule.push_back(sched_day);
+    }
+
+    for (indx=0; indx<7; indx++) {
+        if (indx == 0) {        tst = "sun";
+        } else if (indx == 1) { tst = "mon";
+        } else if (indx == 2) { tst = "tue";
+        } else if (indx == 3) { tst = "wed";
+        } else if (indx == 4) { tst = "thu";
+        } else if (indx == 5) { tst = "fri";
+        } else if (indx == 6) { tst = "sat";
+        }
+        for (indx1=0; indx1<picture_schedule[indx].size(); indx1++) {
+            if ((picture_schedule[indx][indx1].action == "stop") &&
+                (picture_schedule[indx][indx1].detect == false)) {
+                action = "stopped";
+            } else if (sched_day[indx1].detect == false) {
+               action = "paused";
+            } else {
+                action = "active";
+            }
+            MOTION_LOG(INF, TYPE_ALL, NO_ERRNO
+                ,_("Picture Schedule: %s %02d:%02d to %02d:%02d %s")
+                ,tst.c_str()
+                ,sched_day[indx1].st_hr
+                ,sched_day[indx1].st_min
+                ,sched_day[indx1].en_hr
+                ,sched_day[indx1].en_min
+                ,action.c_str()
+                );
+        }
+    }
+
+    mydelete(params);
+}
+
 /* initialize everything for the loop */
 void cls_camera::init()
 {
@@ -1209,6 +1340,7 @@ void cls_camera::init()
     init_cleandir();
 
     init_schedule();
+    init_picture_schedule();
 
     init_areadetect();
 
@@ -1766,12 +1898,22 @@ void cls_camera::snapshot()
         return;
     }
 
-    if ((cfg->snapshot_interval > 0 && shots_mt == 0 &&
-         frame_curr_ts.tv_sec % cfg->snapshot_interval <=
-         frame_last_ts.tv_sec % cfg->snapshot_interval) ||
-         action_snapshot) {
+    /* Manual snapshot via action_snapshot always allowed */
+    if (action_snapshot) {
         picture->process_snapshot();
         action_snapshot = false;
+        return;
+    }
+
+    /* Scheduled snapshots respect picture_pause */
+    if (picture_pause) {
+        return;
+    }
+
+    if (cfg->snapshot_interval > 0 && shots_mt == 0 &&
+        frame_curr_ts.tv_sec % cfg->snapshot_interval <=
+        frame_last_ts.tv_sec % cfg->snapshot_interval) {
+        picture->process_snapshot();
     }
 }
 
@@ -1787,6 +1929,7 @@ void cls_camera::timelapse()
     if (cfg->timelapse_interval) {
         localtime_r(&current_image->imgts.tv_sec, &timestamp_tm);
 
+        /* Handle timelapse file rollover (always allowed, even when paused) */
         if (timestamp_tm.tm_min == 0 &&
             (frame_curr_ts.tv_sec % 60 < frame_last_ts.tv_sec % 60) &&
             shots_mt == 0) {
@@ -1812,7 +1955,8 @@ void cls_camera::timelapse()
             }
         }
 
-        if (shots_mt == 0 &&
+        /* Adding frames respects picture_pause schedule */
+        if (!picture_pause && shots_mt == 0 &&
             frame_curr_ts.tv_sec % cfg->timelapse_interval <=
             frame_last_ts.tv_sec % cfg->timelapse_interval) {
             movie_timelapse->start();
@@ -1905,6 +2049,44 @@ void cls_camera::check_schedule()
     */
 }
 
+void cls_camera::check_picture_schedule()
+{
+    struct tm c_tm;
+    int indx, cur_dy;
+    bool prev;
+
+    if ((restart == true) || (handler_stop == true)) {
+        return;
+    }
+
+    if (picture_schedule.size() == 0) {
+        return;
+    }
+
+    localtime_r(&current_image->imgts.tv_sec, &c_tm);
+    cur_dy = c_tm.tm_wday;
+    prev = picture_pause;
+
+    for (indx=0; indx<picture_schedule[cur_dy].size(); indx++) {
+        if ((picture_schedule[cur_dy][indx].action == "pause") &&
+            (c_tm.tm_hour >= picture_schedule[cur_dy][indx].st_hr) &&
+            (c_tm.tm_min  >= picture_schedule[cur_dy][indx].st_min) &&
+            (c_tm.tm_hour <= picture_schedule[cur_dy][indx].en_hr) &&
+            (c_tm.tm_min  <= picture_schedule[cur_dy][indx].en_min) ) {
+            if (picture_schedule[cur_dy][indx].detect) {
+                picture_pause = false;
+            } else {
+                picture_pause = true;
+            }
+        }
+    }
+    if (prev != picture_pause) {
+        MOTION_LOG(NTC, TYPE_EVENTS, NO_ERRNO
+            , _("Scheduled action. Picture capture %s")
+            , picture_pause ? _("disabled"):_("enabled"));
+    }
+}
+
 /* sleep the loop to get framerate requested */
 void cls_camera::frametiming()
 {
@@ -1945,6 +2127,7 @@ void cls_camera::handler()
         tuning();
         overlay();
         actions();
+        check_picture_schedule();
         snapshot();
         timelapse();
         loopback();
@@ -2058,9 +2241,11 @@ cls_camera::cls_camera(cls_motapp *p_app)
     pipe = -1;
     mpipe = -1;
     pause = false;
+    picture_pause = false;
     user_pause = "schedule";
     missing_frame_counter = -1;
     schedule.clear();
+    picture_schedule.clear();
     cleandir = nullptr;
 
     info_diff_tot = 0;

@@ -129,6 +129,7 @@ struct ctx_parm_cam {
     int             device_tmo;
     std::string     pause;
     std::string     schedule_params;
+    std::string     picture_schedule_params;
     std::string     cleandir_params;
 
     /* Source parameters (PARM_CAT_02) */

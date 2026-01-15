@@ -87,8 +87,9 @@ jobs:
 
       - name: Configure build
         env:
-          # Workaround for Alpine OpenEXR/Imath version mismatch (see doc/KNOWN-ISSUES.md)
-          LIBS: ${{ matrix.libc == 'musl' && '-lImath' || '' }}
+          # Workaround for Alpine OpenEXR/Imath transitive dependency issue
+          # OpenCV's imgcodecs requires OpenEXR (Imf) and Imath but pkg-config doesn't pull them in
+          LIBS: ${{ matrix.libc == 'musl' && '-lOpenEXR -lImath' || '' }}
         run: |
           autoreconf -fiv
           CONFIG_SHELL=/bin/bash ./configure CC=${{ matrix.cc }} CXX=${{ matrix.cxx }}

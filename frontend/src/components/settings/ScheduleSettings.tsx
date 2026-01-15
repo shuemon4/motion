@@ -96,13 +96,6 @@ export function ScheduleSettings({ config, onChange, getError }: ScheduleSetting
             />
           )}
         </div>
-
-        {/* Backend Support Warning */}
-        <div className="p-3 bg-yellow-900/20 border border-yellow-600/30 rounded text-xs text-yellow-200">
-          <strong>Note:</strong> Continuous Recording Schedule configuration is available,
-          but backend support will be added in a future update. The schedule will be saved
-          but not enforced until backend implementation is complete.
-        </div>
       </div>
     </FormSection>
   );

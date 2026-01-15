@@ -123,6 +123,7 @@ class cls_webu_mpegts;
 class cls_webu_post;
 class cls_webu_common;
 class cls_webu_stream;
+class cls_thumbnail;
 
 enum MOTION_SIGNAL {
     MOTION_SIGNAL_NONE,
@@ -206,6 +207,7 @@ class cls_motapp {
         cls_config_profile  *profiles;
         cls_allcam          *allcam;
         cls_schedule        *schedule;
+        cls_thumbnail       *thumbnail;
 
         pthread_mutex_t     mutex_camlst;       /* Lock the list of cams while adding/removing */
         pthread_mutex_t     mutex_post;         /* mutex to allow for processing of post actions*/

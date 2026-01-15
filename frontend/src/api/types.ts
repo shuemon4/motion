@@ -49,6 +49,7 @@ export interface MediaItem {
   date: string;
   time?: string;
   size: number;
+  thumbnail?: string; // Optional thumbnail URL for videos
 }
 
 // Pictures API response from /{cam}/api/media/pictures

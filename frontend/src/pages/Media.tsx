@@ -283,7 +283,7 @@ export function Media() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
-              <div className="aspect-video bg-surface flex items-center justify-center">
+              <div className="aspect-video bg-surface flex items-center justify-center relative overflow-hidden">
                 {mediaType === 'pictures' ? (
                   <img
                     src={item.path}
@@ -291,14 +291,31 @@ export function Media() {
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
-                ) : (
-                  <div className="text-gray-400">
-                    <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                )}
+                ) : item.thumbnail ? (
+                  <img
+                    src={item.thumbnail}
+                    alt={item.filename}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      // Fallback to play icon if thumbnail fails to load
+                      e.currentTarget.style.display = 'none';
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        const fallback = parent.querySelector('.fallback-icon');
+                        if (fallback) {
+                          (fallback as HTMLElement).style.display = 'flex';
+                        }
+                      }
+                    }}
+                  />
+                ) : null}
+                <div className={`fallback-icon text-gray-400 absolute inset-0 flex items-center justify-center ${item.thumbnail ? 'hidden' : ''}`}>
+                  <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
               </div>
               <div className="p-3">
                 <p className="text-sm font-medium truncate">{item.filename}</p>

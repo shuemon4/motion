@@ -34,6 +34,7 @@
 #include "dbse.hpp"
 #include "alg_sec.hpp"
 #include "movie.hpp"
+#include "thumbnail.hpp"
 
 int movie_interrupt(void *ctx)
 {
@@ -1285,10 +1286,18 @@ void cls_movie::stop()
         } else {
             cam->app->dbse->filelist_add(cam, ts, "movie"
                     , file_nm, full_nm, file_dir);
+            /* Queue thumbnail generation for saved video */
+            if (cam->app->thumbnail != nullptr) {
+                cam->app->thumbnail->queue(full_nm);
+            }
         }
     } else if (movie_type == "timelapse") {
         on_movie_end();
         cam->app->dbse->exec(cam, full_nm, "movie_end");
+        /* Queue thumbnail generation for timelapse */
+        if (cam->app->thumbnail != nullptr) {
+            cam->app->thumbnail->queue(full_nm);
+        }
     } else {
         MOTION_LOG(ERR, TYPE_EVENTS, NO_ERRNO,_("Invalid movie type"));
     }
