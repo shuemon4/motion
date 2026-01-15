@@ -980,7 +980,7 @@ void cls_webu_json::api_media_pictures()
 
     sql  = " select * from motion ";
     sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
-    sql += " and file_typ = '1'";  /* 1 = snapshot */
+    sql += " and file_typ = 'pic'";
     sql += " order by file_dtl desc, file_tml desc";
     sql += " limit 100;";
 
@@ -1050,7 +1050,7 @@ void cls_webu_json::api_delete_picture()
     sql  = " select * from motion ";
     sql += " where record_id = " + std::to_string(file_id);
     sql += " and device_id = " + std::to_string(webua->cam->cfg->device_id);
-    sql += " and file_typ = '1'";  /* 1 = picture */
+    sql += " and file_typ = 'pic'";
     app->dbse->filelist_get(sql, flst);
 
     if (flst.empty()) {
@@ -1139,7 +1139,7 @@ void cls_webu_json::api_delete_movie()
     sql  = " select * from motion ";
     sql += " where record_id = " + std::to_string(file_id);
     sql += " and device_id = " + std::to_string(webua->cam->cfg->device_id);
-    sql += " and file_typ = '2'";  /* 2 = movie */
+    sql += " and file_typ = 'movie'";
     app->dbse->filelist_get(sql, flst);
 
     if (flst.empty()) {
@@ -1196,11 +1196,13 @@ void cls_webu_json::api_media_movies()
 
     sql  = " select * from motion ";
     sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
-    sql += " and file_typ = '2'";  /* 2 = movie */
+    sql += " and file_typ = 'movie'";
     sql += " order by file_dtl desc, file_tml desc";
     sql += " limit 100;";
 
     app->dbse->filelist_get(sql, flst);
+
+    std::string cam_id = std::to_string(webua->cam->cfg->device_id);
 
     webua->resp_page = "{\"movies\":[";
     for (size_t i = 0; i < flst.size(); i++) {
@@ -1208,7 +1210,8 @@ void cls_webu_json::api_media_movies()
         webua->resp_page += "{";
         webua->resp_page += "\"id\":" + std::to_string(flst[i].record_id) + ",";
         webua->resp_page += "\"filename\":\"" + escstr(flst[i].file_nm) + "\",";
-        webua->resp_page += "\"path\":\"" + escstr(flst[i].full_nm) + "\",";
+        /* Return URL path for browser access, not filesystem path */
+        webua->resp_page += "\"path\":\"/" + cam_id + "/movies/" + escstr(flst[i].file_nm) + "\",";
         webua->resp_page += "\"date\":\"" + std::to_string(flst[i].file_dtl) + "\",";
         webua->resp_page += "\"time\":\"" + escstr(flst[i].file_tml) + "\",";
         webua->resp_page += "\"size\":" + std::to_string(flst[i].file_sz);

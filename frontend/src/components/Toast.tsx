@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
 
@@ -6,7 +6,6 @@ interface Toast {
   id: string
   message: string
   type: ToastType
-  timeoutId?: ReturnType<typeof setTimeout>
 }
 
 interface ToastContextType {
@@ -19,38 +18,39 @@ const ToastContext = createContext<ToastContextType | null>(null)
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
+  // Track timeouts in a ref to avoid cleanup issues when toasts state changes
+  const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   const addToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = Math.random().toString(36).slice(2)
 
-    // Auto-remove after 5 seconds and store timeout ID
+    // Auto-remove after 5 seconds
     const timeoutId = setTimeout(() => {
+      timeoutsRef.current.delete(id)
       setToasts((prev) => prev.filter((t) => t.id !== id))
     }, 5000)
 
-    setToasts((prev) => [...prev, { id, message, type, timeoutId }])
+    timeoutsRef.current.set(id, timeoutId)
+    setToasts((prev) => [...prev, { id, message, type }])
   }, [])
 
   const removeToast = useCallback((id: string) => {
-    setToasts((prev) => {
-      const toast = prev.find((t) => t.id === id)
-      if (toast?.timeoutId) {
-        clearTimeout(toast.timeoutId)
-      }
-      return prev.filter((t) => t.id !== id)
-    })
+    const timeoutId = timeoutsRef.current.get(id)
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutsRef.current.delete(id)
+    }
+    setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  // Cleanup all timeouts on unmount
+  // Cleanup all timeouts on unmount only
   useEffect(() => {
+    const timeouts = timeoutsRef.current
     return () => {
-      toasts.forEach((toast) => {
-        if (toast.timeoutId) {
-          clearTimeout(toast.timeoutId)
-        }
-      })
+      timeouts.forEach((timeoutId) => clearTimeout(timeoutId))
+      timeouts.clear()
     }
-  }, [toasts])
+  }, []) // Empty deps = only on unmount
 
   return (
     <ToastContext.Provider value={{ toasts, addToast, removeToast }}>

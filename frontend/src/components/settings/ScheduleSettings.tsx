@@ -12,41 +12,97 @@ export function ScheduleSettings({ config, onChange, getError }: ScheduleSetting
     return config[param]?.value ?? defaultValue;
   };
 
+  // Motion Detection Schedule
   const scheduleParams = String(getValue('schedule_params', ''));
-  const isScheduleEnabled = scheduleParams.trim() !== '';
+  const isMotionScheduleEnabled = scheduleParams.trim() !== '';
 
-  const handleEnableToggle = (enabled: boolean) => {
+  const handleMotionScheduleToggle = (enabled: boolean) => {
     if (!enabled) {
-      // Disable schedule by clearing the parameter
       onChange('schedule_params', '');
     } else {
-      // Enable with a default schedule (Mon-Fri business hours paused)
+      // Default: pause motion detection Mon-Fri 9am-5pm
       onChange('schedule_params', 'default=true action=pause mon-fri=0900-1700');
+    }
+  };
+
+  // Continuous Recording Schedule
+  const pictureScheduleParams = String(getValue('picture_schedule_params', ''));
+  const isPictureScheduleEnabled = pictureScheduleParams.trim() !== '';
+
+  const handlePictureScheduleToggle = (enabled: boolean) => {
+    if (!enabled) {
+      onChange('picture_schedule_params', '');
+    } else {
+      // Default: enable continuous recording Mon-Fri 9am-5pm
+      onChange('picture_schedule_params', 'default=false action=pause mon-fri=0900-1700');
     }
   };
 
   return (
     <FormSection
-      title="Motion Detection Schedule"
-      description="Configure when motion detection is active"
+      title="Schedules"
+      description="Configure when motion detection and continuous recording are active"
       collapsible
       defaultOpen={false}
     >
-      <div className="space-y-4">
-        <FormToggle
-          label="Enable Schedule"
-          value={isScheduleEnabled}
-          onChange={handleEnableToggle}
-          helpText="When enabled, motion detection follows the schedule below"
-        />
-
-        {isScheduleEnabled && (
-          <SchedulePicker
-            value={scheduleParams}
-            onChange={(val) => onChange('schedule_params', val)}
-            error={getError?.('schedule_params')}
+      <div className="space-y-6">
+        {/* Motion Detection Schedule */}
+        <div className="space-y-4">
+          <h4 className="text-sm font-medium border-b border-gray-700 pb-2">
+            Motion Detection Schedule
+          </h4>
+          <p className="text-xs text-gray-400">
+            Control when motion detection is active or paused
+          </p>
+          <FormToggle
+            label="Enable Motion Detection Schedule"
+            value={isMotionScheduleEnabled}
+            onChange={handleMotionScheduleToggle}
+            helpText="When enabled, motion detection follows the schedule below"
           />
-        )}
+
+          {isMotionScheduleEnabled && (
+            <SchedulePicker
+              value={scheduleParams}
+              onChange={(val) => onChange('schedule_params', val)}
+              error={getError?.('schedule_params')}
+            />
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-gray-700" />
+
+        {/* Continuous Recording Schedule */}
+        <div className="space-y-4">
+          <h4 className="text-sm font-medium border-b border-gray-700 pb-2">
+            Continuous Recording Schedule
+          </h4>
+          <p className="text-xs text-gray-400">
+            Control when continuous picture capture (timelapse) is active
+          </p>
+          <FormToggle
+            label="Enable Continuous Recording Schedule"
+            value={isPictureScheduleEnabled}
+            onChange={handlePictureScheduleToggle}
+            helpText="When enabled, continuous recording follows the schedule below"
+          />
+
+          {isPictureScheduleEnabled && (
+            <SchedulePicker
+              value={pictureScheduleParams}
+              onChange={(val) => onChange('picture_schedule_params', val)}
+              error={getError?.('picture_schedule_params')}
+            />
+          )}
+        </div>
+
+        {/* Backend Support Warning */}
+        <div className="p-3 bg-yellow-900/20 border border-yellow-600/30 rounded text-xs text-yellow-200">
+          <strong>Note:</strong> Continuous Recording Schedule configuration is available,
+          but backend support will be added in a future update. The schedule will be saved
+          but not enforced until backend implementation is complete.
+        </div>
       </div>
     </FormSection>
   );
