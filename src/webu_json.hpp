@@ -40,6 +40,7 @@
             void api_auth_status();
             void api_media_pictures();
             void api_media_movies();
+            void api_media_dates();
             void api_delete_picture();
             void api_delete_movie();
             void api_system_temperature();

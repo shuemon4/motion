@@ -1,10 +1,13 @@
-import { useState, useCallback, useMemo } from 'react'
-import { useCameras, usePictures, useMovies, useDeletePicture, useDeleteMovie } from '@/api/queries'
+import { useState, useCallback, useEffect } from 'react'
+import { useCameras, usePictures, useMovies, useMediaDates, useDeletePicture, useDeleteMovie } from '@/api/queries'
 import { useToast } from '@/components/Toast'
+import { Pagination } from '@/components/Pagination'
 import type { MediaItem } from '@/api/types'
 
 type MediaType = 'pictures' | 'movies'
 type ViewMode = 'all' | 'by-date'
+
+const PAGE_SIZE = 100
 
 // Parse date in YYYYMMDD format with optional time in HH:MM:SS format
 function parseDateAndTime(dateStr: string, timeStr?: string): Date | null {
@@ -31,60 +34,57 @@ function parseDateAndTime(dateStr: string, timeStr?: string): Date | null {
   return isNaN(date.getTime()) ? null : date
 }
 
-// Group items by date (YYYY-MM-DD)
-function groupByDate(items: MediaItem[]): Map<string, MediaItem[]> {
-  const groups = new Map<string, MediaItem[]>();
-  for (const item of items) {
-    // Convert YYYYMMDD to YYYY-MM-DD for grouping
-    const date = parseDateAndTime(item.date, item.time)
-    if (!date) continue // Skip invalid dates
-    const dateStr = date.toISOString().split('T')[0];
-    if (!groups.has(dateStr)) {
-      groups.set(dateStr, []);
-    }
-    groups.get(dateStr)!.push(item);
-  }
-  // Sort by date descending (newest first)
-  return new Map([...groups.entries()].sort((a, b) => b[0].localeCompare(a[0])));
-}
-
 export function Media() {
   const { addToast } = useToast()
   const [selectedCamera, setSelectedCamera] = useState(1)
   const [mediaType, setMediaType] = useState<MediaType>('pictures')
   const [viewMode, setViewMode] = useState<ViewMode>('all')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<MediaItem | null>(null)
 
+  const offset = page * PAGE_SIZE
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(0)
+  }, [selectedCamera, mediaType, selectedDate])
+
   const { data: cameras } = useCameras()
-  const { data: picturesData, isLoading: picturesLoading } = usePictures(selectedCamera)
-  const { data: moviesData, isLoading: moviesLoading } = useMovies(selectedCamera)
+
+  // Fetch paginated pictures/movies with optional date filter
+  const { data: picturesData, isLoading: picturesLoading } = usePictures(
+    selectedCamera,
+    offset,
+    PAGE_SIZE,
+    selectedDate
+  )
+  const { data: moviesData, isLoading: moviesLoading } = useMovies(
+    selectedCamera,
+    offset,
+    PAGE_SIZE,
+    selectedDate
+  )
+
+  // Fetch date summary when in by-date view mode
+  const { data: datesData } = useMediaDates(
+    selectedCamera,
+    mediaType === 'pictures' ? 'pic' : 'movie',
+    { enabled: viewMode === 'by-date' }
+  )
 
   const deletePictureMutation = useDeletePicture()
   const deleteMovieMutation = useDeleteMovie()
 
   const isLoading = mediaType === 'pictures' ? picturesLoading : moviesLoading
 
-  // Memoize allItems to prevent unstable references from conditional/nullish coalescing
-  const allItems = useMemo(() => {
-    return mediaType === 'pictures'
-      ? picturesData?.pictures ?? []
-      : moviesData?.movies ?? []
-  }, [mediaType, picturesData?.pictures, moviesData?.movies])
-
-  // Group items by date
-  const groupedItems = useMemo(() => groupByDate(allItems), [allItems])
-  const dateList = useMemo(() => Array.from(groupedItems.keys()), [groupedItems])
-
-  // Filter items based on view mode and selected date
-  const items = useMemo(() => {
-    if (viewMode === 'all') return allItems
-    if (selectedDate && groupedItems.has(selectedDate)) {
-      return groupedItems.get(selectedDate)!
-    }
-    return allItems
-  }, [viewMode, selectedDate, allItems, groupedItems])
+  // Get current media data
+  const currentData = mediaType === 'pictures' ? picturesData : moviesData
+  const items: MediaItem[] = mediaType === 'pictures'
+    ? (picturesData?.pictures ?? [])
+    : (moviesData?.movies ?? [])
+  const totalCount = currentData?.total_count ?? 0
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -170,7 +170,7 @@ export function Media() {
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
             >
-              Pictures ({picturesData?.pictures.length === 100 ? '100+' : picturesData?.pictures.length ?? 0})
+              Pictures ({picturesData?.total_count ?? 0})
             </button>
             <button
               onClick={() => setMediaType('movies')}
@@ -180,7 +180,7 @@ export function Media() {
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
             >
-              Movies ({moviesData?.movies.length === 100 ? '100+' : moviesData?.movies.length ?? 0})
+              Movies ({moviesData?.total_count ?? 0})
             </button>
           </div>
         </div>
@@ -209,14 +209,14 @@ export function Media() {
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
             >
-              By Date ({dateList.length})
+              By Date ({datesData?.dates.length ?? 0})
             </button>
           </div>
         </div>
       </div>
 
       {/* Date folder navigation */}
-      {viewMode === 'by-date' && dateList.length > 0 && (
+      {viewMode === 'by-date' && datesData && datesData.dates.length > 0 && (
         <div className="mb-6 p-4 bg-surface-elevated rounded-lg">
           <div className="flex items-center gap-2 mb-3">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,29 +233,40 @@ export function Media() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {dateList.map((date) => {
-              const count = groupedItems.get(date)?.length ?? 0;
-              const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString(undefined, {
+            {datesData.dates.map((dateItem) => {
+              const date = parseDateAndTime(dateItem.date);
+              const formattedDate = date ? date.toLocaleDateString(undefined, {
                 weekday: 'short',
                 month: 'short',
                 day: 'numeric',
-              });
+              }) : dateItem.date;
               return (
                 <button
-                  key={date}
-                  onClick={() => setSelectedDate(date)}
+                  key={dateItem.date}
+                  onClick={() => setSelectedDate(dateItem.date)}
                   className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                    selectedDate === date
+                    selectedDate === dateItem.date
                       ? 'bg-primary text-white'
                       : 'bg-surface hover:bg-surface-elevated'
                   }`}
                 >
-                  {formattedDate} ({count})
+                  {formattedDate} ({dateItem.count})
                 </button>
               );
             })}
           </div>
         </div>
+      )}
+
+      {/* Pagination Controls - Top */}
+      {!isLoading && totalCount > 0 && (
+        <Pagination
+          offset={offset}
+          limit={PAGE_SIZE}
+          total={totalCount}
+          onPageChange={(newOffset) => setPage(newOffset / PAGE_SIZE)}
+          context={selectedDate ? `on ${formatDate(selectedDate)}` : undefined}
+        />
       )}
 
       {/* Gallery Grid */}
@@ -344,6 +355,17 @@ export function Media() {
             </button>
           ))}
         </div>
+      )}
+
+      {/* Pagination Controls - Bottom */}
+      {!isLoading && totalCount > 0 && (
+        <Pagination
+          offset={offset}
+          limit={PAGE_SIZE}
+          total={totalCount}
+          onPageChange={(newOffset) => setPage(newOffset / PAGE_SIZE)}
+          context={selectedDate ? `on ${formatDate(selectedDate)}` : undefined}
+        />
       )}
 
       {/* Media Viewer Modal */}

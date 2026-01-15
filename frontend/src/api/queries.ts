@@ -6,6 +6,7 @@ import type {
   Camera,
   PicturesResponse,
   MoviesResponse,
+  DateSummaryResponse,
   TemperatureResponse,
   SystemStatus,
 } from './types';
@@ -16,6 +17,7 @@ export const queryKeys = {
   cameras: ['cameras'] as const,
   pictures: (camId: number) => ['pictures', camId] as const,
   movies: (camId: number) => ['movies', camId] as const,
+  mediaDates: (camId: number, type: 'pic' | 'movie') => ['media-dates', camId, type] as const,
   temperature: ['temperature'] as const,
   systemStatus: ['systemStatus'] as const,
 };
@@ -48,21 +50,53 @@ export function useCameras() {
   });
 }
 
-// Fetch pictures for a camera
-export function usePictures(camId: number) {
+// Fetch pictures for a camera with pagination
+export function usePictures(
+  camId: number,
+  offset: number = 0,
+  limit: number = 100,
+  date: string | null = null
+) {
   return useQuery({
-    queryKey: queryKeys.pictures(camId),
-    queryFn: () => apiGet<PicturesResponse>(`/${camId}/api/media/pictures`),
+    queryKey: [...queryKeys.pictures(camId), offset, limit, date],
+    queryFn: () => {
+      let url = `/${camId}/api/media/pictures?offset=${offset}&limit=${limit}`;
+      if (date) url += `&date=${date}`;
+      return apiGet<PicturesResponse>(url);
+    },
     staleTime: 30000, // Cache for 30 seconds
   });
 }
 
-// Fetch movies for a camera
-export function useMovies(camId: number) {
+// Fetch movies for a camera with pagination
+export function useMovies(
+  camId: number,
+  offset: number = 0,
+  limit: number = 100,
+  date: string | null = null
+) {
   return useQuery({
-    queryKey: queryKeys.movies(camId),
-    queryFn: () => apiGet<MoviesResponse>(`/${camId}/api/media/movies`),
+    queryKey: [...queryKeys.movies(camId), offset, limit, date],
+    queryFn: () => {
+      let url = `/${camId}/api/media/movies?offset=${offset}&limit=${limit}`;
+      if (date) url += `&date=${date}`;
+      return apiGet<MoviesResponse>(url);
+    },
     staleTime: 30000, // Cache for 30 seconds
+  });
+}
+
+// Fetch date summary for media type
+export function useMediaDates(
+  camId: number,
+  type: 'pic' | 'movie',
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: queryKeys.mediaDates(camId, type),
+    queryFn: () => apiGet<DateSummaryResponse>(`/${camId}/api/media/dates?type=${type}`),
+    staleTime: 60000, // Cache date summary longer (1 minute)
+    ...options,
   });
 }
 

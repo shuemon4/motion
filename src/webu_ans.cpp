@@ -1181,6 +1181,9 @@ void cls_webu_ans::answer_get()
         } else if (uri_cmd2 == "media" && uri_cmd3 == "movies") {
             webu_json->api_media_movies();
             mhd_send();
+        } else if (uri_cmd2 == "media" && uri_cmd3 == "dates") {
+            webu_json->api_media_dates();
+            mhd_send();
         } else if (uri_cmd2 == "system" && uri_cmd3 == "temperature") {
             webu_json->api_system_temperature();
             mhd_send();

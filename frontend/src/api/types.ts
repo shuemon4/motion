@@ -52,14 +52,35 @@ export interface MediaItem {
   thumbnail?: string; // Optional thumbnail URL for videos
 }
 
+// Pagination metadata
+export interface PaginationMeta {
+  total_count: number;
+  offset: number;
+  limit: number;
+  date_filter: string | null;
+}
+
 // Pictures API response from /{cam}/api/media/pictures
-export interface PicturesResponse {
+export interface PicturesResponse extends PaginationMeta {
   pictures: MediaItem[];
 }
 
 // Movies API response from /{cam}/api/media/movies
-export interface MoviesResponse {
+export interface MoviesResponse extends PaginationMeta {
   movies: MediaItem[];
+}
+
+// Date count entry
+export interface DateCount {
+  date: string;      // YYYYMMDD format
+  count: number;
+}
+
+// Date summary response from /{cam}/api/media/dates
+export interface DateSummaryResponse {
+  type: 'pic' | 'movie';
+  total_count: number;
+  dates: DateCount[];
 }
 
 // System temperature response from /0/api/system/temperature

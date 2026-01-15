@@ -972,23 +972,62 @@ void cls_webu_json::api_auth_status()
  */
 void cls_webu_json::api_media_pictures()
 {
-    vec_files flst;
-    std::string sql;
+    vec_files flst, flst_count;
+    std::string sql, where_clause;
+    int offset = 0, limit = 100;
+    int64_t total_count = 0;
+    const char* date_filter = nullptr;
 
     if (webua->cam == nullptr) {
         webua->bad_request();
         return;
     }
 
+    /* Parse query parameters */
+    const char* offset_str = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "offset");
+    const char* limit_str = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "limit");
+    date_filter = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "date");
+
+    if (offset_str) offset = std::max(0, atoi(offset_str));
+    if (limit_str) limit = std::min(std::max(1, atoi(limit_str)), 100); // Cap at 100
+
+    /* Build WHERE clause */
+    where_clause  = " where device_id = " + std::to_string(webua->cam->cfg->device_id);
+    where_clause += " and file_typ = 'pic'";
+    if (date_filter && strlen(date_filter) == 8) {
+        where_clause += " and file_dtl = " + std::string(date_filter);
+    }
+
+    /* Get total count - query just record_id for efficiency */
+    sql = " select record_id from motion " + where_clause + ";";
+    app->dbse->filelist_get(sql, flst_count);
+    total_count = flst_count.size();
+
+    /* Get paginated results */
     sql  = " select * from motion ";
-    sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
-    sql += " and file_typ = 'pic'";
+    sql += where_clause;
     sql += " order by file_dtl desc, file_tml desc";
-    sql += " limit 100;";
+    sql += " limit " + std::to_string(limit);
+    sql += " offset " + std::to_string(offset) + ";";
 
     app->dbse->filelist_get(sql, flst);
 
-    webua->resp_page = "{\"pictures\":[";
+    /* Build JSON response with pagination metadata */
+    webua->resp_page = "{";
+    webua->resp_page += "\"total_count\":" + std::to_string(total_count) + ",";
+    webua->resp_page += "\"offset\":" + std::to_string(offset) + ",";
+    webua->resp_page += "\"limit\":" + std::to_string(limit) + ",";
+    webua->resp_page += "\"date_filter\":";
+    if (date_filter) {
+        webua->resp_page += "\"" + std::string(date_filter) + "\"";
+    } else {
+        webua->resp_page += "null";
+    }
+    webua->resp_page += ",\"pictures\":[";
+
     for (size_t i = 0; i < flst.size(); i++) {
         if (i > 0) webua->resp_page += ",";
         webua->resp_page += "{";
@@ -1196,25 +1235,64 @@ void cls_webu_json::api_delete_movie()
  */
 void cls_webu_json::api_media_movies()
 {
-    vec_files flst;
-    std::string sql;
+    vec_files flst, flst_count;
+    std::string sql, where_clause, cam_id;
+    int offset = 0, limit = 100;
+    int64_t total_count = 0;
+    const char* date_filter = nullptr;
 
     if (webua->cam == nullptr) {
         webua->bad_request();
         return;
     }
 
+    cam_id = std::to_string(webua->cam->cfg->device_id);
+
+    /* Parse query parameters */
+    const char* offset_str = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "offset");
+    const char* limit_str = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "limit");
+    date_filter = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "date");
+
+    if (offset_str) offset = std::max(0, atoi(offset_str));
+    if (limit_str) limit = std::min(std::max(1, atoi(limit_str)), 100); // Cap at 100
+
+    /* Build WHERE clause */
+    where_clause  = " where device_id = " + cam_id;
+    where_clause += " and file_typ = 'movie'";
+    if (date_filter && strlen(date_filter) == 8) {
+        where_clause += " and file_dtl = " + std::string(date_filter);
+    }
+
+    /* Get total count - query just record_id for efficiency */
+    sql = " select record_id from motion " + where_clause + ";";
+    app->dbse->filelist_get(sql, flst_count);
+    total_count = flst_count.size();
+
+    /* Get paginated results */
     sql  = " select * from motion ";
-    sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
-    sql += " and file_typ = 'movie'";
+    sql += where_clause;
     sql += " order by file_dtl desc, file_tml desc";
-    sql += " limit 100;";
+    sql += " limit " + std::to_string(limit);
+    sql += " offset " + std::to_string(offset) + ";";
 
     app->dbse->filelist_get(sql, flst);
 
-    std::string cam_id = std::to_string(webua->cam->cfg->device_id);
+    /* Build JSON response with pagination metadata */
+    webua->resp_page = "{";
+    webua->resp_page += "\"total_count\":" + std::to_string(total_count) + ",";
+    webua->resp_page += "\"offset\":" + std::to_string(offset) + ",";
+    webua->resp_page += "\"limit\":" + std::to_string(limit) + ",";
+    webua->resp_page += "\"date_filter\":";
+    if (date_filter) {
+        webua->resp_page += "\"" + std::string(date_filter) + "\"";
+    } else {
+        webua->resp_page += "null";
+    }
+    webua->resp_page += ",\"movies\":[";
 
-    webua->resp_page = "{\"movies\":[";
     for (size_t i = 0; i < flst.size(); i++) {
         if (i > 0) webua->resp_page += ",";
         webua->resp_page += "{";
@@ -1236,6 +1314,71 @@ void cls_webu_json::api_media_movies()
 
         webua->resp_page += "}";
     }
+    webua->resp_page += "]}";
+    webua->resp_type = WEBUI_RESP_JSON;
+}
+
+/*
+ * React UI API: Date summary
+ * Returns list of dates with counts for a media type
+ * GET /{camId}/api/media/dates?type=movie
+ */
+void cls_webu_json::api_media_dates()
+{
+    vec_files flst;
+    std::string sql, file_typ;
+    std::map<std::string, int> date_counts;
+    int64_t total_count = 0;
+    const char* type_param;
+
+    if (webua->cam == nullptr) {
+        webua->bad_request();
+        return;
+    }
+
+    /* Parse type parameter (required) */
+    type_param = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "type");
+
+    if (!type_param || (strcmp(type_param, "pic") != 0 && strcmp(type_param, "movie") != 0)) {
+        webua->resp_page = "{\"error\":\"Invalid or missing 'type' parameter. Must be 'pic' or 'movie'\"}";
+        webua->resp_type = WEBUI_RESP_JSON;
+        return;
+    }
+
+    file_typ = type_param;
+
+    /* Query all records for this type to build date summary */
+    sql  = " select record_id, file_dtl from motion ";
+    sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
+    sql += " and file_typ = '" + file_typ + "'";
+    sql += " order by file_dtl desc;";
+
+    app->dbse->filelist_get(sql, flst);
+    total_count = flst.size();
+
+    /* Group by date */
+    for (size_t i = 0; i < flst.size(); i++) {
+        std::string date_str = std::to_string(flst[i].file_dtl);
+        date_counts[date_str]++;
+    }
+
+    /* Build JSON response */
+    webua->resp_page = "{";
+    webua->resp_page += "\"type\":\"" + file_typ + "\",";
+    webua->resp_page += "\"total_count\":" + std::to_string(total_count) + ",";
+    webua->resp_page += "\"dates\":[";
+
+    bool first = true;
+    for (const auto& pair : date_counts) {
+        if (!first) webua->resp_page += ",";
+        webua->resp_page += "{";
+        webua->resp_page += "\"date\":\"" + pair.first + "\",";
+        webua->resp_page += "\"count\":" + std::to_string(pair.second);
+        webua->resp_page += "}";
+        first = false;
+    }
+
     webua->resp_page += "]}";
     webua->resp_type = WEBUI_RESP_JSON;
 }
