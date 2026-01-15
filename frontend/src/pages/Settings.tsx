@@ -17,6 +17,7 @@ import { MovieSettings } from '@/components/settings/MovieSettings'
 import { StorageSettings } from '@/components/settings/StorageSettings'
 import { ScheduleSettings } from '@/components/settings/ScheduleSettings'
 import { PreferencesSettings } from '@/components/settings/PreferencesSettings'
+import { PlaybackSettings } from '@/components/settings/PlaybackSettings'
 import { MaskEditor } from '@/components/settings/MaskEditor'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { UploadSettings } from '@/components/settings/UploadSettings'
@@ -107,24 +108,29 @@ export function Settings() {
   const isDirty = Object.keys(changes).length > 0
   const hasValidationErrors = Object.keys(validationErrors).length > 0
 
+  // Get the original config for the selected camera (without pending changes)
+  // Used to detect modified fields and show indicators
+  const originalConfig = useMemo(() => {
+    if (!config) return {}
+    const defaultConfig = config.configuration.default || {}
+
+    if (selectedCamera === '0') {
+      return defaultConfig
+    } else {
+      const cameraConfig = config.configuration[`cam${selectedCamera}`] || {}
+      // Merge: camera-specific values override defaults
+      return { ...defaultConfig, ...cameraConfig }
+    }
+  }, [config, selectedCamera])
+
   // Get the active config for the selected camera
   // Merges camera-specific config with defaults (camera values override defaults)
   // Also merges in pending changes so UI reflects unsaved edits
   const activeConfig = useMemo(() => {
     if (!config) return {}
-    const defaultConfig = config.configuration.default || {}
 
-    let baseConfig: Record<string, ConfigParam>
-    if (selectedCamera === '0') {
-      baseConfig = defaultConfig
-    } else {
-      const cameraConfig = config.configuration[`cam${selectedCamera}`] || {}
-      // Merge: camera-specific values override defaults
-      baseConfig = { ...defaultConfig, ...cameraConfig }
-    }
-
-    // Merge pending changes into config so child components see updated values
-    const mergedConfig = { ...baseConfig }
+    // Start with originalConfig and merge pending changes
+    const mergedConfig = { ...originalConfig }
     for (const [param, value] of Object.entries(changes)) {
       if (mergedConfig[param]) {
         mergedConfig[param] = { ...mergedConfig[param], value }
@@ -135,7 +141,7 @@ export function Settings() {
     }
 
     return mergedConfig
-  }, [config, selectedCamera, changes])
+  }, [config, originalConfig, changes])
 
   const handleSave = async () => {
     if (!isDirty) {
@@ -373,7 +379,22 @@ export function Settings() {
               To configure camera-specific settings, select a camera from the dropdown above.
             </p>
           </div>
-          <SystemSettings config={activeConfig} onChange={handleChange} getError={getError} />
+          <SystemSettings config={activeConfig} onChange={handleChange} getError={getError} originalConfig={originalConfig} />
+
+          {/* UI Preferences - Global only */}
+          <PreferencesSettings />
+
+          {/* About - Global only */}
+          <FormSection
+            title="About"
+            description="Motion version information"
+            collapsible
+            defaultOpen={false}
+          >
+            <p className="text-sm text-gray-400">
+              Motion Version: {config.version}
+            </p>
+          </FormSection>
         </>
       )}
 
@@ -398,6 +419,7 @@ export function Settings() {
             onChange={handleChange}
             getError={getError}
             capabilities={capabilities}
+            originalConfig={originalConfig}
           />
 
           {/* 4. Movie Settings */}
@@ -443,6 +465,7 @@ export function Settings() {
             config={activeConfig}
             onChange={handleChange}
             getError={getError}
+            originalConfig={originalConfig}
           />
 
           {/* 11. Text Overlay */}
@@ -465,22 +488,11 @@ export function Settings() {
             onChange={handleChange}
             getError={getError}
           />
+
+          {/* 14. Playback Settings - Camera only (extracted from UI Preferences) */}
+          <PlaybackSettings />
         </>
       )}
-
-      {/* Always visible */}
-      <PreferencesSettings />
-
-      <FormSection
-        title="About"
-        description="Motion version information"
-        collapsible
-        defaultOpen={false}
-      >
-        <p className="text-sm text-gray-400">
-          Motion Version: {config.version}
-        </p>
-      </FormSection>
     </div>
   )
 }

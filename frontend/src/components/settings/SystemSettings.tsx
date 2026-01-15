@@ -6,13 +6,19 @@ export interface SystemSettingsProps {
   config: Record<string, { value: string | number | boolean }>
   onChange: (param: string, value: string | number | boolean) => void
   getError?: (param: string) => string | undefined
+  /** Original config from server (without pending changes) - used for modified indicators */
+  originalConfig?: Record<string, { value: string | number | boolean }>
 }
 
-export function SystemSettings({ config, onChange, getError }: SystemSettingsProps) {
+export function SystemSettings({ config, onChange, getError, originalConfig }: SystemSettingsProps) {
   const { addToast } = useToast()
 
   const getValue = (param: string, defaultValue: string | number | boolean = '') => {
     return config[param]?.value ?? defaultValue
+  }
+
+  const getOriginalValue = (param: string, defaultValue: string | number | boolean = '') => {
+    return originalConfig?.[param]?.value ?? defaultValue
   }
 
   const handleReboot = async () => {
@@ -47,44 +53,112 @@ export function SystemSettings({ config, onChange, getError }: SystemSettingsPro
 
   return (
     <>
-      {/* Authentication Section - FIRST and PROMINENT */}
+      {/* Device Controls - FIRST section for quick access */}
+      <FormSection
+        title="Device Controls"
+        description="System power management"
+        collapsible
+        defaultOpen={false}
+      >
+        <div className="flex gap-3">
+          <button
+            onClick={handleReboot}
+            className="px-4 py-2 bg-yellow-600/20 text-yellow-300 hover:bg-yellow-600/30 rounded-lg text-sm transition-colors"
+          >
+            Restart Pi
+          </button>
+          <button
+            onClick={handleShutdown}
+            className="px-4 py-2 bg-red-600/20 text-red-300 hover:bg-red-600/30 rounded-lg text-sm transition-colors"
+          >
+            Shutdown Pi
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Requires <code className="text-xs bg-surface-base px-1 rounded">webcontrol_actions power=on</code> in config
+        </p>
+      </FormSection>
+
+      {/* Authentication Section */}
       <FormSection
         title="Authentication"
-        description="Web interface login credentials"
+        description="Web interface and stream access credentials"
         collapsible
         defaultOpen={true}
       >
-        <p className="text-xs text-gray-400 mb-4">
-          Configure web interface authentication. Format: username:password or username:ha1hash
-        </p>
-        <FormSelect
-          label="Auth Method"
-          value={String(getValue('webcontrol_auth_method', '0'))}
-          onChange={(val) => onChange('webcontrol_auth_method', val)}
-          options={[
-            { value: '0', label: 'None - No authentication' },
-            { value: '1', label: 'Basic - Simple username/password' },
-            { value: '2', label: 'Digest - More secure hash-based' },
-          ]}
-          helpText="Authentication for direct stream access and external API clients. The web UI uses session login instead."
-          error={getError?.('webcontrol_auth_method')}
-        />
-        <FormInput
-          label="Admin Credentials"
-          value={String(getValue('webcontrol_authentication', ''))}
-          onChange={(val) => onChange('webcontrol_authentication', val)}
-          type="password"
-          helpText="Administrator username:password (full access to all settings)"
-          error={getError?.('webcontrol_authentication')}
-        />
-        <FormInput
-          label="Viewer Credentials"
-          value={String(getValue('webcontrol_user_authentication', ''))}
-          onChange={(val) => onChange('webcontrol_user_authentication', val)}
-          type="password"
-          helpText="View-only username:password (can view streams but not change settings)"
-          error={getError?.('webcontrol_user_authentication')}
-        />
+        {/* Web Interface Subsection */}
+        <div className="mb-6">
+          <h4 className="font-medium text-sm mb-3 text-gray-300">Web Interface</h4>
+          <p className="text-xs text-gray-400 mb-4">
+            Credentials for logging into this web interface. Format: username:password
+          </p>
+          <FormInput
+            label="Admin Username"
+            value={String(getValue('webcontrol_authentication', '')).split(':')[0] || ''}
+            onChange={(val) => {
+              const currentPass = String(getValue('webcontrol_authentication', '')).split(':')[1] || '';
+              onChange('webcontrol_authentication', val ? `${val}:${currentPass}` : '');
+            }}
+            helpText="Administrator username (full access to all settings)"
+            error={getError?.('webcontrol_authentication')}
+            originalValue={String(getOriginalValue('webcontrol_authentication', '')).split(':')[0] || ''}
+            showVisibilityToggle={false}
+          />
+          <FormInput
+            label="Admin Password"
+            value={String(getValue('webcontrol_authentication', '')).split(':')[1] || ''}
+            onChange={(val) => {
+              const currentUser = String(getValue('webcontrol_authentication', '')).split(':')[0] || '';
+              onChange('webcontrol_authentication', currentUser ? `${currentUser}:${val}` : '');
+            }}
+            type="password"
+            helpText="Administrator password (click eye icon to reveal)"
+            originalValue={String(getOriginalValue('webcontrol_authentication', '')).split(':')[1] || ''}
+          />
+          <FormInput
+            label="Viewer Username"
+            value={String(getValue('webcontrol_user_authentication', '')).split(':')[0] || ''}
+            onChange={(val) => {
+              const currentPass = String(getValue('webcontrol_user_authentication', '')).split(':')[1] || '';
+              onChange('webcontrol_user_authentication', val ? `${val}:${currentPass}` : '');
+            }}
+            helpText="View-only username (can view streams but not change settings)"
+            error={getError?.('webcontrol_user_authentication')}
+            originalValue={String(getOriginalValue('webcontrol_user_authentication', '')).split(':')[0] || ''}
+            showVisibilityToggle={false}
+          />
+          <FormInput
+            label="Viewer Password"
+            value={String(getValue('webcontrol_user_authentication', '')).split(':')[1] || ''}
+            onChange={(val) => {
+              const currentUser = String(getValue('webcontrol_user_authentication', '')).split(':')[0] || '';
+              onChange('webcontrol_user_authentication', currentUser ? `${currentUser}:${val}` : '');
+            }}
+            type="password"
+            helpText="View-only password (click eye icon to reveal)"
+            originalValue={String(getOriginalValue('webcontrol_user_authentication', '')).split(':')[1] || ''}
+          />
+        </div>
+
+        {/* Direct Stream Subsection */}
+        <div className="border-t border-surface-elevated pt-4">
+          <h4 className="font-medium text-sm mb-3 text-gray-300">Direct Stream Access</h4>
+          <p className="text-xs text-gray-400 mb-4">
+            Authentication for direct stream URLs (embedded in websites, VLC, home automation)
+          </p>
+          <FormSelect
+            label="Authentication Mode"
+            value={String(getValue('webcontrol_auth_method', '0'))}
+            onChange={(val) => onChange('webcontrol_auth_method', val)}
+            options={[
+              { value: '0', label: 'None - No authentication required' },
+              { value: '1', label: 'Basic - Simple username/password (use with HTTPS)' },
+              { value: '2', label: 'Digest - Secure hash-based (recommended)' },
+            ]}
+            helpText="Controls authentication for direct stream access and external API clients. The web UI uses session-based login instead."
+            error={getError?.('webcontrol_auth_method')}
+          />
+        </div>
       </FormSection>
 
       {/* Daemon Settings Section */}
@@ -106,6 +180,7 @@ export function SystemSettings({ config, onChange, getError }: SystemSettingsPro
           onChange={(val) => onChange('pid_file', val)}
           helpText="Path to process ID file (leave empty for default)"
           error={getError?.('pid_file')}
+          originalValue={String(getOriginalValue('pid_file', ''))}
         />
         <FormInput
           label="Log File"
@@ -113,6 +188,7 @@ export function SystemSettings({ config, onChange, getError }: SystemSettingsPro
           onChange={(val) => onChange('log_file', val)}
           helpText="Path to Motion log file"
           error={getError?.('log_file')}
+          originalValue={String(getOriginalValue('log_file', ''))}
         />
         <FormSelect
           label="Log Level"
@@ -148,6 +224,7 @@ export function SystemSettings({ config, onChange, getError }: SystemSettingsPro
           type="number"
           helpText="Primary web server port"
           error={getError?.('webcontrol_port')}
+          originalValue={String(getOriginalValue('webcontrol_port', '8080'))}
         />
         <FormToggle
           label="Localhost Only"
@@ -179,32 +256,6 @@ export function SystemSettings({ config, onChange, getError }: SystemSettingsPro
             />
           </>
         )}
-      </FormSection>
-
-      {/* Device Controls - reboot/shutdown buttons */}
-      <FormSection
-        title="Device Controls"
-        description="System power management"
-        collapsible
-        defaultOpen={false}
-      >
-        <div className="flex gap-3">
-          <button
-            onClick={handleReboot}
-            className="px-4 py-2 bg-yellow-600/20 text-yellow-300 hover:bg-yellow-600/30 rounded-lg text-sm transition-colors"
-          >
-            Restart Pi
-          </button>
-          <button
-            onClick={handleShutdown}
-            className="px-4 py-2 bg-red-600/20 text-red-300 hover:bg-red-600/30 rounded-lg text-sm transition-colors"
-          >
-            Shutdown Pi
-          </button>
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-          Requires <code className="text-xs bg-surface-base px-1 rounded">webcontrol_actions power=on</code> in config
-        </p>
       </FormSection>
     </>
   )

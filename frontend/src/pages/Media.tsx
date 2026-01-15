@@ -6,11 +6,28 @@ import type { MediaItem } from '@/api/types'
 type MediaType = 'pictures' | 'movies'
 type ViewMode = 'all' | 'by-date'
 
-// Parse timestamp with validation
-function parseTimestamp(dateStr: string): Date | null {
-  const timestamp = parseInt(dateStr, 10)
-  if (isNaN(timestamp)) return null
-  const date = new Date(timestamp * 1000)
+// Parse date in YYYYMMDD format with optional time in HH:MM:SS format
+function parseDateAndTime(dateStr: string, timeStr?: string): Date | null {
+  // dateStr is YYYYMMDD format (e.g., "20250115")
+  if (!dateStr || dateStr.length !== 8) return null
+
+  const year = parseInt(dateStr.substring(0, 4), 10)
+  const month = parseInt(dateStr.substring(4, 6), 10) - 1 // JS months are 0-indexed
+  const day = parseInt(dateStr.substring(6, 8), 10)
+
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return null
+
+  let hours = 0, minutes = 0, seconds = 0
+  if (timeStr) {
+    const timeParts = timeStr.split(':')
+    if (timeParts.length >= 2) {
+      hours = parseInt(timeParts[0], 10) || 0
+      minutes = parseInt(timeParts[1], 10) || 0
+      seconds = parseInt(timeParts[2], 10) || 0
+    }
+  }
+
+  const date = new Date(year, month, day, hours, minutes, seconds)
   return isNaN(date.getTime()) ? null : date
 }
 
@@ -18,8 +35,8 @@ function parseTimestamp(dateStr: string): Date | null {
 function groupByDate(items: MediaItem[]): Map<string, MediaItem[]> {
   const groups = new Map<string, MediaItem[]>();
   for (const item of items) {
-    // Convert timestamp to date string
-    const date = parseTimestamp(item.date)
+    // Convert YYYYMMDD to YYYY-MM-DD for grouping
+    const date = parseDateAndTime(item.date, item.time)
     if (!date) continue // Skip invalid dates
     const dateStr = date.toISOString().split('T')[0];
     if (!groups.has(dateStr)) {
@@ -75,8 +92,8 @@ export function Media() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  const formatDate = (dateStr: string) => {
-    const date = parseTimestamp(dateStr)
+  const formatDate = (dateStr: string, timeStr?: string) => {
+    const date = parseDateAndTime(dateStr, timeStr)
     if (!date) return 'Unknown date'
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
   }
@@ -153,7 +170,7 @@ export function Media() {
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
             >
-              Pictures ({picturesData?.pictures.length ?? 0})
+              Pictures ({picturesData?.pictures.length === 100 ? '100+' : picturesData?.pictures.length ?? 0})
             </button>
             <button
               onClick={() => setMediaType('movies')}
@@ -163,7 +180,7 @@ export function Media() {
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
             >
-              Movies ({moviesData?.movies.length ?? 0})
+              Movies ({moviesData?.movies.length === 100 ? '100+' : moviesData?.movies.length ?? 0})
             </button>
           </div>
         </div>
@@ -321,7 +338,7 @@ export function Media() {
                 <p className="text-sm font-medium truncate">{item.filename}</p>
                 <div className="flex justify-between text-xs text-gray-400 mt-1">
                   <span>{formatSize(item.size)}</span>
-                  <span>{formatDate(item.date)}</span>
+                  <span>{formatDate(item.date, item.time)}</span>
                 </div>
               </div>
             </button>
@@ -343,7 +360,7 @@ export function Media() {
               <div>
                 <h3 className="font-medium">{selectedItem.filename}</h3>
                 <p className="text-sm text-gray-400">
-                  {formatSize(selectedItem.size)} • {formatDate(selectedItem.date)}
+                  {formatSize(selectedItem.size)} • {formatDate(selectedItem.date, selectedItem.time)}
                 </p>
               </div>
               <div className="flex gap-2">

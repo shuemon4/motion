@@ -12,11 +12,17 @@ export interface LibcameraSettingsProps {
   onChange: (param: string, value: string | number | boolean) => void;
   getError?: (param: string) => string | undefined;
   capabilities?: CameraCapabilities;
+  /** Original config from server (without pending changes) - used for modified indicators */
+  originalConfig?: Record<string, { value: string | number | boolean }>;
 }
 
-export function LibcameraSettings({ config, onChange, getError, capabilities }: LibcameraSettingsProps) {
+export function LibcameraSettings({ config, onChange, getError, capabilities, originalConfig }: LibcameraSettingsProps) {
   const getValue = (param: string, defaultValue: string | number | boolean = '') => {
     return config[param]?.value ?? defaultValue;
+  };
+
+  const getOriginalValue = (param: string, defaultValue: string | number | boolean = '') => {
+    return originalConfig?.[param]?.value ?? defaultValue;
   };
 
   const awbEnabled = Boolean(getValue('libcam_awb_enable', false));
@@ -240,6 +246,7 @@ export function LibcameraSettings({ config, onChange, getError, capabilities }: 
         type="number"
         helpText="Frame buffers for capture (2-8). Higher values reduce frame drops under load but use more memory. Default 4 works for most setups; increase to 6-8 if seeing drops at high framerates."
         error={getError?.('libcam_buffer_count')}
+        originalValue={String(getOriginalValue('libcam_buffer_count', 4))}
       />
     </FormSection>
   );

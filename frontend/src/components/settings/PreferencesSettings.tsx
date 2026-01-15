@@ -120,6 +120,7 @@ export function PreferencesSettings() {
         <div className="border-t border-surface-elevated pt-4">
           <h4 className="font-medium mb-3">Appearance</h4>
 
+          {/* TODO: Enable when theme feature is implemented */}
           <FormSelect
             label="Theme"
             value={preferences.theme}
@@ -130,6 +131,7 @@ export function PreferencesSettings() {
               { value: 'auto', label: 'Auto (System Preference)' },
             ]}
             helpText="UI color theme"
+            disabled={true}
           />
 
           <div className="text-xs text-yellow-200 bg-yellow-600/10 border border-yellow-600/30 p-3 rounded">

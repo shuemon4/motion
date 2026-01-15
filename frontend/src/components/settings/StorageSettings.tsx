@@ -4,11 +4,17 @@ export interface StorageSettingsProps {
   config: Record<string, { value: string | number | boolean }>;
   onChange: (param: string, value: string | number | boolean) => void;
   getError?: (param: string) => string | undefined;
+  /** Original config from server (without pending changes) - used for modified indicators */
+  originalConfig?: Record<string, { value: string | number | boolean }>;
 }
 
-export function StorageSettings({ config, onChange, getError }: StorageSettingsProps) {
+export function StorageSettings({ config, onChange, getError, originalConfig }: StorageSettingsProps) {
   const getValue = (param: string, defaultValue: string | number | boolean = '') => {
     return config[param]?.value ?? defaultValue;
+  };
+
+  const getOriginalValue = (param: string, defaultValue: string | number | boolean = '') => {
+    return originalConfig?.[param]?.value ?? defaultValue;
   };
 
   // Format code reference for help text
@@ -38,6 +44,7 @@ export function StorageSettings({ config, onChange, getError }: StorageSettingsP
           onChange={(val) => onChange('target_dir', val)}
           helpText="Root directory for ALL camera files. Picture and movie filename patterns (configured in their sections) create paths relative to this directory."
           error={getError?.('target_dir')}
+          originalValue={String(getOriginalValue('target_dir', '/var/lib/motion'))}
         />
 
         <div className="border-t border-surface-elevated pt-4">
