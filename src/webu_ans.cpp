@@ -1075,6 +1075,9 @@ void cls_webu_ans::answer_delete()
         } else if (uri_cmd3 == "movie") {
             webu_json->api_delete_movie();
             mhd_send();
+        } else if (uri_cmd3 == "folders" && uri_cmd4 == "files") {
+            webu_json->api_delete_folder_files();
+            mhd_send();
         } else {
             bad_request();
         }
@@ -1183,6 +1186,9 @@ void cls_webu_ans::answer_get()
             mhd_send();
         } else if (uri_cmd2 == "media" && uri_cmd3 == "dates") {
             webu_json->api_media_dates();
+            mhd_send();
+        } else if (uri_cmd2 == "media" && uri_cmd3 == "folders") {
+            webu_json->api_media_folders();
             mhd_send();
         } else if (uri_cmd2 == "system" && uri_cmd3 == "temperature") {
             webu_json->api_system_temperature();

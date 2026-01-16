@@ -41,8 +41,10 @@
             void api_media_pictures();
             void api_media_movies();
             void api_media_dates();
+            void api_media_folders();          /* GET /{camId}/api/media/folders */
             void api_delete_picture();
             void api_delete_movie();
+            void api_delete_folder_files();    /* DELETE /{camId}/api/media/folders/files */
             void api_system_temperature();
             void api_system_status();
             void api_system_reboot();     /* POST /0/api/system/reboot */

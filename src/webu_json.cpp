@@ -42,6 +42,8 @@
 #include <vector>
 #include <thread>
 #include <sys/statvfs.h>
+#include <dirent.h>
+#include <set>
 
 /* CPU-efficient polygon fill using scanline algorithm
  * Fills polygon interior with specified value in bitmap
@@ -1381,6 +1383,470 @@ void cls_webu_json::api_media_dates()
 
     webua->resp_page += "]}";
     webua->resp_type = WEBUI_RESP_JSON;
+}
+
+/* Media file extension checking helpers */
+static bool is_media_extension(const std::string &ext)
+{
+    static const std::set<std::string> media_exts = {
+        ".mp4", ".mkv", ".avi", ".webm", ".mov",
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp"
+    };
+    std::string lower_ext = ext;
+    std::transform(lower_ext.begin(), lower_ext.end(), lower_ext.begin(), ::tolower);
+    return media_exts.find(lower_ext) != media_exts.end();
+}
+
+static bool is_thumbnail(const std::string &filename)
+{
+    return filename.length() > 10 &&
+           filename.substr(filename.length() - 10) == ".thumb.jpg";
+}
+
+static std::string get_file_extension(const std::string &filename)
+{
+    size_t dot_pos = filename.rfind('.');
+    if (dot_pos == std::string::npos || dot_pos == 0) return "";
+    return filename.substr(dot_pos);
+}
+
+/* Validate path is safe (no traversal, within target_dir) */
+static bool validate_folder_path(const std::string &target_dir, const std::string &rel_path,
+                                 std::string &full_path)
+{
+    /* Check for path traversal attempts */
+    if (rel_path.find("..") != std::string::npos) {
+        return false;
+    }
+
+    /* Build full path */
+    full_path = target_dir;
+    if (!full_path.empty() && full_path.back() != '/') {
+        full_path += '/';
+    }
+    if (!rel_path.empty()) {
+        full_path += rel_path;
+    }
+
+    /* Resolve symlinks and check real path is still under target_dir */
+    char resolved[PATH_MAX];
+    if (realpath(full_path.c_str(), resolved) == nullptr) {
+        /* Path doesn't exist - that's ok for empty folder case */
+        return true;
+    }
+
+    std::string real_path(resolved);
+    char target_resolved[PATH_MAX];
+    if (realpath(target_dir.c_str(), target_resolved) == nullptr) {
+        return false;
+    }
+    std::string real_target(target_resolved);
+
+    /* Ensure resolved path starts with target_dir */
+    if (real_path.length() < real_target.length() ||
+        real_path.substr(0, real_target.length()) != real_target) {
+        return false;
+    }
+
+    /* Ensure it's either exactly target_dir or has a / separator after */
+    if (real_path.length() > real_target.length() &&
+        real_path[real_target.length()] != '/') {
+        return false;
+    }
+
+    return true;
+}
+
+/*
+ * React UI API: Folder-based media browsing
+ * GET /{camId}/api/media/folders?path=rel/path&offset=0&limit=100
+ * Returns folders and media files in the specified directory
+ */
+void cls_webu_json::api_media_folders()
+{
+    vec_files flst;
+    std::string sql, target_dir, full_path;
+    int offset = 0, limit = 100;
+    const char* path_param = nullptr;
+    std::string rel_path;
+
+    if (webua->cam == nullptr) {
+        webua->bad_request();
+        return;
+    }
+
+    /* Get target directory for this camera */
+    target_dir = webua->cam->cfg->target_dir;
+    if (target_dir.empty()) {
+        webua->resp_page = "{\"error\":\"Target directory not configured\"}";
+        webua->resp_type = WEBUI_RESP_JSON;
+        return;
+    }
+
+    /* Parse query parameters */
+    path_param = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "path");
+    const char* offset_str = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "offset");
+    const char* limit_str = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "limit");
+
+    if (path_param) rel_path = path_param;
+    if (offset_str) offset = std::max(0, atoi(offset_str));
+    if (limit_str) limit = std::min(std::max(1, atoi(limit_str)), 100);
+
+    /* Validate and build full path */
+    if (!validate_folder_path(target_dir, rel_path, full_path)) {
+        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+            _("Path traversal attempt blocked: %s from %s"),
+            rel_path.c_str(), webua->clientip.c_str());
+        webua->resp_page = "{\"error\":\"Invalid path\"}";
+        webua->resp_type = WEBUI_RESP_JSON;
+        return;
+    }
+
+    /* Open directory */
+    DIR *dir = opendir(full_path.c_str());
+    if (dir == nullptr) {
+        webua->resp_page = "{\"error\":\"Directory not found\"}";
+        webua->resp_type = WEBUI_RESP_JSON;
+        return;
+    }
+
+    /* Scan directory entries */
+    struct dirent *entry;
+    std::vector<std::pair<std::string, std::string>> folders; /* name, path */
+    std::vector<std::string> media_files;
+
+    while ((entry = readdir(dir)) != nullptr) {
+        std::string name = entry->d_name;
+
+        /* Skip . and .. */
+        if (name == "." || name == "..") continue;
+
+        /* Skip hidden files */
+        if (name[0] == '.') continue;
+
+        std::string entry_path = full_path + "/" + name;
+        struct stat st;
+        if (stat(entry_path.c_str(), &st) != 0) continue;
+
+        if (S_ISDIR(st.st_mode)) {
+            /* Directory - add to folders list */
+            std::string folder_rel = rel_path.empty() ? name : rel_path + "/" + name;
+            folders.push_back({name, folder_rel});
+        } else if (S_ISREG(st.st_mode)) {
+            /* Regular file - check if it's a media file (not thumbnail) */
+            std::string ext = get_file_extension(name);
+            if (is_media_extension(ext) && !is_thumbnail(name)) {
+                media_files.push_back(name);
+            }
+        }
+    }
+    closedir(dir);
+
+    /* Sort folders and files alphabetically */
+    std::sort(folders.begin(), folders.end());
+    std::sort(media_files.begin(), media_files.end());
+
+    /* Calculate folder statistics (file count, total size) */
+    std::string cam_id = std::to_string(webua->cam->cfg->device_id);
+
+    /* Build JSON response */
+    webua->resp_page = "{";
+    webua->resp_page += "\"path\":\"" + escstr(rel_path) + "\",";
+
+    /* Parent path for navigation */
+    if (rel_path.empty()) {
+        webua->resp_page += "\"parent\":null,";
+    } else {
+        size_t last_slash = rel_path.rfind('/');
+        std::string parent = (last_slash == std::string::npos) ? "" : rel_path.substr(0, last_slash);
+        webua->resp_page += "\"parent\":\"" + escstr(parent) + "\",";
+    }
+
+    /* Folders */
+    webua->resp_page += "\"folders\":[";
+    for (size_t i = 0; i < folders.size(); i++) {
+        if (i > 0) webua->resp_page += ",";
+
+        /* Count files in this folder (from database) */
+        std::string folder_path = full_path + "/" + folders[i].first;
+        int64_t file_count = 0;
+        int64_t total_size = 0;
+
+        /* Count by scanning directory */
+        DIR *subdir = opendir(folder_path.c_str());
+        if (subdir != nullptr) {
+            struct dirent *subentry;
+            while ((subentry = readdir(subdir)) != nullptr) {
+                std::string subname = subentry->d_name;
+                if (subname == "." || subname == "..") continue;
+                std::string subpath = folder_path + "/" + subname;
+                struct stat sub_st;
+                if (stat(subpath.c_str(), &sub_st) == 0 && S_ISREG(sub_st.st_mode)) {
+                    std::string ext = get_file_extension(subname);
+                    if (is_media_extension(ext) && !is_thumbnail(subname)) {
+                        file_count++;
+                        total_size += sub_st.st_size;
+                    }
+                }
+            }
+            closedir(subdir);
+        }
+
+        webua->resp_page += "{";
+        webua->resp_page += "\"name\":\"" + escstr(folders[i].first) + "\",";
+        webua->resp_page += "\"path\":\"" + escstr(folders[i].second) + "\",";
+        webua->resp_page += "\"file_count\":" + std::to_string(file_count) + ",";
+        webua->resp_page += "\"total_size\":" + std::to_string(total_size);
+        webua->resp_page += "}";
+    }
+    webua->resp_page += "],";
+
+    /* Files with pagination */
+    int total_files = (int)media_files.size();
+    int start_idx = std::min(offset, total_files);
+    int end_idx = std::min(offset + limit, total_files);
+
+    webua->resp_page += "\"files\":[";
+    for (int i = start_idx; i < end_idx; i++) {
+        if (i > start_idx) webua->resp_page += ",";
+
+        std::string filename = media_files[i];
+        std::string file_path = full_path + "/" + filename;
+        struct stat st;
+        stat(file_path.c_str(), &st);
+
+        /* Determine file type */
+        std::string ext = get_file_extension(filename);
+        std::string file_type = "movie";
+        if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" ||
+            ext == ".gif" || ext == ".bmp") {
+            file_type = "picture";
+        }
+
+        /* Look up in database for metadata */
+        sql = " select * from motion ";
+        sql += " where device_id = " + cam_id;
+        sql += " and file_nm = '" + filename + "'";
+        sql += " limit 1;";
+        flst.clear();
+        app->dbse->filelist_get(sql, flst);
+
+        webua->resp_page += "{";
+
+        if (!flst.empty()) {
+            webua->resp_page += "\"id\":" + std::to_string(flst[0].record_id) + ",";
+            webua->resp_page += "\"date\":\"" + std::to_string(flst[0].file_dtl) + "\",";
+            webua->resp_page += "\"time\":\"" + escstr(flst[0].file_tml) + "\",";
+        } else {
+            webua->resp_page += "\"id\":0,";
+            /* Extract date from filename if possible (common format: camera-YYYYMMDD...) */
+            webua->resp_page += "\"date\":\"\",";
+            webua->resp_page += "\"time\":\"\",";
+        }
+
+        webua->resp_page += "\"filename\":\"" + escstr(filename) + "\",";
+
+        /* Build URL path for access */
+        if (file_type == "movie") {
+            std::string url_path = "/" + cam_id + "/movies/";
+            if (!rel_path.empty()) url_path += rel_path + "/";
+            url_path += filename;
+            webua->resp_page += "\"path\":\"" + escstr(url_path) + "\",";
+
+            /* Check for thumbnail */
+            std::string thumb_file = file_path + ".thumb.jpg";
+            struct stat thumb_st;
+            if (stat(thumb_file.c_str(), &thumb_st) == 0) {
+                webua->resp_page += "\"thumbnail\":\"" + escstr(url_path + ".thumb.jpg") + "\",";
+            }
+        } else {
+            /* Pictures use direct file path */
+            webua->resp_page += "\"path\":\"" + escstr(file_path) + "\",";
+        }
+
+        webua->resp_page += "\"type\":\"" + file_type + "\",";
+        webua->resp_page += "\"size\":" + std::to_string(st.st_size);
+        webua->resp_page += "}";
+    }
+    webua->resp_page += "],";
+
+    webua->resp_page += "\"total_files\":" + std::to_string(total_files) + ",";
+    webua->resp_page += "\"offset\":" + std::to_string(offset) + ",";
+    webua->resp_page += "\"limit\":" + std::to_string(limit);
+    webua->resp_page += "}";
+    webua->resp_type = WEBUI_RESP_JSON;
+}
+
+/*
+ * React UI API: Delete all media files in a folder
+ * DELETE /{camId}/api/media/folders/files?path=rel/path
+ * Deletes media files only (not subfolders or non-media files)
+ * Also deletes associated thumbnails
+ */
+void cls_webu_json::api_delete_folder_files()
+{
+    std::string target_dir, full_path, sql;
+    const char* path_param = nullptr;
+    std::string rel_path;
+    int deleted_movies = 0, deleted_pictures = 0, deleted_thumbnails = 0;
+    std::vector<std::string> errors;
+
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Camera not specified\"}";
+        return;
+    }
+
+    /* Require admin role */
+    if (webua->auth_role != "admin") {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+            _("Delete folder files denied - requires admin role (from %s)"),
+            webua->clientip.c_str());
+        webua->resp_page = "{\"error\":\"Admin access required\"}";
+        return;
+    }
+
+    /* Check if delete action is enabled */
+    for (int indx = 0; indx < webu->wb_actions->params_cnt; indx++) {
+        if (webu->wb_actions->params_array[indx].param_name == "delete") {
+            if (webu->wb_actions->params_array[indx].param_value == "off") {
+                MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, "Delete action disabled");
+                webua->resp_page = "{\"error\":\"Delete action is disabled\"}";
+                return;
+            }
+            break;
+        }
+    }
+
+    /* Get path parameter (required) */
+    path_param = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "path");
+
+    if (path_param == nullptr) {
+        webua->resp_page = "{\"error\":\"Path parameter required\"}";
+        return;
+    }
+    rel_path = path_param;
+
+    /* Get target directory for this camera */
+    target_dir = webua->cam->cfg->target_dir;
+    if (target_dir.empty()) {
+        webua->resp_page = "{\"error\":\"Target directory not configured\"}";
+        return;
+    }
+
+    /* Validate and build full path */
+    if (!validate_folder_path(target_dir, rel_path, full_path)) {
+        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+            _("Path traversal attempt blocked: %s from %s"),
+            rel_path.c_str(), webua->clientip.c_str());
+        webua->resp_page = "{\"error\":\"Invalid path\"}";
+        return;
+    }
+
+    /* Open directory */
+    DIR *dir = opendir(full_path.c_str());
+    if (dir == nullptr) {
+        webua->resp_page = "{\"error\":\"Directory not found\"}";
+        return;
+    }
+
+    MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
+        "Delete all media files in folder '%s' requested by %s",
+        rel_path.c_str(), webua->clientip.c_str());
+
+    /* Collect media files to delete */
+    struct dirent *entry;
+    std::vector<std::string> files_to_delete;
+    std::vector<std::string> thumbs_to_delete;
+
+    while ((entry = readdir(dir)) != nullptr) {
+        std::string name = entry->d_name;
+        if (name == "." || name == "..") continue;
+
+        std::string entry_path = full_path + "/" + name;
+        struct stat st;
+        if (stat(entry_path.c_str(), &st) != 0) continue;
+
+        if (S_ISREG(st.st_mode)) {
+            std::string ext = get_file_extension(name);
+            if (is_thumbnail(name)) {
+                /* Track thumbnails separately - they'll be deleted with their movie */
+                continue;
+            } else if (is_media_extension(ext)) {
+                files_to_delete.push_back(entry_path);
+                /* Check for associated thumbnail */
+                std::string thumb_path = entry_path + ".thumb.jpg";
+                struct stat thumb_st;
+                if (stat(thumb_path.c_str(), &thumb_st) == 0) {
+                    thumbs_to_delete.push_back(thumb_path);
+                }
+            }
+        }
+    }
+    closedir(dir);
+
+    std::string cam_id = std::to_string(webua->cam->cfg->device_id);
+
+    /* Delete files */
+    for (const auto& file_path : files_to_delete) {
+        std::string ext = get_file_extension(file_path);
+        bool is_movie = (ext == ".mp4" || ext == ".mkv" || ext == ".avi" ||
+                        ext == ".webm" || ext == ".mov");
+
+        if (remove(file_path.c_str()) == 0) {
+            if (is_movie) {
+                deleted_movies++;
+            } else {
+                deleted_pictures++;
+            }
+
+            /* Delete from database */
+            size_t last_slash = file_path.rfind('/');
+            std::string filename = (last_slash == std::string::npos) ?
+                file_path : file_path.substr(last_slash + 1);
+
+            sql = "delete from motion where device_id = " + cam_id +
+                  " and file_nm = '" + filename + "'";
+            app->dbse->exec_sql(sql);
+        } else {
+            errors.push_back("Failed to delete: " + file_path);
+            MOTION_LOG(ERR, TYPE_STREAM, SHOW_ERRNO,
+                _("Failed to delete file: %s"), file_path.c_str());
+        }
+    }
+
+    /* Delete thumbnails */
+    for (const auto& thumb_path : thumbs_to_delete) {
+        if (remove(thumb_path.c_str()) == 0) {
+            deleted_thumbnails++;
+        }
+    }
+
+    MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
+        "Deleted %d movies, %d pictures, %d thumbnails from '%s'",
+        deleted_movies, deleted_pictures, deleted_thumbnails, rel_path.c_str());
+
+    /* Build response */
+    webua->resp_page = "{";
+    webua->resp_page += "\"success\":true,";
+    webua->resp_page += "\"deleted\":{";
+    webua->resp_page += "\"movies\":" + std::to_string(deleted_movies) + ",";
+    webua->resp_page += "\"pictures\":" + std::to_string(deleted_pictures) + ",";
+    webua->resp_page += "\"thumbnails\":" + std::to_string(deleted_thumbnails);
+    webua->resp_page += "},";
+    webua->resp_page += "\"errors\":[";
+    for (size_t i = 0; i < errors.size(); i++) {
+        if (i > 0) webua->resp_page += ",";
+        webua->resp_page += "\"" + escstr(errors[i]) + "\"";
+    }
+    webua->resp_page += "],";
+    webua->resp_page += "\"path\":\"" + escstr(rel_path) + "\"";
+    webua->resp_page += "}";
 }
 
 /*

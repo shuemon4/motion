@@ -83,6 +83,49 @@ export interface DateSummaryResponse {
   dates: DateCount[];
 }
 
+// Folder item from /{cam}/api/media/folders
+export interface FolderItem {
+  name: string;
+  path: string;
+  file_count: number;
+  total_size: number;
+}
+
+// File item from folder browsing
+export interface FolderFileItem {
+  id: number;
+  filename: string;
+  path: string;
+  type: 'movie' | 'picture';
+  date: string;
+  time: string;
+  size: number;
+  thumbnail?: string;
+}
+
+// Folder contents response from /{cam}/api/media/folders
+export interface FolderContentsResponse {
+  path: string;
+  parent: string | null;
+  folders: FolderItem[];
+  files: FolderFileItem[];
+  total_files: number;
+  offset: number;
+  limit: number;
+}
+
+// Delete folder files response from DELETE /{cam}/api/media/folders/files
+export interface DeleteFolderFilesResponse {
+  success: boolean;
+  deleted: {
+    movies: number;
+    pictures: number;
+    thumbnails: number;
+  };
+  errors: string[];
+  path: string;
+}
+
 // System temperature response from /0/api/system/temperature
 export interface TemperatureResponse {
   celsius: number;

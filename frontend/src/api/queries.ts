@@ -7,6 +7,8 @@ import type {
   PicturesResponse,
   MoviesResponse,
   DateSummaryResponse,
+  FolderContentsResponse,
+  DeleteFolderFilesResponse,
   TemperatureResponse,
   SystemStatus,
 } from './types';
@@ -18,6 +20,7 @@ export const queryKeys = {
   pictures: (camId: number) => ['pictures', camId] as const,
   movies: (camId: number) => ['movies', camId] as const,
   mediaDates: (camId: number, type: 'pic' | 'movie') => ['media-dates', camId, type] as const,
+  mediaFolders: (camId: number, path: string) => ['media-folders', camId, path] as const,
   temperature: ['temperature'] as const,
   systemStatus: ['systemStatus'] as const,
 };
@@ -55,7 +58,8 @@ export function usePictures(
   camId: number,
   offset: number = 0,
   limit: number = 100,
-  date: string | null = null
+  date: string | null = null,
+  options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: [...queryKeys.pictures(camId), offset, limit, date],
@@ -65,6 +69,7 @@ export function usePictures(
       return apiGet<PicturesResponse>(url);
     },
     staleTime: 30000, // Cache for 30 seconds
+    ...options,
   });
 }
 
@@ -73,7 +78,8 @@ export function useMovies(
   camId: number,
   offset: number = 0,
   limit: number = 100,
-  date: string | null = null
+  date: string | null = null,
+  options?: { enabled?: boolean }
 ) {
   return useQuery({
     queryKey: [...queryKeys.movies(camId), offset, limit, date],
@@ -83,6 +89,7 @@ export function useMovies(
       return apiGet<MoviesResponse>(url);
     },
     staleTime: 30000, // Cache for 30 seconds
+    ...options,
   });
 }
 
@@ -97,6 +104,49 @@ export function useMediaDates(
     queryFn: () => apiGet<DateSummaryResponse>(`/${camId}/api/media/dates?type=${type}`),
     staleTime: 60000, // Cache date summary longer (1 minute)
     ...options,
+  });
+}
+
+// Fetch folder contents for media browsing
+export function useMediaFolders(
+  camId: number,
+  path: string = '',
+  offset: number = 0,
+  limit: number = 100,
+  options?: { enabled?: boolean }
+) {
+  return useQuery({
+    queryKey: [...queryKeys.mediaFolders(camId, path), offset, limit],
+    queryFn: () => {
+      let url = `/${camId}/api/media/folders?offset=${offset}&limit=${limit}`;
+      if (path) url += `&path=${encodeURIComponent(path)}`;
+      return apiGet<FolderContentsResponse>(url);
+    },
+    staleTime: 30000, // Cache for 30 seconds
+    ...options,
+  });
+}
+
+// Delete all media files in a folder
+export function useDeleteFolderFiles() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ camId, path }: { camId: number; path: string }) => {
+      return apiDelete<DeleteFolderFilesResponse>(
+        `/${camId}/api/media/folders/files?path=${encodeURIComponent(path)}`
+      );
+    },
+    onSuccess: (_, { camId, path }) => {
+      // Invalidate folder cache for this path and parent
+      queryClient.invalidateQueries({ queryKey: queryKeys.mediaFolders(camId, path) });
+      // Also invalidate parent folder to update file counts
+      const parentPath = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '';
+      queryClient.invalidateQueries({ queryKey: queryKeys.mediaFolders(camId, parentPath) });
+      // Invalidate pictures and movies caches as well
+      queryClient.invalidateQueries({ queryKey: queryKeys.pictures(camId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.movies(camId) });
+    },
   });
 }
 
