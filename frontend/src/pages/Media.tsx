@@ -2,9 +2,21 @@ import { useState, useCallback, useEffect } from 'react'
 import { useCameras, usePictures, useMovies, useMediaDates, useDeletePicture, useDeleteMovie } from '@/api/queries'
 import { useToast } from '@/components/Toast'
 import { Pagination } from '@/components/Pagination'
+import { getSessionToken } from '@/api/session'
 import type { MediaItem } from '@/api/types'
 
 type MediaType = 'pictures' | 'movies'
+
+/**
+ * Append session token to media URL for authentication
+ * Required because img/video tags can't send custom headers
+ */
+function getAuthenticatedUrl(url: string): string {
+  const token = getSessionToken()
+  if (!token) return url
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}token=${encodeURIComponent(token)}`
+}
 type ViewMode = 'all' | 'by-date'
 
 const PAGE_SIZE = 100
@@ -314,14 +326,14 @@ export function Media() {
               <div className="aspect-video bg-surface flex items-center justify-center relative overflow-hidden">
                 {mediaType === 'pictures' ? (
                   <img
-                    src={item.path}
+                    src={getAuthenticatedUrl(item.path)}
                     alt={item.filename}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
                 ) : item.thumbnail ? (
                   <img
-                    src={item.thumbnail}
+                    src={getAuthenticatedUrl(item.thumbnail)}
                     alt={item.filename}
                     className="w-full h-full object-cover"
                     loading="lazy"
@@ -387,7 +399,7 @@ export function Media() {
               </div>
               <div className="flex gap-2">
                 <a
-                  href={selectedItem.path}
+                  href={getAuthenticatedUrl(selectedItem.path)}
                   download={selectedItem.filename}
                   className="px-3 py-1 bg-primary hover:bg-primary-hover rounded text-sm"
                   onClick={(e) => e.stopPropagation()}
@@ -414,13 +426,13 @@ export function Media() {
             <div className="p-4">
               {mediaType === 'pictures' ? (
                 <img
-                  src={selectedItem.path}
+                  src={getAuthenticatedUrl(selectedItem.path)}
                   alt={selectedItem.filename}
                   className="w-full h-auto max-h-[70vh] object-contain"
                 />
               ) : (
                 <video
-                  src={selectedItem.path}
+                  src={getAuthenticatedUrl(selectedItem.path)}
                   controls
                   className="w-full h-auto max-h-[70vh]"
                   autoPlay

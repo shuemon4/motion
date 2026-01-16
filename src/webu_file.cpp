@@ -173,9 +173,28 @@ void cls_webu_file::main() {
     }
 
     full_nm = "";
+
+    /* Check if this is a thumbnail request (.thumb.jpg suffix) */
+    std::string requested_file = webua->uri_cmd2;
+    bool is_thumbnail = false;
+    const std::string thumb_suffix = ".thumb.jpg";
+
+    if (requested_file.length() > thumb_suffix.length() &&
+        requested_file.substr(requested_file.length() - thumb_suffix.length()) == thumb_suffix) {
+        /* Strip suffix to get base video filename for database lookup */
+        requested_file = requested_file.substr(0, requested_file.length() - thumb_suffix.length());
+        is_thumbnail = true;
+    }
+
     for (indx=0;indx<(int)flst.size();indx++) {
-        if (flst[indx].file_nm == webua->uri_cmd2) {
-            full_nm = flst[indx].full_nm;
+        if (flst[indx].file_nm == requested_file) {
+            if (is_thumbnail) {
+                /* Serve the thumbnail file alongside the video */
+                full_nm = flst[indx].full_nm + ".thumb.jpg";
+            } else {
+                full_nm = flst[indx].full_nm;
+            }
+            break;
         }
     }
 
