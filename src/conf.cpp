@@ -863,8 +863,9 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     static const std::vector<std::string> movie_encoder_preset_values = {"ultrafast","superfast","veryfast","faster","fast","medium","slow","slower","veryslow"};
     if (name == "movie_encoder_preset") return edit_generic_list(movie_encoder_preset, parm, pact, "medium", movie_encoder_preset_values);
 
-    static const std::vector<std::string> movie_container_values = {"mkv","mp4","3gp"};
-    if (name == "movie_container") return edit_generic_list(movie_container, parm, pact, "mp4", movie_container_values);
+    // movie_container accepts extended syntax: "container" or "container:codec"
+    // e.g., "mp4", "mp4:libx264", "mkv:h264_v4l2m2m" - parsed in movie.cpp init_container()
+    if (name == "movie_container") return edit_generic_string(movie_container, parm, pact, "mp4");
 
     if (name == "movie_passthrough") return edit_generic_bool(movie_passthrough, parm, pact, false);
 

@@ -170,7 +170,7 @@ export function Media() {
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
             >
-              Pictures ({picturesData?.total_count ?? 0})
+              Pictures
             </button>
             <button
               onClick={() => setMediaType('movies')}
@@ -180,7 +180,7 @@ export function Media() {
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
             >
-              Movies ({moviesData?.total_count ?? 0})
+              Movies
             </button>
           </div>
         </div>

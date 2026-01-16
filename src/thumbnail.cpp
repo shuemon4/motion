@@ -306,11 +306,15 @@ cleanup:
 
 int cls_thumbnail::encode_thumbnail(AVFrame *frame, const std::string &thumb_path)
 {
+    uint8_t *src_buffer = nullptr;
     uint8_t *scaled_buffer = nullptr;
     unsigned char *jpg_buffer = nullptr;
+    struct SwsContext *swsctx = nullptr;
+    AVFrame *yuv_frame = nullptr;
     int jpg_size = 0;
     int thumb_h;
     int jpg_buffer_size;
+    int src_buffer_size;
     int retcd = -1;
     FILE *f = nullptr;
 
@@ -320,6 +324,16 @@ int cls_thumbnail::encode_thumbnail(AVFrame *frame, const std::string &thumb_pat
     /* Ensure even dimensions for YUV420 */
     thumb_h = (thumb_h / 2) * 2;
 
+    /* Calculate buffer size for source YUV420P data */
+    src_buffer_size = (frame->width * frame->height * 3) / 2;
+
+    /* Allocate buffer for source YUV420P conversion */
+    src_buffer = (uint8_t*)mymalloc((size_t)src_buffer_size);
+    if (src_buffer == nullptr) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, _("Failed to allocate source buffer"));
+        goto cleanup;
+    }
+
     /* Allocate buffer for scaled YUV image */
     scaled_buffer = (uint8_t*)mymalloc(THUMB_WIDTH * thumb_h * 3 / 2);
     if (scaled_buffer == nullptr) {
@@ -327,8 +341,46 @@ int cls_thumbnail::encode_thumbnail(AVFrame *frame, const std::string &thumb_pat
         goto cleanup;
     }
 
-    /* Scale image using existing utility function */
-    util_resize(frame->data[0], frame->width, frame->height,
+    /* Create SwsContext to convert decoded frame to YUV420P contiguous buffer */
+    swsctx = sws_getContext(
+        frame->width, frame->height, (enum AVPixelFormat)frame->format,
+        frame->width, frame->height, AV_PIX_FMT_YUV420P,
+        SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
+    if (swsctx == nullptr) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, _("Failed to create sws context"));
+        goto cleanup;
+    }
+
+    /* Allocate output frame for YUV420P conversion */
+    yuv_frame = av_frame_alloc();
+    if (yuv_frame == nullptr) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, _("Failed to allocate YUV frame"));
+        goto cleanup;
+    }
+
+    /* Fill the output frame arrays pointing to our contiguous buffer */
+    retcd = av_image_fill_arrays(
+        yuv_frame->data, yuv_frame->linesize,
+        src_buffer, AV_PIX_FMT_YUV420P,
+        frame->width, frame->height, 1);
+    if (retcd < 0) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, _("Failed to fill YUV frame arrays"));
+        goto cleanup;
+    }
+
+    /* Convert frame to YUV420P in contiguous buffer */
+    retcd = sws_scale(
+        swsctx,
+        (const uint8_t* const*)frame->data, frame->linesize,
+        0, frame->height,
+        yuv_frame->data, yuv_frame->linesize);
+    if (retcd < 0) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, _("Failed to convert frame to YUV420P"));
+        goto cleanup;
+    }
+
+    /* Now src_buffer contains contiguous YUV420P data - scale it */
+    util_resize(src_buffer, frame->width, frame->height,
                 scaled_buffer, THUMB_WIDTH, thumb_h);
 
     /* Allocate buffer for JPEG output (estimate max size) */
@@ -374,6 +426,15 @@ cleanup:
     }
     if (scaled_buffer != nullptr) {
         free(scaled_buffer);
+    }
+    if (src_buffer != nullptr) {
+        free(src_buffer);
+    }
+    if (yuv_frame != nullptr) {
+        av_frame_free(&yuv_frame);
+    }
+    if (swsctx != nullptr) {
+        sws_freeContext(swsctx);
     }
 
     return retcd;

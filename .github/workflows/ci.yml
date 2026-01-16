@@ -86,13 +86,11 @@ jobs:
         uses: actions/checkout@main
 
       - name: Configure build
-        env:
-          # Workaround for Alpine OpenEXR/Imath transitive dependency issue
-          # OpenCV's imgcodecs requires OpenEXR (Imf) and Imath but pkg-config doesn't pull them in
-          LIBS: ${{ matrix.libc == 'musl' && '-lOpenEXR -lImath' || '' }}
         run: |
           autoreconf -fiv
-          CONFIG_SHELL=/bin/bash ./configure CC=${{ matrix.cc }} CXX=${{ matrix.cxx }}
+          # Pass LIBS directly to configure for Alpine OpenEXR/Imath transitive dependency issue
+          # OpenCV's imgcodecs requires OpenEXR (Imf) and Imath but pkg-config doesn't pull them in
+          CONFIG_SHELL=/bin/bash ./configure CC=${{ matrix.cc }} CXX=${{ matrix.cxx }} ${{ matrix.libc == 'musl' && 'LIBS="-lOpenEXR -lImath"' || '' }}
 
       - name: Build target
         run: |

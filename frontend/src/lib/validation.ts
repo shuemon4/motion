@@ -20,9 +20,15 @@ export const deviceNamePattern = /^[A-Za-z0-9\-_+ ]*$/
 /**
  * Filename patterns (for snapshot_filename, picture_filename, movie_filename)
  * Allows: letters, numbers, spaces, parentheses, forward slashes, dots, underscores, hyphens
- * Also allows strftime format codes: %C, %Y, %m, %d, %H, %M, %S, %q, %v
+ * Also allows:
+ * - strftime format codes: %Y, %m, %d, %H, %M, %S, etc.
+ * - Motion single-letter tokens: %v (camera), %q (event), %Q (labels), %t (device),
+ *   %C (event string), %w (width), %h (height), %f (filename), %$ (device name)
+ * - Motion curly-brace tokens: %{movienbr}, %{eventid}, %{host}, %{fps}, %{ver},
+ *   %{sdevx}, %{sdevy}, %{sdevxy}, %{ratio}, %{action_user}, %{secdetect}
+ * - Optional width specifier: %05{movienbr}, %2v, etc.
  */
-export const filenamePattern = /^([A-Za-z0-9 ()/._-]|%[CYmdHMSqv])*$/
+export const filenamePattern = /^([A-Za-z0-9 ()/._-]|%\d*[CYmdHMSqvQtwhf$]|%\d*\{[a-z_]+\})*$/
 
 /**
  * Directory paths (for target_dir, etc.)
@@ -62,7 +68,10 @@ export const deviceNameSchema = z
 export const filenameSchema = z
   .string()
   .max(255, 'Filename must be 255 characters or less')
-  .regex(filenamePattern, 'Filename contains invalid characters. Use letters, numbers, underscores, hyphens, and strftime codes (%Y, %m, %d, etc.)')
+  .regex(filenamePattern, 'Filename contains invalid characters. Use letters, numbers, underscores, hyphens, strftime codes (%Y, %m, %d), and Motion tokens (%{movienbr}, %v, etc.)')
+  .refine((val) => !hasPathTraversal(val), {
+    message: 'Filename cannot contain directory traversal sequences (.. or ~/)',
+  })
 
 /**
  * Directory path validation

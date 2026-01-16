@@ -129,7 +129,7 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
 
         <FormSelect
           label="Container Format"
-          value={String(getValue('movie_container', 'mkv'))}
+          value={String(getValue('movie_container', 'mp4'))}
           onChange={(val) => onChange('movie_container', val)}
           options={getAvailableContainers()}
           helpText="Video container format. Hardware encoding requires v4l2m2m support."
