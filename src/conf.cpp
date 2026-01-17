@@ -715,7 +715,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "timelapse_fps") return edit_generic_int(timelapse_fps, parm, pact, 30, 1, 100);
     if (name == "webcontrol_port") return edit_generic_int(webcontrol_port, parm, pact, 8080, 0, 65535);
     if (name == "webcontrol_port2") return edit_generic_int(webcontrol_port2, parm, pact, 8081, 0, 65535);
-    if (name == "webcontrol_parms") return edit_generic_int(webcontrol_parms, parm, pact, 2, 0, 3);
+    if (name == "webcontrol_parms") return edit_generic_int(webcontrol_parms, parm, pact, 3, 0, 3);
     if (name == "webcontrol_lock_minutes") return edit_generic_int(webcontrol_lock_minutes, parm, pact, 5, 0, INT_MAX);
     if (name == "webcontrol_lock_attempts") return edit_generic_int(webcontrol_lock_attempts, parm, pact, 5, 1, INT_MAX);
     if (name == "webcontrol_session_timeout") return edit_generic_int(webcontrol_session_timeout, parm, pact, 3600, 60, INT_MAX);

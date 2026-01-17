@@ -41,6 +41,8 @@
 #include <algorithm>
 #include <vector>
 #include <thread>
+#include <functional>
+#include <unordered_map>
 #include <sys/statvfs.h>
 #include <dirent.h>
 #include <set>
@@ -119,6 +121,68 @@ static std::string build_mask_path(cls_camera *cam, const std::string &type)
     }
     return target + "/cam" + std::to_string(cam->cfg->device_id) +
            "_" + type + ".pgm";
+}
+
+/* Hot-reload parameter dispatch table
+ * Maps parameter names to lambda functions that apply the change to a camera
+ * This replaces the 28-branch if/else chain with O(1) hash map lookup
+ */
+namespace {
+    using HotReloadFunc = std::function<void(cls_camera*, const std::string&)>;
+
+    const std::unordered_map<std::string, HotReloadFunc> hot_reload_map = {
+        {"libcam_brightness", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_brightness(atof(val.c_str()));
+        }},
+        {"libcam_contrast", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_contrast(atof(val.c_str()));
+        }},
+        {"libcam_gain", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_gain(atof(val.c_str()));
+        }},
+        {"libcam_awb_enable", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_awb_enable(val == "true" || val == "1");
+        }},
+        {"libcam_awb_mode", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_awb_mode(atoi(val.c_str()));
+        }},
+        {"libcam_awb_locked", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_awb_locked(val == "true" || val == "1");
+        }},
+        {"libcam_colour_temp", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_colour_temp(atoi(val.c_str()));
+        }},
+        {"libcam_colour_gain_r", [](cls_camera *cam, const std::string &val) {
+            float r = atof(val.c_str());
+            float b = cam->cfg->parm_cam.libcam_colour_gain_b;
+            cam->set_libcam_colour_gains(r, b);
+        }},
+        {"libcam_colour_gain_b", [](cls_camera *cam, const std::string &val) {
+            float r = cam->cfg->parm_cam.libcam_colour_gain_r;
+            float b = atof(val.c_str());
+            cam->set_libcam_colour_gains(r, b);
+        }},
+        {"libcam_af_mode", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_af_mode(atoi(val.c_str()));
+        }},
+        {"libcam_lens_position", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_lens_position(atof(val.c_str()));
+        }},
+        {"libcam_af_range", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_af_range(atoi(val.c_str()));
+        }},
+        {"libcam_af_speed", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_af_speed(atoi(val.c_str()));
+        }},
+        {"libcam_af_trigger", [](cls_camera *cam, const std::string &val) {
+            int v = atoi(val.c_str());
+            if (v == 0) {
+                cam->trigger_libcam_af_scan();
+            } else {
+                cam->cancel_libcam_af_scan();
+            }
+        }},
+    };
 }
 
 std::string cls_webu_json::escstr(std::string invar)
@@ -674,6 +738,19 @@ bool cls_webu_json::validate_hot_reload(const std::string &parm_name, int &parm_
 }
 
 /*
+ * Hot Reload Helper: Apply hot-reloadable parameter to a specific camera
+ * Uses lookup table for O(1) dispatch instead of if/else chain
+ */
+void cls_webu_json::apply_hot_reload_to_camera(cls_camera *cam,
+    const std::string &parm_name, const std::string &parm_val)
+{
+    auto it = hot_reload_map.find(parm_name);
+    if (it != hot_reload_map.end()) {
+        it->second(cam, parm_val);
+    }
+}
+
+/*
  * Hot Reload API: Apply parameter change to config
  */
 void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val)
@@ -684,93 +761,16 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
         /* Update default config */
         app->cfg->edit_set(parm_name, parm_val);
 
-        /* Update all running cameras */
+        /* Update all running cameras - currently unreachable from UI but kept for
+         * future "Apply to All Cameras" feature and external API clients */
         for (int indx = 0; indx < app->cam_cnt; indx++) {
             app->cam_list[indx]->cfg->edit_set(parm_name, parm_val);
-
-            /* Apply libcam brightness/contrast/gain/AWB changes immediately */
-            if (parm_name == "libcam_brightness") {
-                app->cam_list[indx]->set_libcam_brightness(atof(parm_val.c_str()));
-            } else if (parm_name == "libcam_contrast") {
-                app->cam_list[indx]->set_libcam_contrast(atof(parm_val.c_str()));
-            } else if (parm_name == "libcam_gain") {
-                app->cam_list[indx]->set_libcam_gain(atof(parm_val.c_str()));
-            } else if (parm_name == "libcam_awb_enable") {
-                app->cam_list[indx]->set_libcam_awb_enable(parm_val == "true" || parm_val == "1");
-            } else if (parm_name == "libcam_awb_mode") {
-                app->cam_list[indx]->set_libcam_awb_mode(atoi(parm_val.c_str()));
-            } else if (parm_name == "libcam_awb_locked") {
-                app->cam_list[indx]->set_libcam_awb_locked(parm_val == "true" || parm_val == "1");
-            } else if (parm_name == "libcam_colour_temp") {
-                app->cam_list[indx]->set_libcam_colour_temp(atoi(parm_val.c_str()));
-            } else if (parm_name == "libcam_colour_gain_r") {
-                float r = atof(parm_val.c_str());
-                float b = app->cam_list[indx]->cfg->parm_cam.libcam_colour_gain_b;
-                app->cam_list[indx]->set_libcam_colour_gains(r, b);
-            } else if (parm_name == "libcam_colour_gain_b") {
-                float r = app->cam_list[indx]->cfg->parm_cam.libcam_colour_gain_r;
-                float b = atof(parm_val.c_str());
-                app->cam_list[indx]->set_libcam_colour_gains(r, b);
-            } else if (parm_name == "libcam_af_mode") {
-                app->cam_list[indx]->set_libcam_af_mode(atoi(parm_val.c_str()));
-            } else if (parm_name == "libcam_lens_position") {
-                app->cam_list[indx]->set_libcam_lens_position(atof(parm_val.c_str()));
-            } else if (parm_name == "libcam_af_range") {
-                app->cam_list[indx]->set_libcam_af_range(atoi(parm_val.c_str()));
-            } else if (parm_name == "libcam_af_speed") {
-                app->cam_list[indx]->set_libcam_af_speed(atoi(parm_val.c_str()));
-            } else if (parm_name == "libcam_af_trigger") {
-                int val = atoi(parm_val.c_str());
-                if (val == 0) {
-                    app->cam_list[indx]->trigger_libcam_af_scan();
-                } else {
-                    app->cam_list[indx]->cancel_libcam_af_scan();
-                }
-            }
+            apply_hot_reload_to_camera(app->cam_list[indx], parm_name, parm_val);
         }
     } else if (webua->cam != nullptr) {
         /* Update specific camera only */
         webua->cam->cfg->edit_set(parm_name, parm_val);
-
-        /* Apply libcam brightness/contrast/gain/AWB changes immediately */
-        if (parm_name == "libcam_brightness") {
-            webua->cam->set_libcam_brightness(atof(parm_val.c_str()));
-        } else if (parm_name == "libcam_contrast") {
-            webua->cam->set_libcam_contrast(atof(parm_val.c_str()));
-        } else if (parm_name == "libcam_gain") {
-            webua->cam->set_libcam_gain(atof(parm_val.c_str()));
-        } else if (parm_name == "libcam_awb_enable") {
-            webua->cam->set_libcam_awb_enable(parm_val == "true" || parm_val == "1");
-        } else if (parm_name == "libcam_awb_mode") {
-            webua->cam->set_libcam_awb_mode(atoi(parm_val.c_str()));
-        } else if (parm_name == "libcam_awb_locked") {
-            webua->cam->set_libcam_awb_locked(parm_val == "true" || parm_val == "1");
-        } else if (parm_name == "libcam_colour_temp") {
-            webua->cam->set_libcam_colour_temp(atoi(parm_val.c_str()));
-        } else if (parm_name == "libcam_colour_gain_r") {
-            float r = atof(parm_val.c_str());
-            float b = webua->cam->cfg->parm_cam.libcam_colour_gain_b;
-            webua->cam->set_libcam_colour_gains(r, b);
-        } else if (parm_name == "libcam_colour_gain_b") {
-            float r = webua->cam->cfg->parm_cam.libcam_colour_gain_r;
-            float b = atof(parm_val.c_str());
-            webua->cam->set_libcam_colour_gains(r, b);
-        } else if (parm_name == "libcam_af_mode") {
-            webua->cam->set_libcam_af_mode(atoi(parm_val.c_str()));
-        } else if (parm_name == "libcam_lens_position") {
-            webua->cam->set_libcam_lens_position(atof(parm_val.c_str()));
-        } else if (parm_name == "libcam_af_range") {
-            webua->cam->set_libcam_af_range(atoi(parm_val.c_str()));
-        } else if (parm_name == "libcam_af_speed") {
-            webua->cam->set_libcam_af_speed(atoi(parm_val.c_str()));
-        } else if (parm_name == "libcam_af_trigger") {
-            int val = atoi(parm_val.c_str());
-            if (val == 0) {
-                webua->cam->trigger_libcam_af_scan();
-            } else {
-                webua->cam->cancel_libcam_af_scan();
-            }
-        }
+        apply_hot_reload_to_camera(webua->cam, parm_name, parm_val);
     }
 
     MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import { useCameras, usePictures, useMovies, useMediaFolders, useDeletePicture, useDeleteMovie, useDeleteFolderFiles } from '@/api/queries'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCameras, usePictures, useMovies, useMediaFolders, useDeletePicture, useDeleteMovie, useDeleteFolderFiles, queryKeys } from '@/api/queries'
 import { useToast } from '@/components/Toast'
 import { Pagination } from '@/components/Pagination'
 import { getSessionToken } from '@/api/session'
@@ -50,6 +51,7 @@ function parseDateAndTime(dateStr: string, timeStr?: string): Date | null {
 export function Media() {
   const { addToast } = useToast()
   const { role } = useAuthContext()
+  const queryClient = useQueryClient()
   const isAdmin = role === 'admin'
   const [selectedCamera, setSelectedCamera] = useState(1)
   const [mediaType, setMediaType] = useState<MediaType>('pictures')
@@ -73,6 +75,26 @@ export function Media() {
       setCurrentFolderPath('')
     }
   }, [viewMode])
+
+  // Force refetch when switching views or navigating folders to ensure fresh data with thumbnails
+  useEffect(() => {
+    if (viewMode === 'all') {
+      queryClient.invalidateQueries({ queryKey: queryKeys.movies(selectedCamera) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.pictures(selectedCamera) })
+    }
+  }, [viewMode, selectedCamera, queryClient])
+
+  // Invalidate folder queries when folder path changes
+  useEffect(() => {
+    if (viewMode === 'folders') {
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'media-folders' &&
+          query.queryKey[1] === selectedCamera
+      })
+    }
+  }, [viewMode, currentFolderPath, selectedCamera, queryClient])
 
   const { data: cameras } = useCameras()
 
@@ -443,10 +465,10 @@ export function Media() {
         <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => {
             const itemType = 'type' in item ? item.type : (mediaType === 'pictures' ? 'picture' : 'movie')
-            const thumbnail = 'thumbnail' in item ? item.thumbnail : undefined
+            const thumbnail = item.thumbnail || undefined
             return (
               <button
-                key={item.id}
+                key={`${viewMode}-${currentFolderPath}-${item.id}`}
                 className="bg-surface-elevated rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary focus:ring-2 focus:ring-primary focus:outline-none transition-all group relative text-left w-full"
                 onClick={() => setSelectedItem(item)}
                 aria-label={`View ${item.filename}`}

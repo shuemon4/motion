@@ -180,3 +180,312 @@ Complete rewrite of view mode system:
 3. **Move Files**: Allow moving files between folders
 4. **Sort Options**: Add sorting by name, date, size for folder contents
 5. **Search Within Folders**: Find files by name pattern within a folder tree
+
+---
+
+# NoIR Camera ColourTemperature Fix
+
+**Date:** 2026-01-16
+**Status:** Completed
+
+## Overview
+
+Fixed an issue where the Color Temperature control was incorrectly shown for NoIR (No IR filter) cameras. NoIR cameras lack an IR filter, so color temperature adjustment doesn't work properly on these sensors. The control should be hidden in the UI.
+
+## Problem
+
+The backend was correctly querying libcamera for supported controls, but libcamera reports `ColourTemperature` as supported for NoIR cameras because the sensor hardware technically supports the control. However, without an IR filter, color temperature adjustment produces incorrect results.
+
+**API Response (Before Fix):**
+```json
+"supportedControls": {
+  "ColourTemperature": true,  // Incorrect for NoIR
+  ...
+}
+```
+
+## Root Cause Analysis
+
+1. **Frontend logic was correct**: `LibcameraSettings.tsx` line 107 checks `capabilities?.ColourTemperature !== false`
+2. **Backend was passing through raw libcamera data**: `is_control_supported()` only checks if control exists in libcamera's control list
+3. **libcamera reports hardware capability, not semantic appropriateness**: The IMX708 sensor hardware supports ColourTemperature, but it doesn't work meaningfully on NoIR variants
+
+## Changes Made
+
+### 1. Backend NoIR Detection
+
+**File:** `src/libcam.hpp`
+
+Added method declaration:
+```cpp
+/* NoIR camera detection for capability overrides */
+bool is_noir_camera();
+```
+
+**File:** `src/libcam.cpp`
+
+Added `is_noir_camera()` method:
+```cpp
+bool cls_libcam::is_noir_camera()
+{
+    if (!camera) {
+        return false;
+    }
+
+    /* Get camera model from libcamera properties */
+    const ControlList &props = camera->properties();
+    auto model_opt = props.get(properties::Model);
+
+    if (model_opt) {
+        std::string model(*model_opt);
+        std::string model_lower = model;
+        std::transform(model_lower.begin(), model_lower.end(),
+                       model_lower.begin(), ::tolower);
+
+        if (model_lower.find("noir") != std::string::npos) {
+            return true;
+        }
+    }
+
+    /* Fallback: also check camera ID */
+    std::string id = camera->id();
+    std::string id_lower = id;
+    std::transform(id_lower.begin(), id_lower.end(),
+                   id_lower.begin(), ::tolower);
+
+    return id_lower.find("noir") != std::string::npos;
+}
+```
+
+### 2. Capability Override
+
+**File:** `src/libcam.cpp`
+
+Modified `get_capability_map()` to override ColourTemperature for NoIR cameras:
+```cpp
+/* NoIR camera overrides:
+ * NoIR cameras lack an IR filter, so color temperature adjustment
+ * doesn't work properly. Override these capabilities to false.
+ */
+if (is_noir_camera()) {
+    caps["ColourTemperature"] = false;
+    MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+        , "NoIR camera detected - disabling ColourTemperature control");
+}
+```
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/libcam.hpp` | Added `is_noir_camera()` method declaration |
+| `src/libcam.cpp` | Added `is_noir_camera()` implementation and capability override in `get_capability_map()` |
+
+## Technical Notes
+
+### Why `camera->id()` Wasn't Enough
+
+Initial implementation attempted to use `camera->id()` which returns the I2C bus path:
+```
+/base/axi/pcie@1000120000/rp1/i2c@88000/imx708@1a
+```
+
+This path contains "imx708" but NOT "noir". The full model name (`imx708_wide_noir`) is only available via `camera->properties().get(properties::Model)`.
+
+### Detection Strategy
+
+The implementation uses a two-tier detection:
+1. **Primary**: Check `properties::Model` for "noir" substring (case-insensitive)
+2. **Fallback**: Check `camera->id()` for "noir" in case Model property is empty
+
+## Verification
+
+**Tested on:** Raspberry Pi 5 with Pi Camera v3 NoIR Wide (`imx708_wide_noir`)
+
+**API Response (After Fix):**
+```json
+"supportedControls": {
+  "ColourTemperature": false,
+  ...
+}
+```
+
+**Log Output:**
+```
+[NTC][VID][wc00] get_capability_map: NoIR camera detected - disabling ColourTemperature control
+```
+
+## Frontend Impact
+
+No frontend changes required. The existing visibility logic in `LibcameraSettings.tsx` correctly handles this:
+
+```tsx
+{/* Color Temperature - only show if camera supports it (NoIR cameras don't) */}
+{capabilities?.ColourTemperature !== false && (
+  <FormSlider label="Color Temperature" ... />
+)}
+
+{/* NoIR camera info - only show when capabilities indicate no ColourTemperature */}
+{capabilities?.ColourTemperature === false && (
+  <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded">
+    <strong>Note:</strong> Color Temperature control is not available on this camera.
+    NoIR cameras and some other sensors don't support this feature.
+    Use Red/Blue Gain for manual white balance.
+  </div>
+)}
+```
+
+---
+
+# AWB Mode Visibility Investigation
+
+**Date:** 2026-01-16
+**Status:** Closed (User Error)
+
+## Overview
+
+Investigated report that AWB (Auto White Balance) modes were not showing for NoIR cameras.
+
+## Finding
+
+This was not a bug. The AWB Mode dropdown is intentionally hidden when the "Auto White Balance" toggle is OFF. This is by design because AWB modes only apply when AWB is enabled.
+
+**Frontend Logic (`LibcameraSettings.tsx:79-101`):**
+```tsx
+{awbEnabled && (
+  <>
+    <FormSelect
+      label="AWB Mode"
+      value={String(getValue('libcam_awb_mode', 0))}
+      onChange={(val) => onChange('libcam_awb_mode', Number(val))}
+      options={AWB_MODES.map((mode) => ({
+        value: String(mode.value),
+        label: mode.label,
+      }))}
+      helpText="White balance mode"
+    />
+    ...
+  </>
+)}
+```
+
+## Resolution
+
+No code changes required. User was unaware that enabling the "Auto White Balance" toggle reveals the AWB Mode dropdown.
+
+---
+
+# Settings Fields Not Showing Current Values
+
+**Date:** 2026-01-17
+**Status:** Completed
+
+## Overview
+
+Fixed an issue where settings fields (Admin Password, Viewer Password, PID File, Log File, Port, Buffer Count, Base Storage path) were blank on page load instead of showing their current configured values.
+
+## Problem
+
+The "Show Current Values in Settings Fields" feature (commit `27330ec`) was implemented but values weren't displaying because the backend API was returning empty strings for RESTRICTED-level parameters.
+
+**Expected Behavior:** Settings fields should display current values from the server until the user edits them.
+
+**Actual Behavior:** Fields were blank on page load, even when credentials and other settings were configured.
+
+## Root Cause Analysis
+
+In `webu_json.cpp:363-365`, parameter values are hidden when:
+
+```cpp
+if ((config_parms[indx_parm].webui_level > app->cfg->webcontrol_parms) &&
+    (config_parms[indx_parm].webui_level > PARM_LEVEL_LIMITED)) {
+    // Returns empty value
+}
+```
+
+The parameter visibility levels are:
+- `PARM_LEVEL_LIMITED = 1`
+- `PARM_LEVEL_ADVANCED = 2`
+- `PARM_LEVEL_RESTRICTED = 3`
+
+Authentication parameters (`webcontrol_authentication`, `webcontrol_user_authentication`) are `PARM_LEVEL_RESTRICTED (3)`.
+
+With `webcontrol_parms` defaulting to `2` (ADVANCED):
+- Condition: `3 > 2` AND `3 > 1` = TRUE AND TRUE = TRUE
+- Result: Values returned as empty strings
+
+## Changes Made
+
+### 1. Backend Default Value
+
+**File:** `src/conf.cpp:718`
+
+Changed `webcontrol_parms` default from `2` to `3`:
+
+```cpp
+// Before
+if (name == "webcontrol_parms") return edit_generic_int(webcontrol_parms, parm, pact, 2, 0, 3);
+
+// After
+if (name == "webcontrol_parms") return edit_generic_int(webcontrol_parms, parm, pact, 3, 0, 3);
+```
+
+### 2. Config Template
+
+**File:** `data/motion-dist.conf.in:110`
+
+Updated default and comment:
+
+```conf
+; Before
+;*****   - Parameters restricted to level 1 (limited visibility)
+webcontrol_parms 1
+
+; After
+;*****   - webcontrol_parms 3 allows admin access to all settings including credentials
+webcontrol_parms 3
+```
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/conf.cpp` | Changed `webcontrol_parms` default from 2 to 3 |
+| `data/motion-dist.conf.in` | Updated `webcontrol_parms` to 3 and updated comment |
+
+## Technical Notes
+
+### Parameter Visibility Levels
+
+| Level | Name | Description |
+|-------|------|-------------|
+| 0 | ALWAYS | Always visible |
+| 1 | LIMITED | Basic parameters |
+| 2 | ADVANCED | Advanced parameters (paths, ports) |
+| 3 | RESTRICTED | Sensitive parameters (credentials, scripts) |
+| 99 | NEVER | Never exposed via API |
+
+### Security Consideration
+
+Setting `webcontrol_parms 3` allows admins to view credential values through the API. This is appropriate because:
+1. Access to Settings requires admin authentication
+2. Admins already have full system access
+3. Being able to view/edit credentials through the UI is expected functionality
+
+## Verification
+
+After rebuilding Motion with the fix:
+1. API returns actual values for RESTRICTED parameters
+2. Settings fields populate with current values on page load
+3. "(modified)" indicator correctly shows when values differ from server
+4. Values refresh properly after saving
+
+## Workaround for Existing Installations
+
+Users can apply this fix without rebuilding by adding to their `motion.conf`:
+
+```conf
+webcontrol_parms 3
+```
+
+Then restart Motion.

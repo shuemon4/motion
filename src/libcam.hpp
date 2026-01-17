@@ -150,6 +150,9 @@
                 std::vector<std::shared_ptr<libcamera::Camera>> get_pi_cameras();
                 std::shared_ptr<libcamera::Camera> find_camera_by_model(const std::string &model);
 
+                /* NoIR camera detection for capability overrides */
+                bool is_noir_camera();
+
         };
     #else
         #define LIBCAMVER 0

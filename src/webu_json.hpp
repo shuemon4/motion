@@ -85,6 +85,8 @@
 
             /* Hot reload helpers */
             bool validate_hot_reload(const std::string &parm_name, int &parm_index);
+            void apply_hot_reload_to_camera(cls_camera *cam,
+                const std::string &parm_name, const std::string &parm_val);
             void apply_hot_reload(int parm_index, const std::string &parm_val);
             void build_response(bool success, const std::string &parm_name,
                                const std::string &old_val, const std::string &new_val,

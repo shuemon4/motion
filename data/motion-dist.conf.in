@@ -82,7 +82,7 @@ picture_min_interval 0
 ;*************************************************
 ;*****   Movie
 ;*************************************************
-movie_output on
+movie_output off
 movie_max_time 120
 movie_quality 60
 ; Encoder preset controls CPU usage vs compression efficiency for H.264/H.265
@@ -100,14 +100,14 @@ movie_filename %v-%{movienbr}-%Y%m%d%H%M%S
 ;*****   SECURITY: Configure authentication for network access:
 ;*****   - Authentication method set to digest (more secure than basic)
 ;*****   - Lockout protection enabled after 5 failed attempts
-;*****   - Parameters restricted to level 1 (limited visibility)
+;*****   - webcontrol_parms 3 allows admin access to all settings including credentials
 ;*****
 ;*****   For localhost-only access, set webcontrol_localhost on
 ;*****   For network access, configure webcontrol_authentication.
 ;*************************************************
 webcontrol_port 8080
 webcontrol_localhost off
-webcontrol_parms 1
+webcontrol_parms 3
 webcontrol_auth_method digest
 webcontrol_lock_attempts 5
 webcontrol_lock_minutes 10

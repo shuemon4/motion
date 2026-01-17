@@ -4,7 +4,7 @@ import { ConfigurationPresets } from '@/components/ConfigurationPresets'
 import { useBatchUpdateConfig } from '@/api/queries'
 import { percentToPixels, pixelsToPercent } from '@/utils/translations'
 import { useCameraCapabilities } from '@/hooks/useCameraCapabilities'
-import { AUTOFOCUS_MODES } from '@/utils/parameterMappings'
+import { AUTOFOCUS_MODES, AWB_MODES } from '@/utils/parameterMappings'
 
 interface QuickSettingsProps {
   cameraId: number
@@ -158,7 +158,7 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
       <ConfigurationPresets cameraId={cameraId} readOnly={true} />
 
       {/* Stream Settings */}
-      <QuickSection title="Stream" defaultOpen={true}>
+      <QuickSection title="Stream" defaultOpen={false}>
         <FormSlider
           label="Quality"
           value={Number(getValue('stream_quality', 50))}
@@ -181,7 +181,7 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
       </QuickSection>
 
       {/* Image/Camera Settings (libcamera) */}
-      <QuickSection title="Image" defaultOpen={true}>
+      <QuickSection title="Image" defaultOpen={false}>
         <FormSlider
           label="Brightness"
           value={Number(getValue('libcam_brightness', 0))}
@@ -203,13 +203,13 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
         />
 
         <FormSlider
-          label="Gain"
+          label="Gain (ISO)"
           value={Number(getValue('libcam_gain', 1))}
           onChange={(val) => handleChange('libcam_gain', val)}
           min={0}
           max={10}
           step={0.1}
-          helpText="Analog gain (0=auto, 1.0-10.0)"
+          helpText="Analog gain (0=auto, 1.0-10.0) (Gain 1.0 ~ ISO 100)"
         />
 
         <FormToggle
@@ -218,6 +218,80 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
           onChange={(val) => handleImmediateChange('libcam_awb_enable', val)}
           helpText="Enable automatic white balance"
         />
+
+        {/* AWB Mode - only show when AWB is enabled */}
+        {Boolean(getValue('libcam_awb_enable', true)) && (
+          <>
+            <FormSelect
+              label="AWB Mode"
+              value={String(getValue('libcam_awb_mode', 0))}
+              onChange={(val) => handleImmediateChange('libcam_awb_mode', Number(val))}
+              options={AWB_MODES.map((mode) => ({
+                value: String(mode.value),
+                label: mode.label,
+              }))}
+              helpText="White balance mode"
+            />
+
+            {/* AWB Lock - only show if camera supports it (NoIR cameras don't) */}
+            {capabilities?.AwbLocked !== false && (
+              <FormToggle
+                label="Lock AWB"
+                value={Boolean(getValue('libcam_awb_locked', false))}
+                onChange={(val) => handleImmediateChange('libcam_awb_locked', val)}
+                helpText="Lock white balance settings"
+              />
+            )}
+          </>
+        )}
+
+        {/* Manual color controls - only show when AWB is disabled */}
+        {!Boolean(getValue('libcam_awb_enable', true)) && (
+          <>
+            {/* Color Temperature - only show if camera supports it (NoIR cameras don't) */}
+            {capabilities?.ColourTemperature !== false && (
+              <FormSlider
+                label="Color Temperature"
+                value={Number(getValue('libcam_colour_temp', 0))}
+                onChange={(val) => handleChange('libcam_colour_temp', val)}
+                min={0}
+                max={10000}
+                step={100}
+                unit=" K"
+                helpText="Manual color temperature in Kelvin (0-10000)"
+              />
+            )}
+
+            {/* Color Gains - always show when AWB is disabled */}
+            <FormSlider
+              label="Red Gain"
+              value={Number(getValue('libcam_colour_gain_r', 1))}
+              onChange={(val) => handleChange('libcam_colour_gain_r', val)}
+              min={0}
+              max={8}
+              step={0.1}
+              helpText="Red color gain (0.0-8.0)"
+            />
+
+            <FormSlider
+              label="Blue Gain"
+              value={Number(getValue('libcam_colour_gain_b', 1))}
+              onChange={(val) => handleChange('libcam_colour_gain_b', val)}
+              min={0}
+              max={8}
+              step={0.1}
+              helpText="Blue color gain (0.0-8.0)"
+            />
+
+            {/* NoIR camera info - only show when capabilities indicate no ColourTemperature */}
+            {capabilities?.ColourTemperature === false && (
+              <div className="text-xs text-gray-400 bg-surface-elevated p-3 rounded">
+                <strong>Note:</strong> Color Temperature control is not available on this camera.
+                NoIR cameras and some other sensors don't support this feature. Use Red/Blue Gain for manual white balance.
+              </div>
+            )}
+          </>
+        )}
 
         {/* Autofocus controls - conditional based on capabilities */}
         {capabilities?.AfMode && (

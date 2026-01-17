@@ -445,6 +445,42 @@ bool cls_libcam::is_control_supported(const ControlId *id)
     return cam_controls->find(id) != cam_controls->end();
 }
 
+/* Check if this is a NoIR (No IR filter) camera variant.
+ * NoIR cameras don't support meaningful color temperature adjustment
+ * because they lack the IR filter needed for proper color calibration.
+ * Detection is based on "noir" appearing in the camera model name.
+ */
+bool cls_libcam::is_noir_camera()
+{
+    if (!camera) {
+        return false;
+    }
+
+    /* Get camera model from libcamera properties */
+    const ControlList &props = camera->properties();
+    auto model_opt = props.get(properties::Model);
+
+    if (model_opt) {
+        std::string model(*model_opt);
+        std::string model_lower = model;
+        std::transform(model_lower.begin(), model_lower.end(), model_lower.begin(), ::tolower);
+
+        MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+            , "Camera model: %s", model.c_str());
+
+        if (model_lower.find("noir") != std::string::npos) {
+            return true;
+        }
+    }
+
+    /* Fallback: also check camera ID in case Model property is empty */
+    std::string id = camera->id();
+    std::string id_lower = id;
+    std::transform(id_lower.begin(), id_lower.end(), id_lower.begin(), ::tolower);
+
+    return id_lower.find("noir") != std::string::npos;
+}
+
 /* Build a map of control names to supported status for JSON API */
 std::map<std::string, bool> cls_libcam::get_capability_map()
 {
@@ -483,6 +519,16 @@ std::map<std::string, bool> cls_libcam::get_capability_map()
     /* Other controls */
     caps["DigitalGain"] = is_control_supported(&controls::DigitalGain);
     caps["ScalerCrop"] = is_control_supported(&controls::ScalerCrop);
+
+    /* NoIR camera overrides:
+     * NoIR cameras lack an IR filter, so color temperature adjustment
+     * doesn't work properly. Override these capabilities to false.
+     */
+    if (is_noir_camera()) {
+        caps["ColourTemperature"] = false;
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+            , "NoIR camera detected - disabling ColourTemperature control");
+    }
 
     return caps;
 }

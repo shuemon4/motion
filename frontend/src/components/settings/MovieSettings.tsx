@@ -24,7 +24,7 @@ export function MovieSettings({ config, onChange, getError }: MovieSettingsProps
 
   // Determine current recording mode
   const movieOutput = getValue('movie_output', false) as boolean;
-  const movieOutputMotion = getValue('movie_output_motion', true) as boolean;
+  const movieOutputMotion = getValue('movie_output_motion', false) as boolean;
   const emulateMotion = getValue('emulate_motion', false) as boolean;
   const currentMode = motionToRecordingMode(movieOutput, movieOutputMotion, emulateMotion);
 

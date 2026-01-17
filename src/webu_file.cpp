@@ -186,8 +186,15 @@ void cls_webu_file::main() {
         is_thumbnail = true;
     }
 
+    /* Extract just the filename from the request (may include subdirectory path) */
+    std::string requested_filename = requested_file;
+    size_t last_slash = requested_file.rfind('/');
+    if (last_slash != std::string::npos) {
+        requested_filename = requested_file.substr(last_slash + 1);
+    }
+
     for (indx=0;indx<(int)flst.size();indx++) {
-        if (flst[indx].file_nm == requested_file) {
+        if (flst[indx].file_nm == requested_filename) {
             if (is_thumbnail) {
                 /* Serve the thumbnail file alongside the video */
                 full_nm = flst[indx].full_nm + ".thumb.jpg";
@@ -195,6 +202,18 @@ void cls_webu_file::main() {
                 full_nm = flst[indx].full_nm;
             }
             break;
+        }
+    }
+
+    /* If not found in database, try direct path construction for subfolder files */
+    if (full_nm.empty() && !requested_file.empty()) {
+        std::string direct_path = webua->cam->cfg->target_dir + "/" + requested_file;
+        if (is_thumbnail) {
+            direct_path += ".thumb.jpg";
+        }
+        struct stat st;
+        if (stat(direct_path.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+            full_nm = direct_path;
         }
     }
 
