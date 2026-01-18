@@ -86,11 +86,18 @@ install-service: data/motion-dist.service
 	@rm -f $(DESTDIR)$(SYSTEMD_UNIT_DIR)/motion.service.tmp
 	@echo ""
 	@echo "Service installed to $(DESTDIR)$(SYSTEMD_UNIT_DIR)/motion.service"
-	@echo ""
-	@echo "To enable and start:"
-	@echo "  sudo systemctl daemon-reload"
-	@echo "  sudo systemctl enable motion"
-	@echo "  sudo systemctl start motion"
+	@if [ -z "$(DESTDIR)" ] && command -v systemctl >/dev/null 2>&1; then \
+		echo "Reloading systemd and enabling service..."; \
+		systemctl daemon-reload; \
+		systemctl enable motion; \
+		echo "Service enabled. Start with: sudo systemctl start motion"; \
+	else \
+		echo ""; \
+		echo "To enable and start:"; \
+		echo "  sudo systemctl daemon-reload"; \
+		echo "  sudo systemctl enable motion"; \
+		echo "  sudo systemctl start motion"; \
+	fi
 	@echo ""
 
 uninstall-service:

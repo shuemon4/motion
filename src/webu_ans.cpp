@@ -1369,7 +1369,12 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             mhd_send();
             retcd = MHD_YES;
         } else if (uri_cmd1 == "api" && uri_cmd2 == "system" && uri_cmd3 == "reboot") {
-            /* System reboot - no body needed */
+            /* System reboot - consume body first (even if empty) */
+            if (*upload_data_size > 0) {
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            /* Body complete, process reboot */
             if (webu_json == nullptr) {
                 webu_json = new cls_webu_json(this);
             }
@@ -1377,7 +1382,12 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             mhd_send();
             retcd = MHD_YES;
         } else if (uri_cmd1 == "api" && uri_cmd2 == "system" && uri_cmd3 == "shutdown") {
-            /* System shutdown - no body needed */
+            /* System shutdown - consume body first (even if empty) */
+            if (*upload_data_size > 0) {
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            /* Body complete, process shutdown */
             if (webu_json == nullptr) {
                 webu_json = new cls_webu_json(this);
             }

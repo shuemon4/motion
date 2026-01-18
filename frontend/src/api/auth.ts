@@ -12,6 +12,7 @@ interface AuthStatusResponse {
   authenticated: boolean;
   role?: 'admin' | 'user';
   csrf_token?: string;
+  session_token?: string;
 }
 
 /**
@@ -91,5 +92,17 @@ export async function getAuthStatus(): Promise<AuthStatusResponse> {
     throw new Error(`Auth check failed: ${response.status}`);
   }
 
-  return response.json();
+  const data: AuthStatusResponse = await response.json();
+
+  /* When auth not required, backend creates pseudo-session for CSRF protection */
+  if (data.session_token && data.csrf_token && data.role) {
+    setSession({
+      session_token: data.session_token,
+      csrf_token: data.csrf_token,
+      role: data.role as 'admin' | 'user',
+      expires_in: 86400, // Default 24h expiry for pseudo-sessions
+    }, false); // Don't persist to localStorage for pseudo-sessions
+  }
+
+  return data;
 }

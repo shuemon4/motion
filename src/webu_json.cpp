@@ -939,9 +939,31 @@ void cls_webu_json::api_auth_status()
     webua->resp_page += "\"auth_required\":" + std::string(auth_required ? "true" : "false");
 
     if (!auth_required) {
-        /* No auth configured - full access */
-        webua->resp_page += ",\"authenticated\":true";
-        webua->resp_page += ",\"role\":\"admin\"";
+        /* No auth configured - full access with pseudo-session for CSRF protection */
+        /* Create or reuse session for CSRF token even when auth not required */
+        if (webua->session_token.empty()) {
+            /* No session yet - create pseudo-session for CSRF */
+            std::string new_token = webu->session_create("admin", webua->clientip);
+            webua->resp_page += ",\"authenticated\":true";
+            webua->resp_page += ",\"role\":\"admin\"";
+            webua->resp_page += ",\"session_token\":\"" + new_token + "\"";
+            webua->resp_page += ",\"csrf_token\":\"" + webu->session_get_csrf(new_token) + "\"";
+        } else {
+            /* Reuse existing session */
+            std::string role = webu->session_validate(webua->session_token, webua->clientip);
+            if (!role.empty()) {
+                webua->resp_page += ",\"authenticated\":true";
+                webua->resp_page += ",\"role\":\"" + role + "\"";
+                webua->resp_page += ",\"csrf_token\":\"" + webu->session_get_csrf(webua->session_token) + "\"";
+            } else {
+                /* Session expired - create new one */
+                std::string new_token = webu->session_create("admin", webua->clientip);
+                webua->resp_page += ",\"authenticated\":true";
+                webua->resp_page += ",\"role\":\"admin\"";
+                webua->resp_page += ",\"session_token\":\"" + new_token + "\"";
+                webua->resp_page += ",\"csrf_token\":\"" + webu->session_get_csrf(new_token) + "\"";
+            }
+        }
     } else if (!webua->session_token.empty()) {
         /* Session token provided - validate it */
         std::string role = webu->session_validate(
@@ -2244,6 +2266,50 @@ void cls_webu_json::api_config_patch()
             error_msg = "SQL parameters cannot be modified via web interface (security restriction)";
             error_count++;
         }
+        /* SECURITY: Allow initial authentication setup regardless of webcontrol_parms
+         * This enables first-run configuration without requiring webcontrol_parms 3
+         * Exception only applies when BOTH auth parameters are empty (fresh install)
+         * Once any auth is configured, normal permission levels apply */
+        else if ((parm_name == "webcontrol_authentication" ||
+                  parm_name == "webcontrol_user_authentication") &&
+                 cfg->webcontrol_authentication == "" &&
+                 cfg->webcontrol_user_authentication == "") {
+            /* Initial setup exception - find parameter without permission check */
+            parm_index = 0;
+            while (config_parms[parm_index].parm_name != "") {
+                if (config_parms[parm_index].parm_name == parm_name) {
+                    break;
+                }
+                parm_index++;
+            }
+
+            if (config_parms[parm_index].parm_name == "") {
+                /* Parameter not found */
+                parm_index = -1;
+                error_msg = "Unknown parameter";
+                error_count++;
+            } else {
+                /* Parameter exists - get current value */
+                cfg->edit_get(parm_name, old_val, config_parms[parm_index].parm_cat);
+
+                /* Check if value actually changed */
+                if (old_val == parm_val) {
+                    unchanged = true;
+                    hot_reload = config_parms[parm_index].hot_reload;
+                    success_count++;
+                } else {
+                    /* Authentication parameters require restart */
+                    cfg->edit_set(parm_name, parm_val);
+                    applied = true;
+                    hot_reload = false;
+                    success_count++;
+
+                    MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+                        "Initial setup: %s configured (restart required)",
+                        parm_name.c_str());
+                }
+            }
+        }
         /* Check if parameter exists */
         else {
             validate_hot_reload(parm_name, parm_index);
@@ -2251,6 +2317,11 @@ void cls_webu_json::api_config_patch()
             if (parm_index < 0) {
                 /* Parameter doesn't exist */
                 error_msg = "Unknown parameter";
+                error_count++;
+            } else if (config_parms[parm_index].webui_level > app->cfg->webcontrol_parms) {
+                /* Permission level too low */
+                error_msg = "Insufficient permissions (requires webcontrol_parms " +
+                            std::to_string(config_parms[parm_index].webui_level) + ")";
                 error_count++;
             } else {
                 /* Parameter exists - get current value */

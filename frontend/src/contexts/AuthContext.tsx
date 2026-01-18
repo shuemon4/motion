@@ -21,6 +21,8 @@ interface AuthContextValue {
   role: 'admin' | 'user' | null
   /** Whether auth status is still loading */
   isLoading: boolean
+  /** Whether authentication is required (configured in Motion) */
+  authRequired: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -48,6 +50,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated: authStatus?.authenticated ?? false,
     role: authStatus?.role ?? null,
     isLoading,
+    authRequired: authStatus?.auth_required ?? true,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

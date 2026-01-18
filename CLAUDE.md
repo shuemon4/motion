@@ -34,6 +34,7 @@ This project combines Motion and MotionEye into a single, efficient application:
 6. **Minimize CPU usage** - always consider CPU impact when developing code changes
 7. **Efficiency first** - all new code must be planned for efficiency before implementation
 8. **Updating Motion binaries** - Review `doc/project/MOTION_RESTART.md` to prevent issues, prior to updating Motion binaries on the Pi
+9. All changes need to work on the Pi 4 and the Pi 5.
 
 ## Technology Stack
 

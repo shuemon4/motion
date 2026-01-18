@@ -7,7 +7,7 @@ import { SystemStatus, VersionDisplay } from '@/components/SystemStatus'
 
 export const Layout = memo(function Layout() {
   const queryClient = useQueryClient()
-  const { isAuthenticated, role } = useAuthContext()
+  const { isAuthenticated, role, authRequired } = useAuthContext()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleLogout = async () => {
@@ -35,7 +35,7 @@ export const Layout = memo(function Layout() {
                   <Link to="/settings" className="hover:text-primary">Settings</Link>
                 )}
                 <Link to="/media" className="hover:text-primary">Media</Link>
-                {isAuthenticated && (
+                {authRequired && isAuthenticated && (
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-surface-elevated transition-colors"
@@ -48,6 +48,11 @@ export const Layout = memo(function Layout() {
                       {role === 'admin' ? 'Admin' : 'User'}
                     </span>
                   </button>
+                )}
+                {!authRequired && (
+                  <div className="px-3 py-1.5 rounded-lg bg-yellow-500/10">
+                    <span className="text-xs text-yellow-500">No Authentication</span>
+                  </div>
                 )}
               </div>
               <SystemStatus variant="desktop" />
@@ -102,7 +107,7 @@ export const Layout = memo(function Layout() {
                 >
                   Media
                 </Link>
-                {isAuthenticated && (
+                {authRequired && isAuthenticated && (
                   <button
                     onClick={() => {
                       handleLogout()
@@ -117,6 +122,11 @@ export const Layout = memo(function Layout() {
                       Logout ({role === 'admin' ? 'Admin' : 'User'})
                     </span>
                   </button>
+                )}
+                {!authRequired && (
+                  <div className="px-3 py-2 rounded-lg bg-yellow-500/10">
+                    <span className="text-xs text-yellow-500">No Authentication</span>
+                  </div>
                 )}
 
                 {/* Mobile system stats */}

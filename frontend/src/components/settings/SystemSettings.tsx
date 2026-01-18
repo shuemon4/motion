@@ -92,6 +92,29 @@ export function SystemSettings({ config, onChange, getError, originalConfig }: S
           <p className="text-xs text-gray-400 mb-4">
             Credentials for logging into this web interface. Format: username:password
           </p>
+
+          {/* Initial Setup Banner */}
+          {getOriginalValue('webcontrol_authentication', '') === '' &&
+           getOriginalValue('webcontrol_user_authentication', '') === '' && (
+            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-300 mb-1">Initial Setup Available</p>
+                  <p className="text-xs text-blue-300/80">
+                    Configure authentication now to secure your Motion installation.
+                    During initial setup, you can set credentials without changing{' '}
+                    <code className="text-xs bg-surface px-1 rounded">webcontrol_parms</code> in the config file.
+                    Once authentication is configured, it will require restart to apply.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <FormInput
             label="Admin Username"
             value={String(getValue('webcontrol_authentication', '')).split(':')[0] || ''}
