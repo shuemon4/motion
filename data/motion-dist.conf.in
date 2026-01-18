@@ -5,6 +5,10 @@
 ; system working.  There are many more options available.  Please
 ; consult the documentation for the complete list of all options.
 ;
+; SYNC REQUIREMENT: When changing default values in this file, also update:
+;   1. src/conf.cpp - Compiled-in defaults (edit_generic_* functions)
+;   2. frontend/src/utils/parameterMappings.ts - UI labels if showing defaults
+;
 
 ;*************************************************
 ;*****   System
@@ -90,8 +94,8 @@ movie_quality 60
 ; Faster presets = lower CPU usage but larger files.
 ; Note: ultrafast forces H.264 baseline profile (~30% larger files than superfast with high profile)
 ; For Pi 5: use ultrafast if CPU/heat is critical, superfast for better compression
-movie_encoder_preset superfast
-movie_container mkv
+movie_encoder_preset veryfast
+movie_container mp4
 movie_filename %v-%{movienbr}-%Y%m%d%H%M%S
 
 ;*************************************************

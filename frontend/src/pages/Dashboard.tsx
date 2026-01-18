@@ -5,6 +5,7 @@ import { BottomSheet } from '@/components/BottomSheet'
 import { QuickSettings } from '@/components/QuickSettings'
 import { FullscreenButton } from '@/components/FullscreenButton'
 import { SettingsButton } from '@/components/SettingsButton'
+import { SnapshotButton } from '@/components/SnapshotButton'
 import { useCameras } from '@/api/queries'
 import { apiGet } from '@/api/client'
 import { updateSessionCsrf } from '@/api/session'
@@ -155,6 +156,7 @@ export function Dashboard() {
                     {camera.width}x{camera.height}{fps > 0 && ` @ ${fps} fps`}
                   </span>
                 )}
+                {role === 'admin' && <SnapshotButton cameraId={camera.id} />}
                 <FullscreenButton cameraId={camera.id} />
                 {role === 'admin' && <SettingsButton cameraId={camera.id} onClick={openQuickSettings} />}
               </div>
@@ -223,6 +225,7 @@ export function Dashboard() {
                       {camera.width}x{camera.height}{fps > 0 && ` @ ${fps} fps`}
                     </span>
                   )}
+                  {role === 'admin' && <SnapshotButton cameraId={camera.id} />}
                   <FullscreenButton cameraId={camera.id} />
                   {role === 'admin' && <SettingsButton cameraId={camera.id} onClick={openQuickSettings} />}
                 </div>

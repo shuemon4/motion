@@ -27,6 +27,10 @@
  * - parm_registry.hpp: O(1) lookup via hash map, scoped by PARM_SCOPE_APP/CAM/SND
  * - parm_structs.hpp: Lightweight ctx_parm_app/cam/snd structs for live device use
  * - conf_file.hpp: Separated file I/O (cls_config_file) from parameter editing
+ *
+ * SYNC REQUIREMENT: When changing default values in this file, also update:
+ *   1. data/motion-dist.conf.in  - Config template (installed as starting config)
+ *   2. frontend/src/utils/parameterMappings.ts - UI labels if showing defaults
  */
 
 #include "motion.hpp"
@@ -663,7 +667,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "emulate_motion") return edit_generic_bool(emulate_motion, parm, pact, false);
     if (name == "threshold_tune") return edit_generic_bool(threshold_tune, parm, pact, false);
     if (name == "noise_tune") return edit_generic_bool(noise_tune, parm, pact, true);
-    if (name == "movie_output") return edit_generic_bool(movie_output, parm, pact, true);
+    if (name == "movie_output") return edit_generic_bool(movie_output, parm, pact, false);
     if (name == "movie_output_motion") return edit_generic_bool(movie_output_motion, parm, pact, false);
     if (name == "movie_all_frames") return edit_generic_bool(movie_all_frames, parm, pact, false);
     if (name == "movie_extpipe_use") return edit_generic_bool(movie_extpipe_use, parm, pact, false);
@@ -861,7 +865,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "picture_type") return edit_generic_list(picture_type, parm, pact, "jpg", picture_type_values);
 
     static const std::vector<std::string> movie_encoder_preset_values = {"ultrafast","superfast","veryfast","faster","fast","medium","slow","slower","veryslow"};
-    if (name == "movie_encoder_preset") return edit_generic_list(movie_encoder_preset, parm, pact, "medium", movie_encoder_preset_values);
+    if (name == "movie_encoder_preset") return edit_generic_list(movie_encoder_preset, parm, pact, "veryfast", movie_encoder_preset_values);
 
     // movie_container accepts extended syntax: "container" or "container:codec"
     // e.g., "mp4", "mp4:libx264", "mkv:h264_v4l2m2m" - parsed in movie.cpp init_container()

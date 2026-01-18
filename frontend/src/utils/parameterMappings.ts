@@ -1,5 +1,9 @@
 // Direct parameter mappings between MotionEye UI names and Motion backend params
 // These require no translation, just pass through the value
+//
+// SYNC REQUIREMENT: When changing default values or "(Default)" labels, also update:
+//   1. src/conf.cpp - Compiled-in defaults (edit_generic_* functions)
+//   2. data/motion-dist.conf.in - Config template (installed as starting config)
 
 export const DIRECT_MAPPINGS = {
   // Device
@@ -204,7 +208,7 @@ export const ENCODER_PRESETS = [
   { value: 'veryfast', label: 'Very Fast', description: 'Low CPU' },
   { value: 'faster', label: 'Faster', description: 'Below average CPU' },
   { value: 'fast', label: 'Fast', description: 'Slightly below average CPU' },
-  { value: 'medium', label: 'Medium (Default)', description: 'Balanced CPU/quality (~50-60%)' },
+  { value: 'medium', label: 'Medium', description: 'Balanced CPU/quality (~50-60%)' },
   { value: 'slow', label: 'Slow', description: 'Above average quality' },
   { value: 'slower', label: 'Slower', description: 'High quality' },
   { value: 'veryslow', label: 'Very Slow', description: 'Highest quality (~70-80%), highest CPU' },
