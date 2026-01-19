@@ -115,18 +115,21 @@ export function SystemSettings({ config, onChange, getError, originalConfig }: S
             </div>
           )}
 
-          <FormInput
-            label="Admin Username"
-            value={String(getValue('webcontrol_authentication', '')).split(':')[0] || ''}
-            onChange={(val) => {
-              const currentPass = String(getValue('webcontrol_authentication', '')).split(':')[1] || '';
-              onChange('webcontrol_authentication', val ? `${val}:${currentPass}` : '');
-            }}
-            helpText="Administrator username (full access to all settings)"
-            error={getError?.('webcontrol_authentication')}
-            originalValue={String(getOriginalValue('webcontrol_authentication', '')).split(':')[0] || ''}
-            showVisibilityToggle={false}
-          />
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1 text-gray-300">
+              Admin Username
+            </label>
+            <input
+              type="text"
+              value="admin"
+              disabled
+              className="w-full px-3 py-2 bg-surface-elevated border border-gray-700 rounded-lg
+                       text-gray-500 cursor-not-allowed"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Admin username is fixed for security
+            </p>
+          </div>
           <FormInput
             label="Admin Password"
             value={String(getValue('webcontrol_authentication', '')).split(':')[1] || ''}

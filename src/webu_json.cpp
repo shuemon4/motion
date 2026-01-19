@@ -33,6 +33,7 @@
 #include "logger.hpp"
 #include "webu.hpp"
 #include "webu_ans.hpp"
+#include "webu_auth.hpp"
 #include "webu_json.hpp"
 #include "dbse.hpp"
 #include "libcam.hpp"
@@ -853,10 +854,27 @@ void cls_webu_json::api_auth_login()
         size_t colon_pos = admin_auth.find(':');
         if (colon_pos != std::string::npos) {
             std::string admin_user = admin_auth.substr(0, colon_pos);
-            std::string admin_pass = admin_auth.substr(colon_pos + 1);
+            std::string stored_value = admin_auth.substr(colon_pos + 1);
 
-            if (username == admin_user && password == admin_pass) {
-                role = "admin";
+            /* Verify username matches */
+            if (username == admin_user) {
+                /* Check if stored value is bcrypt hash or plaintext */
+                if (cls_webu_auth::is_bcrypt_hash(stored_value)) {
+                    /* Bcrypt hash - verify password */
+                    if (cls_webu_auth::verify_password(password, stored_value)) {
+                        role = "admin";
+                    }
+                } else {
+                    /* Plaintext password (for initial setup compatibility) */
+                    if (password == stored_value) {
+                        role = "admin";
+
+                        /* Log warning about plaintext password */
+                        MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+                            "Plaintext admin password detected - "
+                            "run motion-setup to hash credentials");
+                    }
+                }
             }
         }
     }
@@ -868,10 +886,27 @@ void cls_webu_json::api_auth_login()
             size_t colon_pos = user_auth.find(':');
             if (colon_pos != std::string::npos) {
                 std::string user_user = user_auth.substr(0, colon_pos);
-                std::string user_pass = user_auth.substr(colon_pos + 1);
+                std::string stored_value = user_auth.substr(colon_pos + 1);
 
-                if (username == user_user && password == user_pass) {
-                    role = "user";
+                /* Verify username matches */
+                if (username == user_user) {
+                    /* Check if stored value is bcrypt hash or plaintext */
+                    if (cls_webu_auth::is_bcrypt_hash(stored_value)) {
+                        /* Bcrypt hash - verify password */
+                        if (cls_webu_auth::verify_password(password, stored_value)) {
+                            role = "user";
+                        }
+                    } else {
+                        /* Plaintext password (for initial setup compatibility) */
+                        if (password == stored_value) {
+                            role = "user";
+
+                            /* Log warning about plaintext password */
+                            MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+                                "Plaintext viewer password detected - "
+                                "run motion-setup to hash credentials");
+                        }
+                    }
                 }
             }
         }
@@ -2260,6 +2295,31 @@ void cls_webu_json::api_config_patch()
         bool hot_reload = false;
         bool unchanged = false;
         std::string error_msg;
+
+        /* Auto-hash authentication passwords if not already hashed */
+        if (parm_name == "webcontrol_authentication" ||
+            parm_name == "webcontrol_user_authentication") {
+
+            size_t colon_pos = parm_val.find(':');
+            if (colon_pos != std::string::npos) {
+                std::string username = parm_val.substr(0, colon_pos);
+                std::string password = parm_val.substr(colon_pos + 1);
+
+                /* If password is not already a bcrypt hash, hash it */
+                if (!cls_webu_auth::is_bcrypt_hash(password)) {
+                    std::string hashed = cls_webu_auth::hash_password(password);
+                    if (!hashed.empty()) {
+                        parm_val = username + ":" + hashed;
+                        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+                            "Auto-hashed password for %s", parm_name.c_str());
+                    } else {
+                        /* Hash failed - log error but allow plaintext */
+                        MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+                            "Failed to hash password for %s - saving plaintext", parm_name.c_str());
+                    }
+                }
+            }
+        }
 
         /* SECURITY: Reject SQL parameter modifications */
         if (parm_name.substr(0, 4) == "sql_") {

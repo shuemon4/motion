@@ -104,6 +104,28 @@ AS_IF([test "${ZLIB}" != "yes" ], [
 CPPFLAGS="$HOLD_CPPFLAGS"
 
 ##############################################################################
+###  Check libxcrypt - Required.  Needed for bcrypt password hashing
+##############################################################################
+AS_IF([pkgconf libxcrypt ], [
+    TEMP_CPPFLAGS="$TEMP_CPPFLAGS "`pkgconf --cflags libxcrypt`
+    TEMP_LIBS="$TEMP_LIBS "`pkgconf --libs libxcrypt`
+  ],[
+    dnl libxcrypt not found via pkgconf, try system library
+    TEMP_LIBS="$TEMP_LIBS -lcrypt"
+  ]
+)
+HOLD_CPPFLAGS="$CPPFLAGS"
+CPPFLAGS="$CPPFLAGS $TEMP_CPPFLAGS"
+AC_CHECK_HEADERS(crypt.h,[XCRYPT="yes"],[XCRYPT="no"])
+AC_MSG_CHECKING(libxcrypt libraries)
+AC_MSG_RESULT($XCRYPT)
+AS_IF([test "${XCRYPT}" != "yes" ], [
+    AC_MSG_ERROR([Required package libxcrypt not found, please check motion_guide.html and install necessary dependencies])
+  ]
+)
+CPPFLAGS="$HOLD_CPPFLAGS"
+
+##############################################################################
 ###  Check setting/getting thread names
 ##############################################################################
 AC_CHECK_HEADERS(pthread_np.h,[PTHREAD_NP="yes"],[PTHREAD_NP="no"])
