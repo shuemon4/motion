@@ -5,6 +5,63 @@ Motion
 
 Motion is a program that monitors the signal from video cameras and detects changes in the images.
 
+## Requirements
+
+- Raspberry Pi 4 or newer (64-bit only)
+- Raspberry Pi OS Bookworm or newer
+- Camera Module v2/v3 or compatible USB camera
+
+## Quick Start
+
+### Installation (Interactive)
+
+SSH into your Pi and run:
+
+```bash
+git clone https://github.com/Motion-Project/motion.git
+cd motion
+sudo scripts/install.sh
+```
+
+The installer will prompt for admin and viewer passwords, then start the service automatically.
+
+### Installation (Unattended)
+
+For automated deployments:
+
+```bash
+git clone https://github.com/Motion-Project/motion.git
+cd motion
+sudo scripts/install.sh --unattended \
+    --admin-pass "youradminpass" \
+    --viewer-pass "yourviewerpass"
+```
+
+### One-Line Remote Install
+
+From your Mac/PC, install on a Pi via SSH:
+
+```bash
+ssh admin@<pi-ip> 'git clone https://github.com/Motion-Project/motion.git && cd motion && sudo scripts/install.sh --unattended --admin-pass "adminpass" --viewer-pass "viewerpass"'
+```
+
+### Access the Web UI
+
+After installation:
+
+- **URL**: `http://<pi-ip>:8080/`
+- **Admin**: Full access (view, configure, control)
+- **Viewer**: Read-only access (view only)
+
+### Useful Commands
+
+```bash
+sudo journalctl -u motion -f      # View logs
+sudo systemctl restart motion     # Restart service
+sudo systemctl stop motion        # Stop service
+sudo motion-setup --reset         # Reset passwords
+```
+
 ## Authentication Setup
 
 Motion requires authentication to be configured before production use.
