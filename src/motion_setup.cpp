@@ -25,8 +25,92 @@
 #include <cstring>
 #include <termios.h>
 #include <unistd.h>
+#include <random>
+#include <sys/stat.h>
 
 const char* DEFAULT_CONFIG_PATH = "/usr/local/etc/motion/motion.conf";
+const char* INITIAL_PASSWORD_FILE = "/var/lib/motion/initial-password.txt";
+const int MAX_PASSWORD_ATTEMPTS = 3;
+const int GENERATED_PASSWORD_LENGTH = 16;
+
+/**
+ * Generate a cryptographically secure random password
+ */
+std::string generate_random_password() {
+    const char charset[] =
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "0123456789"
+        "!@#$%^&*";
+
+    std::string password;
+    password.reserve(GENERATED_PASSWORD_LENGTH);
+
+    /* Use /dev/urandom for crypto-quality randomness */
+    FILE *fp = fopen("/dev/urandom", "rb");
+    if (!fp) {
+        /* Fallback to less secure random if urandom unavailable */
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(0, sizeof(charset) - 2);
+        for (int i = 0; i < GENERATED_PASSWORD_LENGTH; i++) {
+            password += charset[dis(gen)];
+        }
+        return password;
+    }
+
+    unsigned char random_bytes[GENERATED_PASSWORD_LENGTH];
+    size_t bytes_read = fread(random_bytes, 1, GENERATED_PASSWORD_LENGTH, fp);
+    fclose(fp);
+
+    if (bytes_read != GENERATED_PASSWORD_LENGTH) {
+        return "";  /* Error reading random bytes */
+    }
+
+    for (int i = 0; i < GENERATED_PASSWORD_LENGTH; i++) {
+        password += charset[random_bytes[i] % (sizeof(charset) - 1)];
+    }
+
+    return password;
+}
+
+/**
+ * Save generated password to a temporary file for recovery
+ * File is readable only by root
+ */
+bool save_initial_password_file(const std::string &admin_pass, const std::string &viewer_user,
+                                 const std::string &viewer_pass, bool admin_generated, bool viewer_generated) {
+    /* Create directory if it doesn't exist */
+    mkdir("/var/lib/motion", 0755);
+
+    FILE *fp = fopen(INITIAL_PASSWORD_FILE, "w");
+    if (!fp) {
+        return false;
+    }
+
+    fprintf(fp, "Motion Initial Password Recovery\n");
+    fprintf(fp, "=================================\n\n");
+    fprintf(fp, "This file contains auto-generated passwords.\n");
+    fprintf(fp, "DELETE THIS FILE after saving the passwords securely.\n\n");
+
+    if (admin_generated) {
+        fprintf(fp, "Admin username:  admin\n");
+        fprintf(fp, "Admin password:  %s  (AUTO-GENERATED)\n\n", admin_pass.c_str());
+    }
+
+    if (viewer_generated) {
+        fprintf(fp, "Viewer username: %s\n", viewer_user.c_str());
+        fprintf(fp, "Viewer password: %s  (AUTO-GENERATED)\n\n", viewer_pass.c_str());
+    }
+
+    fprintf(fp, "To change passwords later, run: sudo motion-setup --reset\n");
+    fclose(fp);
+
+    /* Set restrictive permissions (root read-only) */
+    chmod(INITIAL_PASSWORD_FILE, 0600);
+
+    return true;
+}
 
 /**
  * Get password from user without echoing to terminal
@@ -171,24 +255,57 @@ int main(int argc, char **argv) {
         std::cout << "  - viewer: Read-only access (view only)\n\n";
     }
 
-    /* Admin password */
+    /* Admin password with retry logic */
     std::cout << "Admin Account (username: admin)\n";
     std::cout << "--------------------------------\n";
 
-    std::string admin_pass = get_password("Admin password");
-    std::string admin_pass_confirm = get_password("Confirm password");
+    std::string admin_pass;
+    bool admin_generated = false;
+    int admin_attempts = 0;
 
-    if (admin_pass != admin_pass_confirm) {
-        std::cerr << "Error: Passwords don't match\n";
-        return 1;
+    while (admin_attempts < MAX_PASSWORD_ATTEMPTS) {
+        admin_pass = get_password("Admin password");
+        std::string admin_pass_confirm = get_password("Confirm password");
+
+        if (admin_pass.empty()) {
+            admin_attempts++;
+            std::cerr << "Error: Password cannot be empty. "
+                      << (MAX_PASSWORD_ATTEMPTS - admin_attempts) << " attempts remaining.\n\n";
+            continue;
+        }
+
+        if (admin_pass != admin_pass_confirm) {
+            admin_attempts++;
+            std::cerr << "Error: Passwords don't match. "
+                      << (MAX_PASSWORD_ATTEMPTS - admin_attempts) << " attempts remaining.\n\n";
+            continue;
+        }
+
+        break;  /* Success */
     }
 
-    if (admin_pass.empty()) {
-        std::cerr << "Error: Password cannot be empty\n";
-        return 1;
+    /* If all attempts failed, generate random password */
+    if (admin_attempts >= MAX_PASSWORD_ATTEMPTS) {
+        admin_pass = generate_random_password();
+        admin_generated = true;
+
+        std::cout << "\n";
+        std::cout << "╔══════════════════════════════════════════════════════════════╗\n";
+        std::cout << "║  ⚠  ADMIN PASSWORD SET TO AUTO-GENERATED VALUE              ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════════╣\n";
+        std::cout << "║                                                              ║\n";
+        std::cout << "║  Admin password: " << admin_pass;
+        /* Pad to align box */
+        for (size_t i = admin_pass.length(); i < 40; i++) std::cout << " ";
+        std::cout << "║\n";
+        std::cout << "║                                                              ║\n";
+        std::cout << "║  SAVE THIS PASSWORD - It will not be shown again!            ║\n";
+        std::cout << "║  Change later with: sudo motion-setup --reset                ║\n";
+        std::cout << "╚══════════════════════════════════════════════════════════════╝\n";
+        std::cout << "\n";
     }
 
-    /* Viewer credentials */
+    /* Viewer credentials with retry logic */
     std::cout << "\nViewer Account\n";
     std::cout << "---------------\n";
     std::cout << "Username [viewer]: " << std::flush;
@@ -199,17 +316,50 @@ int main(int argc, char **argv) {
         viewer_user = "viewer";
     }
 
-    std::string viewer_pass = get_password("Viewer password");
-    std::string viewer_pass_confirm = get_password("Confirm password");
+    std::string viewer_pass;
+    bool viewer_generated = false;
+    int viewer_attempts = 0;
 
-    if (viewer_pass != viewer_pass_confirm) {
-        std::cerr << "Error: Passwords don't match\n";
-        return 1;
+    while (viewer_attempts < MAX_PASSWORD_ATTEMPTS) {
+        viewer_pass = get_password("Viewer password");
+        std::string viewer_pass_confirm = get_password("Confirm password");
+
+        if (viewer_pass.empty()) {
+            viewer_attempts++;
+            std::cerr << "Error: Password cannot be empty. "
+                      << (MAX_PASSWORD_ATTEMPTS - viewer_attempts) << " attempts remaining.\n\n";
+            continue;
+        }
+
+        if (viewer_pass != viewer_pass_confirm) {
+            viewer_attempts++;
+            std::cerr << "Error: Passwords don't match. "
+                      << (MAX_PASSWORD_ATTEMPTS - viewer_attempts) << " attempts remaining.\n\n";
+            continue;
+        }
+
+        break;  /* Success */
     }
 
-    if (viewer_pass.empty()) {
-        std::cerr << "Error: Password cannot be empty\n";
-        return 1;
+    /* If all attempts failed, generate random password */
+    if (viewer_attempts >= MAX_PASSWORD_ATTEMPTS) {
+        viewer_pass = generate_random_password();
+        viewer_generated = true;
+
+        std::cout << "\n";
+        std::cout << "╔══════════════════════════════════════════════════════════════╗\n";
+        std::cout << "║  ⚠  VIEWER PASSWORD SET TO AUTO-GENERATED VALUE             ║\n";
+        std::cout << "╠══════════════════════════════════════════════════════════════╣\n";
+        std::cout << "║                                                              ║\n";
+        std::cout << "║  Viewer password: " << viewer_pass;
+        /* Pad to align box */
+        for (size_t i = viewer_pass.length(); i < 39; i++) std::cout << " ";
+        std::cout << "║\n";
+        std::cout << "║                                                              ║\n";
+        std::cout << "║  SAVE THIS PASSWORD - It will not be shown again!            ║\n";
+        std::cout << "║  Change later with: sudo motion-setup --reset                ║\n";
+        std::cout << "╚══════════════════════════════════════════════════════════════╝\n";
+        std::cout << "\n";
     }
 
     /* Hash passwords */
@@ -240,16 +390,45 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    /* Save initial password file if any passwords were auto-generated */
+    if (admin_generated || viewer_generated) {
+        if (save_initial_password_file(admin_pass, viewer_user, viewer_pass,
+                                        admin_generated, viewer_generated)) {
+            std::cout << "Auto-generated passwords saved to: " << INITIAL_PASSWORD_FILE << "\n";
+            std::cout << "(Delete this file after saving passwords securely)\n\n";
+        }
+    }
+
     std::cout << "\n";
-    std::cout << "========================================\n";
-    std::cout << "  Configuration Updated Successfully\n";
-    std::cout << "========================================\n\n";
+    std::cout << "╔══════════════════════════════════════════════════════════════╗\n";
+    std::cout << "║          Configuration Updated Successfully                  ║\n";
+    std::cout << "╚══════════════════════════════════════════════════════════════╝\n\n";
+
     std::cout << "Admin username:  admin\n";
-    std::cout << "Admin password:  " << admin_pass << "\n\n";
+    if (admin_generated) {
+        std::cout << "Admin password:  " << admin_pass << "  ⚠ AUTO-GENERATED\n\n";
+    } else {
+        std::cout << "Admin password:  (as entered)\n\n";
+    }
+
     std::cout << "Viewer username: " << viewer_user << "\n";
-    std::cout << "Viewer password: " << viewer_pass << "\n\n";
+    if (viewer_generated) {
+        std::cout << "Viewer password: " << viewer_pass << "  ⚠ AUTO-GENERATED\n\n";
+    } else {
+        std::cout << "Viewer password: (as entered)\n\n";
+    }
+
     std::cout << "Passwords have been hashed with bcrypt (work factor 12)\n";
     std::cout << "Config file updated: " << config_path << "\n\n";
+
+    if (admin_generated || viewer_generated) {
+        std::cout << "╔══════════════════════════════════════════════════════════════╗\n";
+        std::cout << "║  ⚠  IMPORTANT: Save auto-generated passwords NOW!           ║\n";
+        std::cout << "║     They are also saved to: " << INITIAL_PASSWORD_FILE << "    ║\n";
+        std::cout << "║     Delete that file after saving passwords securely.        ║\n";
+        std::cout << "╚══════════════════════════════════════════════════════════════╝\n\n";
+    }
+
     std::cout << "Restart Motion to apply changes:\n";
     std::cout << "  sudo systemctl restart motion\n\n";
 

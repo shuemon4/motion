@@ -93,12 +93,25 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Validate unattended mode requirements
+# Validate unattended mode requirements (fail fast before any installation begins)
 if [ "$UNATTENDED" = true ]; then
     if [ -z "$ADMIN_PASS" ] || [ -z "$VIEWER_PASS" ]; then
         echo -e "${RED}Error: --unattended requires --admin-pass and --viewer-pass${NC}"
         exit 1
     fi
+
+    # Validate password length (minimum 8 characters recommended)
+    if [ ${#ADMIN_PASS} -lt 8 ]; then
+        echo -e "${RED}Error: Admin password must be at least 8 characters${NC}"
+        exit 1
+    fi
+
+    if [ ${#VIEWER_PASS} -lt 8 ]; then
+        echo -e "${RED}Error: Viewer password must be at least 8 characters${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}✓ Password validation passed${NC}"
 fi
 
 # Detect Pi model
