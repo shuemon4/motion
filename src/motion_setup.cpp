@@ -29,9 +29,34 @@
 #include <sys/stat.h>
 
 const char* DEFAULT_CONFIG_PATH = "/usr/local/etc/motion/motion.conf";
+const char* ALT_CONFIG_PATH = "/etc/motion/motion.conf";
 const char* INITIAL_PASSWORD_FILE = "/var/lib/motion/initial-password.txt";
 const int MAX_PASSWORD_ATTEMPTS = 3;
 const int GENERATED_PASSWORD_LENGTH = 16;
+
+/**
+ * Find the best config file path
+ * Checks common locations and returns the first one that exists,
+ * or the default path if none exist (will be created)
+ */
+std::string find_config_path() {
+    /* Check if alternate path exists (package install location) */
+    std::ifstream alt_test(ALT_CONFIG_PATH);
+    if (alt_test) {
+        alt_test.close();
+        return ALT_CONFIG_PATH;
+    }
+
+    /* Check if default path exists (source install location) */
+    std::ifstream def_test(DEFAULT_CONFIG_PATH);
+    if (def_test) {
+        def_test.close();
+        return DEFAULT_CONFIG_PATH;
+    }
+
+    /* Neither exists - return default (will be created) */
+    return DEFAULT_CONFIG_PATH;
+}
 
 /**
  * Generate a cryptographically secure random password
@@ -136,12 +161,63 @@ std::string get_password(const char *prompt) {
 }
 
 /**
+ * Ensure config directory and file exist
+ * Creates directory and minimal config file if needed
+ */
+bool ensure_config_exists(const std::string &config_path) {
+    /* Extract directory from config path */
+    size_t last_slash = config_path.rfind('/');
+    if (last_slash != std::string::npos) {
+        std::string dir_path = config_path.substr(0, last_slash);
+
+        /* Create directory if it doesn't exist (with parents) */
+        std::string mkdir_cmd = "mkdir -p " + dir_path;
+        if (system(mkdir_cmd.c_str()) != 0) {
+            std::cerr << "Warning: Could not create directory: " << dir_path << std::endl;
+        }
+    }
+
+    /* Check if config file exists */
+    std::ifstream test(config_path);
+    if (!test) {
+        /* Create minimal config file */
+        std::ofstream outfile(config_path);
+        if (!outfile) {
+            std::cerr << "Error: Cannot create config file: " << config_path << std::endl;
+            return false;
+        }
+
+        outfile << "# Motion configuration file\n";
+        outfile << "# Created by motion-setup\n";
+        outfile << "#\n";
+        outfile << "# See motion-dist.conf for all available options\n";
+        outfile << "\n";
+        outfile << "# Web control interface\n";
+        outfile << "webcontrol_port 8080\n";
+        outfile << "webcontrol_localhost off\n";
+        outfile << "webcontrol_parms 2\n";
+        outfile << "\n";
+        outfile << "# Authentication (configured by motion-setup)\n";
+        outfile.close();
+
+        std::cout << "Created new config file: " << config_path << "\n";
+    }
+
+    return true;
+}
+
+/**
  * Update a parameter in the config file
  * Returns true on success, false on failure
  */
 bool update_config_parameter(const std::string &config_path,
                              const std::string &param_name,
                              const std::string &param_value) {
+    /* Ensure config file exists first */
+    if (!ensure_config_exists(config_path)) {
+        return false;
+    }
+
     /* Read entire file */
     std::ifstream infile(config_path);
     if (!infile) {
@@ -205,7 +281,8 @@ bool update_config_parameter(const std::string &config_path,
 
 int main(int argc, char **argv) {
     bool reset_mode = false;
-    std::string config_path = DEFAULT_CONFIG_PATH;
+    bool config_specified = false;
+    std::string config_path;
 
     /* Parse command line arguments */
     for (int i = 1; i < argc; i++) {
@@ -213,6 +290,7 @@ int main(int argc, char **argv) {
             reset_mode = true;
         } else if (strcmp(argv[i], "--config") == 0 && i + 1 < argc) {
             config_path = argv[i + 1];
+            config_specified = true;
             i++;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             std::cout << "Motion Authentication Setup\n";
@@ -220,8 +298,11 @@ int main(int argc, char **argv) {
             std::cout << "Usage: motion-setup [OPTIONS]\n\n";
             std::cout << "Options:\n";
             std::cout << "  --reset              Reset forgotten passwords\n";
-            std::cout << "  --config PATH        Use alternate config file\n";
+            std::cout << "  --config PATH        Use alternate config file (auto-detected if not specified)\n";
             std::cout << "  --help, -h           Show this help message\n\n";
+            std::cout << "Config file locations checked:\n";
+            std::cout << "  1. /etc/motion/motion.conf (package install)\n";
+            std::cout << "  2. /usr/local/etc/motion/motion.conf (source install)\n\n";
             std::cout << "This tool configures Motion authentication by:\n";
             std::cout << "  1. Prompting for admin password (username: admin)\n";
             std::cout << "  2. Prompting for viewer username and password\n";
@@ -243,8 +324,15 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    /* Auto-detect config path if not specified */
+    if (!config_specified) {
+        config_path = find_config_path();
+    }
+
     std::cout << "Motion Authentication Setup\n";
     std::cout << "============================\n\n";
+
+    std::cout << "Config file: " << config_path << "\n\n";
 
     if (reset_mode) {
         std::cout << "Password Reset Mode\n\n";
