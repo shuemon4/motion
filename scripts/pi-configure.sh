@@ -1,7 +1,10 @@
 #!/bin/bash
 # Motion Configuration Script for Raspberry Pi
-# Interactive configuration tool for Motion settings
+# PRODUCTION - Interactive configuration tool for Motion settings
+#
 # Can be run multiple times to update configuration
+#
+# Usage: scripts/pi-configure.sh
 
 set -e
 

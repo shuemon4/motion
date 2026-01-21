@@ -1,8 +1,12 @@
 #!/bin/bash
 # Motion Setup Script for Raspberry Pi
+# PRODUCTION - Run on new Pi installations to install dependencies
+#
 # Auto-detects Pi model and configures accordingly
 # Supports: Pi 4, Pi 5 (with appropriate camera stack)
 # OS: Raspberry Pi OS Bookworm or newer
+#
+# Usage: sudo scripts/pi-setup.sh
 
 set -e
 

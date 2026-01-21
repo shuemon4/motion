@@ -1,7 +1,11 @@
 #!/bin/bash
 # Motion Build Script for Raspberry Pi
+# PRODUCTION - Build Motion from source on the Pi
+#
 # Auto-detects Pi model and configures accordingly
-# Run this after setup script and transferring source code
+# Run this after pi-setup.sh has installed dependencies
+#
+# Usage: scripts/pi-build.sh
 
 set -e
 

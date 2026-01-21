@@ -1,8 +1,8 @@
 #!/bin/bash
-#
 # Motion Service Setup Script
-# Sets up systemd service and initial configuration
+# PRODUCTION - Sets up systemd service and initial configuration
 #
+# Usage: sudo scripts/setup-motion-service.sh
 # This file is part of Motion.
 #
 # Motion is free software: you can redistribute it and/or modify
