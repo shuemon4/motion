@@ -199,13 +199,15 @@ cd "$PROJECT_DIR"
 bash "$SCRIPT_DIR/pi-build.sh"
 echo -e "${GREEN}✅ Build complete${NC}"
 
-# Step 3: Install binaries
+# Step 3: Install binaries and service
 echo ""
 echo -e "${BLUE}[3/5] Installing Motion...${NC}"
 echo "═══════════════════════════════════════════════════════════════"
 cd "$PROJECT_DIR"
 make install
+make install-service
 echo -e "${GREEN}✅ Motion installed to /usr/local${NC}"
+echo -e "${GREEN}✅ Systemd service file installed${NC}"
 
 # Step 4: Configure authentication
 echo ""

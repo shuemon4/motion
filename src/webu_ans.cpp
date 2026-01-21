@@ -604,7 +604,7 @@ mhdrslt cls_webu_ans::mhd_digest()
     /* This function gets called a couple of
      * times by MHD during the authentication process.
      */
-    int retcd;
+    int retcd = MHD_NO;
     char *user;
     bool is_admin = false;
     bool is_user = false;
