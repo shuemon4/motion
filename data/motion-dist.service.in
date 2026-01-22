@@ -23,7 +23,9 @@ After=local-fs.target network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
+WatchdogSec=30
 ExecStart=@bindir@/motion -n
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure

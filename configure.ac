@@ -126,6 +126,34 @@ AS_IF([test "${XCRYPT}" != "yes" ], [
 CPPFLAGS="$HOLD_CPPFLAGS"
 
 ##############################################################################
+###  Check for systemd - Optional.  Needed for watchdog integration
+##############################################################################
+AC_ARG_WITH([systemd],
+  AS_HELP_STRING([--with-systemd],[Build with systemd watchdog support]),
+  [SYSTEMD=$withval],
+  [SYSTEMD="yes"]
+)
+SYSTEMD_VER=""
+AS_IF([test "${SYSTEMD}" = "no"], [
+    AC_MSG_CHECKING(for systemd)
+    AC_MSG_RESULT(skipped)
+  ],[
+    AC_MSG_CHECKING(for systemd)
+    AS_IF([pkgconf libsystemd], [
+        SYSTEMD_VER="("`pkgconf --modversion libsystemd`")"
+        TEMP_CPPFLAGS="$TEMP_CPPFLAGS "`pkgconf --cflags libsystemd`
+        TEMP_LIBS="$TEMP_LIBS "`pkgconf --libs libsystemd`
+        AC_DEFINE([HAVE_SYSTEMD], [1], [Define to 1 if you have systemd support])
+        SYSTEMD="yes"
+      ],[
+        SYSTEMD="no"
+      ]
+    )
+    AC_MSG_RESULT([$SYSTEMD])
+  ]
+)
+
+##############################################################################
 ###  Check setting/getting thread names
 ##############################################################################
 AC_CHECK_HEADERS(pthread_np.h,[PTHREAD_NP="yes"],[PTHREAD_NP="no"])
@@ -743,6 +771,7 @@ echo "OS                    : $host_os"
 echo "pthread_np            : $PTHREAD_NP"
 echo "pthread_setname_np    : $PTHREAD_SETNAME_NP"
 echo "pthread_getname_np    : $PTHREAD_GETNAME_NP"
+echo "systemd               : $SYSTEMD$SYSTEMD_VER"
 echo "V4L2                  : $V4L2"
 echo "webp                  : $WEBP$WEBP_VER"
 echo "libcamera             : $LIBCAM$LIBCAM_VER"

@@ -70,6 +70,10 @@
     #include <pthread_np.h>
 #endif
 
+#ifdef HAVE_SYSTEMD
+    #include <systemd/sd-daemon.h>
+#endif
+
 #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wconversion"
     extern "C" {

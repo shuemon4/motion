@@ -572,6 +572,10 @@ void cls_motapp::init(int p_argc, char *p_argv[])
             , _("Waiting for camera or sound configuration to be added via web control."));
     }
 
+#ifdef HAVE_SYSTEMD
+    sd_notify(0, "READY=1");
+#endif
+
 }
 
 void cls_motapp::deinit()
@@ -675,6 +679,9 @@ int main (int p_argc, char **p_argv)
         app->init(p_argc, p_argv);
         while (app->check_devices()) {
             SLEEP(1, 0);
+#ifdef HAVE_SYSTEMD
+            sd_notify(0, "WATCHDOG=1");
+#endif
             if (motsignal != MOTION_SIGNAL_NONE) {
                 app->signal_process();
             }
