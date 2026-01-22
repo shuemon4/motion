@@ -48,6 +48,11 @@ data/camera3-dist.conf
 data/sound1-dist.conf
 data/webcontrol/samplepage.html
 
+#development scripts (local only)
+scripts/deploy-pi4.sh
+scripts/deploy-pi5.sh
+scripts/pi5-test.conf
+
 #src
 src/*.o
 src/motion
