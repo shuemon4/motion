@@ -29,12 +29,15 @@ doc/installation/
 doc/issues/
 doc/libcamera/
 doc/plans/
+doc/project/
 doc/reviews/
 doc/scratchpads/
 doc/sub-agent-summaries/
 doc/summaries/
 doc/aar/
 doc/Screenshots/
+doc/sub-agent-plans/
+doc/MOTION_PI5_CHANGES.md
 
 #data
 data/motion-dist.service
