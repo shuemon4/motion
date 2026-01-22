@@ -249,15 +249,20 @@ show_summary() {
     echo "  sudo systemctl restart motion   # Restart service"
     echo "  sudo journalctl -u motion -f    # View logs"
     echo ""
+    # Check if authentication is configured (either via this script or motion-setup)
+    local auth_configured=false
     if [[ -n "$ADMIN_PASS" ]]; then
+        auth_configured=true
+    elif grep -q "^webcontrol_authentication" "$MOTION_CONF_DIR/motion.conf" 2>/dev/null; then
+        auth_configured=true
+    fi
+
+    if [[ "$auth_configured" == "true" ]]; then
         local port=$(grep "^webcontrol_port" "$MOTION_CONF_DIR/motion.conf" 2>/dev/null | awk '{print $2}' || echo "8080")
         echo "Web interface: http://$(hostname -I | awk '{print $1}'):$port/"
-        echo "  Admin login: $ADMIN_USER / [password set]"
-        if [[ -n "$VIEWER_PASS" ]]; then
-            echo "  Viewer login: $VIEWER_USER / [password set]"
-        fi
+        echo "  Authentication: configured"
     else
-        log_warn "No authentication configured. Set --admin-pass and --viewer-pass for security."
+        log_warn "No authentication configured. Run 'sudo motion-setup' or set --admin-pass for security."
     fi
     echo ""
 }

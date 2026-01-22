@@ -261,6 +261,8 @@ void cls_webu_json::parms_item_detail(cls_config *conf, std::string pNm)
 void cls_webu_json::parms_item(cls_config *conf, int indx_parm)
 {
     std::string parm_orig, parm_val, parm_list, parm_enable;
+    std::string parm_name = config_parms[indx_parm].parm_name;
+    bool password_set = false;
 
     parm_orig = "";
     parm_val = "";
@@ -275,7 +277,23 @@ void cls_webu_json::parms_item(cls_config *conf, int indx_parm)
     conf->edit_get(config_parms[indx_parm].parm_name
         , parm_orig, config_parms[indx_parm].parm_cat);
 
-    parm_val = escstr(parm_orig);
+    /* Mask password values for authentication parameters
+     * Returns username with empty password, plus password_set flag */
+    if (parm_name == "webcontrol_authentication" ||
+        parm_name == "webcontrol_user_authentication") {
+        size_t colon_pos = parm_orig.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string username = parm_orig.substr(0, colon_pos);
+            std::string password = parm_orig.substr(colon_pos + 1);
+            password_set = !password.empty();
+            /* Return username with empty password portion */
+            parm_val = escstr(username) + ":";
+        } else {
+            parm_val = "";
+        }
+    } else {
+        parm_val = escstr(parm_orig);
+    }
 
     if (config_parms[indx_parm].parm_type == PARM_TYP_INT) {
         webua->resp_page +=
@@ -331,13 +349,18 @@ void cls_webu_json::parms_item(cls_config *conf, int indx_parm)
         webua->resp_page += "}";
     } else {
         webua->resp_page +=
-            "\"" + config_parms[indx_parm].parm_name + "\"" +
+            "\"" + parm_name + "\"" +
             ":{" +
             " \"value\":\"" + parm_val + "\"" +
             ",\"enabled\":" + parm_enable +
             ",\"category\":" + std::to_string(config_parms[indx_parm].parm_cat) +
-            ",\"type\":\""+ conf->type_desc(config_parms[indx_parm].parm_type) + "\"" +
-            "}";
+            ",\"type\":\""+ conf->type_desc(config_parms[indx_parm].parm_type) + "\"";
+        /* Add password_set flag for authentication parameters */
+        if (parm_name == "webcontrol_authentication" ||
+            parm_name == "webcontrol_user_authentication") {
+            webua->resp_page += ",\"password_set\":" + std::string(password_set ? "true" : "false");
+        }
+        webua->resp_page += "}";
     }
 }
 

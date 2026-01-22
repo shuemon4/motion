@@ -3,11 +3,11 @@ import { useToast } from '@/components/Toast'
 import { systemReboot, systemShutdown } from '@/api/system'
 
 export interface SystemSettingsProps {
-  config: Record<string, { value: string | number | boolean }>
+  config: Record<string, { value: string | number | boolean; password_set?: boolean }>
   onChange: (param: string, value: string | number | boolean) => void
   getError?: (param: string) => string | undefined
   /** Original config from server (without pending changes) - used for modified indicators */
-  originalConfig?: Record<string, { value: string | number | boolean }>
+  originalConfig?: Record<string, { value: string | number | boolean; password_set?: boolean }>
 }
 
 export function SystemSettings({ config, onChange, getError, originalConfig }: SystemSettingsProps) {
@@ -19,6 +19,15 @@ export function SystemSettings({ config, onChange, getError, originalConfig }: S
 
   const getOriginalValue = (param: string, defaultValue: string | number | boolean = '') => {
     return originalConfig?.[param]?.value ?? defaultValue
+  }
+
+  /** Check if a password is set for an authentication parameter */
+  const isPasswordSet = (param: string) => {
+    return config[param]?.password_set === true
+  }
+
+  const isOriginalPasswordSet = (param: string) => {
+    return originalConfig?.[param]?.password_set === true
   }
 
   const handleReboot = async () => {
@@ -134,12 +143,15 @@ export function SystemSettings({ config, onChange, getError, originalConfig }: S
             label="Admin Password"
             value={String(getValue('webcontrol_authentication', '')).split(':')[1] || ''}
             onChange={(val) => {
-              const currentUser = String(getValue('webcontrol_authentication', '')).split(':')[0] || '';
-              onChange('webcontrol_authentication', currentUser ? `${currentUser}:${val}` : '');
+              const currentUser = String(getValue('webcontrol_authentication', '')).split(':')[0] || 'admin';
+              onChange('webcontrol_authentication', `${currentUser}:${val}`);
             }}
             type="password"
-            helpText="Administrator password (click eye icon to reveal)"
-            originalValue={String(getOriginalValue('webcontrol_authentication', '')).split(':')[1] || ''}
+            placeholder={isPasswordSet('webcontrol_authentication') ? 'Password set (enter new to change)' : 'Enter password'}
+            helpText={isPasswordSet('webcontrol_authentication')
+              ? "Password is configured. Enter a new password to change it."
+              : "Administrator password (click eye icon to reveal)"}
+            originalValue={isOriginalPasswordSet('webcontrol_authentication') ? '[set]' : ''}
           />
           <FormInput
             label="Viewer Username"
@@ -161,8 +173,11 @@ export function SystemSettings({ config, onChange, getError, originalConfig }: S
               onChange('webcontrol_user_authentication', currentUser ? `${currentUser}:${val}` : '');
             }}
             type="password"
-            helpText="View-only password (click eye icon to reveal)"
-            originalValue={String(getOriginalValue('webcontrol_user_authentication', '')).split(':')[1] || ''}
+            placeholder={isPasswordSet('webcontrol_user_authentication') ? 'Password set (enter new to change)' : 'Enter password'}
+            helpText={isPasswordSet('webcontrol_user_authentication')
+              ? "Password is configured. Enter a new password to change it."
+              : "View-only password (click eye icon to reveal)"}
+            originalValue={isOriginalPasswordSet('webcontrol_user_authentication') ? '[set]' : ''}
           />
         </div>
 
