@@ -219,7 +219,7 @@ export function SystemSettings({ config, onChange, getError, originalConfig }: S
           label="PID File"
           value={String(getValue('pid_file', ''))}
           onChange={(val) => onChange('pid_file', val)}
-          helpText="Path to process ID file (leave empty for default)"
+          helpText="Path to process ID file. Leave empty to let systemd manage the PID."
           error={getError?.('pid_file')}
           originalValue={String(getOriginalValue('pid_file', ''))}
         />
@@ -227,7 +227,7 @@ export function SystemSettings({ config, onChange, getError, originalConfig }: S
           label="Log File"
           value={String(getValue('log_file', ''))}
           onChange={(val) => onChange('log_file', val)}
-          helpText="Path to Motion log file"
+          helpText="Path to log file. Leave empty to use journald (view with: journalctl -u motion)."
           error={getError?.('log_file')}
           originalValue={String(getOriginalValue('log_file', ''))}
         />

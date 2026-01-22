@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react'
+import { useEffect, useRef, useLayoutEffect } from 'react'
 import { useCameraStream } from '@/hooks/useCameraStream'
 import { useFpsTracker } from '@/hooks/useFpsTracker'
 
@@ -6,17 +6,14 @@ interface CameraStreamProps {
   cameraId: number
   className?: string
   onFpsChange?: (fps: number) => void
-  onFullscreenRequest?: () => void
 }
 
 export function CameraStream({
   cameraId,
   className = '',
-  onFpsChange,
-  onFullscreenRequest
+  onFpsChange
 }: CameraStreamProps) {
   const { streamUrl, isLoading, error } = useCameraStream(cameraId)
-  const [isExpanded, setIsExpanded] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
   const fps = useFpsTracker(imgRef)
 
@@ -31,40 +28,6 @@ export function CameraStream({
   useEffect(() => {
     onFpsChangeRef.current?.(fps)
   }, [fps])
-
-  const openFullscreen = useCallback(() => {
-    if (onFullscreenRequest) {
-      onFullscreenRequest()
-    } else {
-      setIsExpanded(true)
-    }
-  }, [onFullscreenRequest])
-
-  const closeFullscreen = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsExpanded(false)
-  }, [])
-
-  // Handle escape key to close fullscreen
-  useEffect(() => {
-    if (!isExpanded) return
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsExpanded(false)
-      }
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    // Prevent body scroll when fullscreen
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = ''
-    }
-  }, [isExpanded])
 
   if (error) {
     return (
@@ -98,50 +61,15 @@ export function CameraStream({
   }
 
   return (
-    <>
-      {/* Fullscreen overlay */}
-      {isExpanded && (
-        <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
-          {/* Close button - large, obvious, high z-index */}
-          <button
-            type="button"
-            onClick={closeFullscreen}
-            className="absolute top-4 right-4 z-[10000] p-3 bg-white/20 hover:bg-white/40 rounded-full transition-colors"
-            aria-label="Close fullscreen"
-          >
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          {/* Hint text */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm">
-            Press ESC or click X to close
-          </div>
-
-          {/* Fullscreen stream */}
-          <img
-            src={streamUrl}
-            alt={`Camera ${cameraId} stream fullscreen`}
-            className="max-w-[95vw] max-h-[95vh] object-contain"
-          />
-        </div>
-      )}
-
-      {/* Normal view - fills container width */}
-      <div className={`w-full ${className}`}>
-        <div
-          className="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer"
-          onClick={openFullscreen}
-        >
-          <img
-            ref={imgRef}
-            src={streamUrl}
-            alt={`Camera ${cameraId} stream`}
-            className="absolute inset-0 w-full h-full object-contain"
-          />
-        </div>
+    <div className={`w-full ${className}`}>
+      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+        <img
+          ref={imgRef}
+          src={streamUrl}
+          alt={`Camera ${cameraId} stream`}
+          className="absolute inset-0 w-full h-full object-contain"
+        />
       </div>
-    </>
+    </div>
   )
 }

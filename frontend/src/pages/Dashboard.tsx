@@ -241,10 +241,6 @@ export function Dashboard() {
         })}
       </div>
 
-      <p className="text-center text-xs text-gray-500 mt-6">
-        Click on a camera to view fullscreen
-      </p>
-
       {/* Quick Settings Bottom Sheet */}
       <BottomSheet
         isOpen={sheetOpen}
