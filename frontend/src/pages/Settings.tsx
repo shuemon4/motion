@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, applyRestartRequiredChanges } from '@/api/client'
+import { CAMERA_RESTARTED_EVENT } from '@/components/CameraStream'
 import { updateSessionCsrf } from '@/api/session'
 import { FormSection } from '@/components/form'
 import { useToast } from '@/components/Toast'
-import { useBatchUpdateConfig } from '@/api/queries'
+import { useBatchUpdateConfig, useSystemStatus } from '@/api/queries'
 import { validateConfigParam } from '@/lib/validation'
 import { SystemSettings } from '@/components/settings/SystemSettings'
 import { DeviceSettings } from '@/components/settings/DeviceSettings'
@@ -75,6 +76,9 @@ export function Settings() {
   })
 
   const batchUpdateConfigMutation = useBatchUpdateConfig()
+
+  // Fetch system status for action availability
+  const { data: systemStatus } = useSystemStatus()
 
   // Fetch camera capabilities for conditional UI rendering (e.g., autofocus controls)
   const { data: capabilities } = useCameraCapabilities(Number(selectedCamera))
@@ -191,33 +195,35 @@ export function Settings() {
         if (restartParams.length > 0) {
           // Auto-restart for restart-required parameters
           addToast(
-            `Applying ${restartParams.length} setting(s) that require restart: ${restartParams.join(', ')}...`,
+            `Restarting camera to apply ${restartParams.length} setting(s): ${restartParams.join(', ')}...`,
             'info'
           )
 
-          try {
-            // Write config to disk and restart camera
-            await applyRestartRequiredChanges(camId)
+          // Clear changes now since config is already saved
+          setChanges({})
 
-            // Clear all changes since restart applies them
-            setChanges({})
+          // Write config and restart camera (fire-and-forget with polling)
+          const cameBackOnline = await applyRestartRequiredChanges(camId)
 
-            // Wait briefly for camera to restart, then refetch config
-            await new Promise(resolve => setTimeout(resolve, 2000))
-            await queryClient.invalidateQueries({ queryKey: ['config'] })
-            await queryClient.refetchQueries({ queryKey: ['config'] })
+          // Notify stream components to reconnect
+          window.dispatchEvent(
+            new CustomEvent(CAMERA_RESTARTED_EVENT, { detail: { cameraId: camId } })
+          )
 
+          // Refetch config after restart
+          await queryClient.invalidateQueries({ queryKey: ['config'] })
+          await queryClient.refetchQueries({ queryKey: ['config'] })
+
+          if (cameBackOnline) {
             addToast(
-              `Applied ${restartParams.length} setting(s). Camera restarted.`,
+              `Applied ${restartParams.length} setting(s). Camera restarted successfully.`,
               'success'
             )
-          } catch (restartErr) {
-            console.error('Failed to restart camera:', restartErr)
+          } else {
             addToast(
-              `Saved settings but camera restart failed. Please restart manually.`,
+              `Settings saved. Camera is restarting - refresh page if stream doesn't recover.`,
               'warning'
             )
-            setChanges({})
           }
         } else if (summary.errors > 0) {
           // Handle errors (not restart-related)
@@ -379,7 +385,7 @@ export function Settings() {
               To configure camera-specific settings, select a camera from the dropdown above.
             </p>
           </div>
-          <SystemSettings config={activeConfig} onChange={handleChange} getError={getError} originalConfig={originalConfig} />
+          <SystemSettings config={activeConfig} onChange={handleChange} getError={getError} originalConfig={originalConfig} systemStatus={systemStatus} />
 
           {/* UI Preferences - Global only */}
           <PreferencesSettings />

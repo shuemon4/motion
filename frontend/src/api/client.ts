@@ -6,6 +6,11 @@ import { getSessionToken, getCsrfToken, clearSession, updateSessionCsrf } from '
  * Can be overridden via VITE_API_TIMEOUT environment variable
  */
 const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT ?? '10000', 10);
+/**
+ * Longer timeout for action commands (config_write, restart)
+ * These involve disk I/O and process management which can take longer
+ */
+const ACTION_TIMEOUT = 30000;
 const MAX_RETRIES = 1; // Max retries for transient failures
 
 /**
@@ -141,10 +146,11 @@ export async function apiGet<T>(endpoint: string, retryCount = 0): Promise<T> {
 export async function apiPost<T>(
   endpoint: string,
   data: Record<string, unknown>,
-  retryCount = 0
+  retryCount = 0,
+  timeout = API_TIMEOUT
 ): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   const sessionToken = getSessionToken();
   const csrfToken = getCsrfToken();
@@ -233,7 +239,7 @@ export async function apiPost<T>(
     // Handle transient errors with retry
     if (isTransientError(response.status) && retryCount < MAX_RETRIES) {
       await sleep(1000 * (retryCount + 1)); // Exponential backoff
-      return apiPost<T>(endpoint, data, retryCount + 1);
+      return apiPost<T>(endpoint, data, retryCount + 1, timeout);
     }
 
     if (!response.ok) {
@@ -473,66 +479,216 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
   }
 }
 
-/**
- * POST request with form-urlencoded data for Motion action commands
- * Used for restart, config_write, pause, etc.
- */
-export async function apiPostAction(
-  command: string,
-  camId: number
-): Promise<void> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+// ============================================================================
+// Camera Action API Functions
+// These use the new JSON API endpoints for camera control operations
+// ============================================================================
 
-  try {
-    const response = await fetch('/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      credentials: 'same-origin',
-      body: `command=${encodeURIComponent(command)}&camid=${camId}`,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new ApiClientError(`HTTP ${response.status}: ${response.statusText}`, response.status);
-    }
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof ApiClientError) throw error;
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiClientError('Request timeout', 408);
-    }
-    throw new ApiClientError(error instanceof Error ? error.message : 'Unknown error');
-  }
+interface ActionResponse {
+  status: string;
 }
 
 /**
  * Write current configuration to disk
- * @param camId Camera ID (0 for all cameras)
+ * Uses JSON API: POST /0/api/config/write
+ * Note: Config write is always global, camera ID is ignored
  */
-export async function writeConfig(camId: number = 0): Promise<void> {
-  return apiPostAction('config_write', camId);
+export async function writeConfig(): Promise<void> {
+  await apiPost<ActionResponse>('/0/api/config/write', {}, 0, ACTION_TIMEOUT);
+}
+
+/**
+ * Fire-and-forget config write - sends command but doesn't wait for response.
+ * Motion processes the command but may not return HTTP response reliably.
+ * Note: Config write is always global, camera ID is ignored
+ */
+export function writeConfigFireAndForget(): void {
+  const sessionToken = getSessionToken();
+  const csrfToken = getCsrfToken();
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+  fetch('/0/api/config/write', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(sessionToken && { 'X-Session-Token': sessionToken }),
+      ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
+    },
+    credentials: 'same-origin',
+    body: JSON.stringify({}),
+    signal: controller.signal,
+  }).catch(() => {
+    // Ignore errors - command was sent, Motion processes it
+  });
 }
 
 /**
  * Restart a camera to apply configuration changes
+ * Uses JSON API: POST /{camId}/api/camera/restart
  * @param camId Camera ID (0 for all cameras)
  */
 export async function restartCamera(camId: number = 0): Promise<void> {
-  return apiPostAction('restart', camId);
+  await apiPost<ActionResponse>(`/${camId}/api/camera/restart`, {}, 0, ACTION_TIMEOUT);
+}
+
+/**
+ * Fire-and-forget restart - sends command but doesn't wait for response.
+ * Motion's restart command may not respond (it kills its own HTTP handler).
+ * Uses JSON API: POST /{camId}/api/camera/restart
+ * @param camId Camera ID (0 for all cameras)
+ */
+export function restartCameraFireAndForget(camId: number = 0): void {
+  const sessionToken = getSessionToken();
+  const csrfToken = getCsrfToken();
+
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 2000); // 2 second timeout
+
+  fetch(`/${camId}/api/camera/restart`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(sessionToken && { 'X-Session-Token': sessionToken }),
+      ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
+    },
+    credentials: 'same-origin',
+    body: JSON.stringify({}),
+    signal: controller.signal,
+  }).catch(() => {
+    // Ignore errors - expected during restart
+  });
+}
+
+/**
+ * Take a snapshot with the specified camera
+ * Uses JSON API: POST /{camId}/api/camera/snapshot
+ * @param camId Camera ID
+ */
+export async function takeSnapshot(camId: number): Promise<void> {
+  await apiPost<ActionResponse>(`/${camId}/api/camera/snapshot`, {});
+}
+
+/**
+ * Pause or unpause motion detection for a camera
+ * Uses JSON API: POST /{camId}/api/camera/pause
+ * @param camId Camera ID
+ * @param action 'on' to pause, 'off' to unpause, 'schedule' for schedule-based
+ */
+export async function pauseCamera(
+  camId: number,
+  action: 'on' | 'off' | 'schedule'
+): Promise<void> {
+  await apiPost<ActionResponse>(`/${camId}/api/camera/pause`, { action });
+}
+
+/**
+ * Stop a camera (will not restart automatically)
+ * Uses JSON API: POST /{camId}/api/camera/stop
+ * @param camId Camera ID
+ */
+export async function stopCamera(camId: number): Promise<void> {
+  await apiPost<ActionResponse>(`/${camId}/api/camera/stop`, {});
+}
+
+/**
+ * Manually trigger event start for a camera
+ * Uses JSON API: POST /{camId}/api/camera/event/start
+ * @param camId Camera ID
+ */
+export async function triggerEventStart(camId: number): Promise<void> {
+  await apiPost<ActionResponse>(`/${camId}/api/camera/event/start`, {});
+}
+
+/**
+ * Manually trigger event end for a camera
+ * Uses JSON API: POST /{camId}/api/camera/event/end
+ * @param camId Camera ID
+ */
+export async function triggerEventEnd(camId: number): Promise<void> {
+  await apiPost<ActionResponse>(`/${camId}/api/camera/event/end`, {});
+}
+
+/**
+ * Send PTZ (Pan/Tilt/Zoom) command to a camera
+ * Uses JSON API: POST /{camId}/api/camera/ptz
+ * @param camId Camera ID
+ * @param action PTZ action (e.g., 'up', 'down', 'left', 'right', 'zoom_in', 'zoom_out')
+ */
+export async function sendPtzCommand(camId: number, action: string): Promise<void> {
+  await apiPost<ActionResponse>(`/${camId}/api/camera/ptz`, { action });
+}
+
+/**
+ * Poll camera status until it responds (camera is back online after restart)
+ * @param camId Camera ID
+ * @param maxAttempts Maximum polling attempts
+ * @param intervalMs Polling interval in milliseconds
+ * @returns true if camera came back online, false if timed out
+ */
+export async function waitForCameraOnline(
+  _camId: number, // Currently unused - status endpoint is global
+  maxAttempts: number = 30,
+  intervalMs: number = 1000
+): Promise<boolean> {
+  const sessionToken = getSessionToken();
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const response = await fetch('/0/api/system/status', {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          ...(sessionToken && { 'X-Session-Token': sessionToken }),
+        },
+        credentials: 'same-origin',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        // Camera is back online
+        return true;
+      }
+    } catch {
+      // Connection failed - camera still restarting, continue polling
+    }
+
+    // Wait before next attempt
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  return false; // Timed out
 }
 
 /**
  * Write config and restart camera - used after applying restart-required parameters
+ * Uses fire-and-forget for both operations since Motion may not respond reliably.
  * @param camId Camera ID
+ * @returns true if camera came back online after restart
  */
-export async function applyRestartRequiredChanges(camId: number): Promise<void> {
-  await writeConfig(camId);
-  await restartCamera(camId);
+export async function applyRestartRequiredChanges(camId: number): Promise<boolean> {
+  // Fire config write command - don't wait for response (Motion processes but may not respond)
+  writeConfigFireAndForget();
+
+  // Brief delay to let config write complete before restart
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  // Fire restart command - don't wait for response
+  restartCameraFireAndForget(camId);
+
+  // Wait a moment for Motion to start restarting
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // Poll until camera is back online (max 30 seconds)
+  return waitForCameraOnline(camId, 30, 1000);
 }
 
 export { ApiClientError };

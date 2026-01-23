@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProfiles, useApplyProfile } from '../hooks/useProfiles';
 import { ProfileSaveDialog } from './ProfileSaveDialog';
 import { useToast } from './Toast';
+import { applyRestartRequiredChanges } from '@/api/client';
 
 interface ConfigurationPresetsProps {
   cameraId: number;
@@ -18,6 +20,7 @@ interface ConfigurationPresetsProps {
  * - Manage existing profiles (delete, set as default)
  */
 export function ConfigurationPresets({ cameraId, readOnly = false }: ConfigurationPresetsProps) {
+  const queryClient = useQueryClient();
   const { data: profiles, isLoading, error } = useProfiles(cameraId);
   const { mutate: applyProfile, isPending: isApplying } = useApplyProfile();
   const { addToast } = useToast();
@@ -31,12 +34,27 @@ export function ConfigurationPresets({ cameraId, readOnly = false }: Configurati
       const profileName = profile?.name || 'profile';
 
       applyProfile(selectedProfileId, {
-        onSuccess: (requiresRestart) => {
+        onSuccess: async (requiresRestart) => {
           if (requiresRestart.length > 0) {
             addToast(
-              `Profile "${profileName}" applied. Restart required for: ${requiresRestart.join(', ')}`,
-              'warning'
+              `Profile "${profileName}" applied. Restarting camera...`,
+              'info'
             );
+            try {
+              await applyRestartRequiredChanges(cameraId);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              await queryClient.invalidateQueries({ queryKey: ['config'] });
+              addToast(
+                `Profile "${profileName}" applied. Camera restarted.`,
+                'success'
+              );
+            } catch (err) {
+              console.error('Failed to restart camera:', err);
+              addToast(
+                `Profile applied but camera restart failed. Please restart manually.`,
+                'warning'
+              );
+            }
           } else {
             addToast(
               `Profile "${profileName}" applied successfully`,

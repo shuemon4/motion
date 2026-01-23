@@ -124,7 +124,6 @@ class cls_webu_ans;
 class cls_webu_file;
 class cls_webu_json;
 class cls_webu_mpegts;
-class cls_webu_post;
 class cls_webu_common;
 class cls_webu_stream;
 class cls_thumbnail;

@@ -6,7 +6,7 @@ import { QuickSettings } from '@/components/QuickSettings'
 import { FullscreenButton } from '@/components/FullscreenButton'
 import { SettingsButton } from '@/components/SettingsButton'
 import { SnapshotButton } from '@/components/SnapshotButton'
-import { useCameras } from '@/api/queries'
+import { useCameras, useCameraStatus } from '@/api/queries'
 import { apiGet } from '@/api/client'
 import { updateSessionCsrf } from '@/api/session'
 import { useAuthContext } from '@/contexts/AuthContext'
@@ -28,10 +28,18 @@ interface DashboardConfig {
 
 export function Dashboard() {
   const { data: cameras, isLoading, error } = useCameras()
-  const { role } = useAuthContext()
+  const { role, isAuthenticated, authRequired } = useAuthContext()
+  // Only poll for camera status when authenticated (or auth not required)
+  const { data: cameraStatuses } = useCameraStatus({
+    enabled: !authRequired || isAuthenticated,
+  })
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null)
-  const [cameraFps, setCameraFps] = useState<Record<number, number>>({})
+
+  // Get FPS from server-provided camera status
+  const getFps = (cameraId: number) => {
+    return cameraStatuses?.find((c) => c.id === cameraId)?.fps ?? 0
+  }
 
   // Fetch config when sheet is open
   const { data: configData } = useQuery({
@@ -55,10 +63,6 @@ export function Dashboard() {
 
   const closeQuickSettings = () => {
     setSheetOpen(false)
-  }
-
-  const handleFpsChange = (cameraId: number, fps: number) => {
-    setCameraFps((prev) => ({ ...prev, [cameraId]: fps }))
   }
 
   // Get camera name for sheet title
@@ -139,7 +143,7 @@ export function Dashboard() {
   // Single camera: streamlined layout without extra headers
   if (cameraCount === 1) {
     const camera = cameras[0]
-    const fps = cameraFps[camera.id] || 0
+    const fps = getFps(camera.id)
     return (
       <div className="p-4 sm:p-6">
         <div className="max-w-5xl mx-auto">
@@ -163,10 +167,7 @@ export function Dashboard() {
             </div>
 
             {/* Camera stream */}
-            <CameraStream
-              cameraId={camera.id}
-              onFpsChange={(fps) => handleFpsChange(camera.id, fps)}
-            />
+            <CameraStream cameraId={camera.id} />
           </div>
         </div>
 
@@ -206,7 +207,7 @@ export function Dashboard() {
 
       <div className={getGridClasses()}>
         {cameras.map((camera) => {
-          const fps = cameraFps[camera.id] || 0
+          const fps = getFps(camera.id)
           return (
             <div
               key={camera.id}
@@ -232,10 +233,7 @@ export function Dashboard() {
               </div>
 
               {/* Camera stream */}
-              <CameraStream
-                cameraId={camera.id}
-                onFpsChange={(fps) => handleFpsChange(camera.id, fps)}
-              />
+              <CameraStream cameraId={camera.id} />
             </div>
           )
         })}

@@ -2076,6 +2076,26 @@ void cls_webu_json::api_system_status()
         webua->resp_page += "},";
     }
 
+    /* Webcontrol Actions Status */
+    webua->resp_page += "\"actions\":{";
+
+    bool service_enabled = false;
+    bool power_enabled = false;
+    for (int indx = 0; indx < webu->wb_actions->params_cnt; indx++) {
+        if (webu->wb_actions->params_array[indx].param_name == "service" &&
+            webu->wb_actions->params_array[indx].param_value == "on") {
+            service_enabled = true;
+        }
+        if (webu->wb_actions->params_array[indx].param_name == "power" &&
+            webu->wb_actions->params_array[indx].param_value == "on") {
+            power_enabled = true;
+        }
+    }
+
+    webua->resp_page += "\"service\":" + std::string(service_enabled ? "true" : "false");
+    webua->resp_page += ",\"power\":" + std::string(power_enabled ? "true" : "false");
+    webua->resp_page += "},";
+
     /* Motion Version */
     webua->resp_page += "\"version\":\"" + escstr(VERSION) + "\"";
 
@@ -2195,6 +2215,56 @@ void cls_webu_json::api_system_shutdown()
     }).detach();
 
     webua->resp_page = "{\"success\":true,\"operation\":\"shutdown\",\"message\":\"System will shut down in 2 seconds\"}";
+}
+
+/*
+ * React UI API: Restart Motion service
+ * POST /0/api/system/service-restart
+ * Requires CSRF token and authentication
+ */
+void cls_webu_json::api_system_service_restart()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    /* Validate CSRF token (supports both session and global tokens) */
+    const char* csrf_token = MHD_lookup_connection_value(
+        webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
+        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+            _("CSRF token validation failed for service restart from %s"), webua->clientip.c_str());
+        webua->resp_page = "{\"error\":\"CSRF validation failed\"}";
+        return;
+    }
+
+    /* Check if service control is enabled via webcontrol_actions */
+    bool service_enabled = false;
+    for (int indx = 0; indx < webu->wb_actions->params_cnt; indx++) {
+        if (webu->wb_actions->params_array[indx].param_name == "service") {
+            if (webu->wb_actions->params_array[indx].param_value == "on") {
+                service_enabled = true;
+            }
+            break;
+        }
+    }
+
+    if (!service_enabled) {
+        MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
+            "Service restart request denied - service control disabled (from %s)", webua->clientip.c_str());
+        webua->resp_page = "{\"error\":\"Service control is disabled\"}";
+        return;
+    }
+
+    /* Log the restart request */
+    MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+        "Motion service restart requested by %s", webua->clientip.c_str());
+
+    /* Schedule restart with 2-second delay to allow HTTP response to complete */
+    std::thread([]() {
+        sleep(2);
+        system("sudo /usr/bin/systemctl restart motion");
+    }).detach();
+
+    webua->resp_page = "{\"success\":true,\"operation\":\"service-restart\",\"message\":\"Motion service will restart in 2 seconds\"}";
 }
 
 /*
@@ -3181,6 +3251,416 @@ void cls_webu_json::api_profiles_set_default()
 
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
         _("Default profile set: id=%d"), profile_id);
+}
+
+/*
+ * CSRF validation helper for POST endpoints
+ * Gets token from X-CSRF-Token header and validates against session or global token
+ * Returns true if valid, false otherwise (also sets error response)
+ */
+bool cls_webu_json::validate_csrf()
+{
+    const char* csrf_token = MHD_lookup_connection_value(
+        webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
+    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
+        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
+            _("CSRF token validation failed from %s"), webua->clientip.c_str());
+        webua->resp_page = "{\"error\":\"CSRF validation failed\"}";
+        webua->resp_code = 403;
+        return false;
+    }
+    return true;
+}
+
+/*
+ * Check if an action is enabled in webcontrol_actions
+ * Returns true if action is enabled (or not explicitly disabled), false if disabled
+ */
+bool cls_webu_json::check_action_permission(const std::string &action_name)
+{
+    for (int indx = 0; indx < webu->wb_actions->params_cnt; indx++) {
+        if (webu->wb_actions->params_array[indx].param_name == action_name) {
+            if (webu->wb_actions->params_array[indx].param_value == "off") {
+                MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
+                    "%s action disabled", action_name.c_str());
+                webua->resp_page = "{\"error\":\"" + action_name + " action is disabled\"}";
+                return false;
+            }
+            break;
+        }
+    }
+    return true;
+}
+
+/*
+ * Camera action API: Write configuration to file
+ * POST /0/api/config/write
+ * Saves current configuration parameters to file
+ */
+void cls_webu_json::api_config_write()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (!validate_csrf()) {
+        return;
+    }
+
+    if (!check_action_permission("config_write")) {
+        return;
+    }
+
+    MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+        "Config write requested by %s", webua->clientip.c_str());
+
+    pthread_mutex_lock(&app->mutex_post);
+    app->conf_src->parms_write();
+    pthread_mutex_unlock(&app->mutex_post);
+
+    webua->resp_page = "{\"status\":\"ok\"}";
+}
+
+/*
+ * Camera action API: Restart camera(s)
+ * POST /{camId}/api/camera/restart
+ * If camId=0, restart all cameras; otherwise restart specific camera
+ */
+void cls_webu_json::api_camera_restart()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (!validate_csrf()) {
+        return;
+    }
+
+    if (!check_action_permission("restart")) {
+        return;
+    }
+
+    pthread_mutex_lock(&app->mutex_post);
+    if (webua->device_id == 0) {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO, _("Restarting all cameras"));
+        for (int indx = 0; indx < app->cam_cnt; indx++) {
+            app->cam_list[indx]->handler_stop = false;
+            app->cam_list[indx]->restart = true;
+        }
+    } else {
+        if (webua->camindx >= 0 && webua->camindx < app->cam_cnt) {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Restarting camera %d"),
+                app->cam_list[webua->camindx]->cfg->device_id);
+            app->cam_list[webua->camindx]->handler_stop = false;
+            app->cam_list[webua->camindx]->restart = true;
+        } else {
+            pthread_mutex_unlock(&app->mutex_post);
+            webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+            return;
+        }
+    }
+    pthread_mutex_unlock(&app->mutex_post);
+
+    webua->resp_page = "{\"status\":\"ok\"}";
+}
+
+/*
+ * Camera action API: Take snapshot
+ * POST /{camId}/api/camera/snapshot
+ * If camId=0, snapshot all cameras; otherwise snapshot specific camera
+ */
+void cls_webu_json::api_camera_snapshot()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (!validate_csrf()) {
+        return;
+    }
+
+    if (!check_action_permission("snapshot")) {
+        return;
+    }
+
+    pthread_mutex_lock(&app->mutex_post);
+    if (webua->device_id == 0) {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO, _("Snapshot requested for all cameras"));
+        for (int indx = 0; indx < app->cam_cnt; indx++) {
+            app->cam_list[indx]->action_snapshot = true;
+        }
+    } else {
+        if (webua->camindx >= 0 && webua->camindx < app->cam_cnt) {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Snapshot requested for camera %d"),
+                app->cam_list[webua->camindx]->cfg->device_id);
+            app->cam_list[webua->camindx]->action_snapshot = true;
+        } else {
+            pthread_mutex_unlock(&app->mutex_post);
+            webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+            return;
+        }
+    }
+    pthread_mutex_unlock(&app->mutex_post);
+
+    webua->resp_page = "{\"status\":\"ok\"}";
+}
+
+/*
+ * Camera action API: Pause/unpause detection
+ * POST /{camId}/api/camera/pause
+ * Body: {"action": "on"|"off"|"schedule"}
+ * If camId=0, applies to all cameras; otherwise specific camera
+ */
+void cls_webu_json::api_camera_pause()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (!validate_csrf()) {
+        return;
+    }
+
+    if (!check_action_permission("pause")) {
+        return;
+    }
+
+    /* Parse JSON body for action */
+    std::string action = "on";  /* Default to pause on */
+    if (!webua->raw_body.empty()) {
+        JsonParser parser;
+        if (parser.parse(webua->raw_body)) {
+            std::string parsed_action = parser.getString("action");
+            if (!parsed_action.empty()) {
+                action = parsed_action;
+            }
+        }
+    }
+
+    /* Validate action value */
+    if (action != "on" && action != "off" && action != "schedule") {
+        webua->resp_page = "{\"error\":\"Invalid action. Use 'on', 'off', or 'schedule'\"}";
+        return;
+    }
+
+    pthread_mutex_lock(&app->mutex_post);
+    if (webua->device_id == 0) {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+            _("Pause %s requested for all cameras"), action.c_str());
+        for (int indx = 0; indx < app->cam_cnt; indx++) {
+            app->cam_list[indx]->user_pause = action;
+        }
+    } else {
+        if (webua->camindx >= 0 && webua->camindx < app->cam_cnt) {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Pause %s requested for camera %d"), action.c_str(),
+                app->cam_list[webua->camindx]->cfg->device_id);
+            app->cam_list[webua->camindx]->user_pause = action;
+        } else {
+            pthread_mutex_unlock(&app->mutex_post);
+            webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+            return;
+        }
+    }
+    pthread_mutex_unlock(&app->mutex_post);
+
+    webua->resp_page = "{\"status\":\"ok\",\"action\":\"" + action + "\"}";
+}
+
+/*
+ * Camera action API: Stop camera(s)
+ * POST /{camId}/api/camera/stop
+ * If camId=0, stop all cameras; otherwise stop specific camera
+ */
+void cls_webu_json::api_camera_stop()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (!validate_csrf()) {
+        return;
+    }
+
+    if (!check_action_permission("stop")) {
+        return;
+    }
+
+    pthread_mutex_lock(&app->mutex_post);
+    if (webua->device_id == 0) {
+        for (int indx = 0; indx < app->cam_cnt; indx++) {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Stopping camera %d"),
+                app->cam_list[indx]->cfg->device_id);
+            app->cam_list[indx]->restart = false;
+            app->cam_list[indx]->event_stop = true;
+            app->cam_list[indx]->event_user = false;
+            app->cam_list[indx]->handler_stop = true;
+        }
+    } else {
+        if (webua->camindx >= 0 && webua->camindx < app->cam_cnt) {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Stopping camera %d"),
+                app->cam_list[webua->camindx]->cfg->device_id);
+            app->cam_list[webua->camindx]->restart = false;
+            app->cam_list[webua->camindx]->event_stop = true;
+            app->cam_list[webua->camindx]->event_user = false;
+            app->cam_list[webua->camindx]->handler_stop = true;
+        } else {
+            pthread_mutex_unlock(&app->mutex_post);
+            webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+            return;
+        }
+    }
+    pthread_mutex_unlock(&app->mutex_post);
+
+    webua->resp_page = "{\"status\":\"ok\"}";
+}
+
+/*
+ * Camera action API: Trigger event start
+ * POST /{camId}/api/camera/event/start
+ * If camId=0, trigger for all cameras; otherwise specific camera
+ */
+void cls_webu_json::api_camera_event_start()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (!validate_csrf()) {
+        return;
+    }
+
+    if (!check_action_permission("event")) {
+        return;
+    }
+
+    pthread_mutex_lock(&app->mutex_post);
+    if (webua->device_id == 0) {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO, _("Event start triggered for all cameras"));
+        for (int indx = 0; indx < app->cam_cnt; indx++) {
+            app->cam_list[indx]->event_user = true;
+        }
+    } else {
+        if (webua->camindx >= 0 && webua->camindx < app->cam_cnt) {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Event start triggered for camera %d"),
+                app->cam_list[webua->camindx]->cfg->device_id);
+            app->cam_list[webua->camindx]->event_user = true;
+        } else {
+            pthread_mutex_unlock(&app->mutex_post);
+            webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+            return;
+        }
+    }
+    pthread_mutex_unlock(&app->mutex_post);
+
+    webua->resp_page = "{\"status\":\"ok\"}";
+}
+
+/*
+ * Camera action API: Trigger event end
+ * POST /{camId}/api/camera/event/end
+ * If camId=0, trigger for all cameras; otherwise specific camera
+ */
+void cls_webu_json::api_camera_event_end()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (!validate_csrf()) {
+        return;
+    }
+
+    if (!check_action_permission("event")) {
+        return;
+    }
+
+    pthread_mutex_lock(&app->mutex_post);
+    if (webua->device_id == 0) {
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO, _("Event end triggered for all cameras"));
+        for (int indx = 0; indx < app->cam_cnt; indx++) {
+            app->cam_list[indx]->event_stop = true;
+        }
+    } else {
+        if (webua->camindx >= 0 && webua->camindx < app->cam_cnt) {
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Event end triggered for camera %d"),
+                app->cam_list[webua->camindx]->cfg->device_id);
+            app->cam_list[webua->camindx]->event_stop = true;
+        } else {
+            pthread_mutex_unlock(&app->mutex_post);
+            webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+            return;
+        }
+    }
+    pthread_mutex_unlock(&app->mutex_post);
+
+    webua->resp_page = "{\"status\":\"ok\"}";
+}
+
+/*
+ * Camera action API: PTZ control
+ * POST /{camId}/api/camera/ptz
+ * Body: {"action": "pan_left"|"pan_right"|"tilt_up"|"tilt_down"|"zoom_in"|"zoom_out"}
+ * Requires specific camera (camId != 0)
+ */
+void cls_webu_json::api_camera_ptz()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (!validate_csrf()) {
+        return;
+    }
+
+    if (!check_action_permission("ptz")) {
+        return;
+    }
+
+    /* PTZ requires a specific camera */
+    if (webua->camindx < 0 || webua->camindx >= app->cam_cnt) {
+        webua->resp_page = "{\"error\":\"PTZ requires a specific camera ID\"}";
+        return;
+    }
+
+    /* Parse JSON body for action */
+    if (webua->raw_body.empty()) {
+        webua->resp_page = "{\"error\":\"Missing request body with action\"}";
+        return;
+    }
+
+    JsonParser parser;
+    if (!parser.parse(webua->raw_body)) {
+        webua->resp_page = "{\"error\":\"Invalid JSON: " + parser.getError() + "\"}";
+        return;
+    }
+
+    std::string action = parser.getString("action");
+    if (action.empty()) {
+        webua->resp_page = "{\"error\":\"Missing 'action' field\"}";
+        return;
+    }
+
+    cls_camera *cam = app->cam_list[webua->camindx];
+    std::string ptz_cmd;
+
+    /* Map action to PTZ command */
+    if (action == "pan_left" && !cam->cfg->ptz_pan_left.empty()) {
+        ptz_cmd = cam->cfg->ptz_pan_left;
+    } else if (action == "pan_right" && !cam->cfg->ptz_pan_right.empty()) {
+        ptz_cmd = cam->cfg->ptz_pan_right;
+    } else if (action == "tilt_up" && !cam->cfg->ptz_tilt_up.empty()) {
+        ptz_cmd = cam->cfg->ptz_tilt_up;
+    } else if (action == "tilt_down" && !cam->cfg->ptz_tilt_down.empty()) {
+        ptz_cmd = cam->cfg->ptz_tilt_down;
+    } else if (action == "zoom_in" && !cam->cfg->ptz_zoom_in.empty()) {
+        ptz_cmd = cam->cfg->ptz_zoom_in;
+    } else if (action == "zoom_out" && !cam->cfg->ptz_zoom_out.empty()) {
+        ptz_cmd = cam->cfg->ptz_zoom_out;
+    } else {
+        webua->resp_page = "{\"error\":\"Invalid or unconfigured PTZ action: " + action + "\"}";
+        return;
+    }
+
+    pthread_mutex_lock(&app->mutex_post);
+    cam->frame_skip = cam->cfg->ptz_wait;
+    util_exec_command(cam, ptz_cmd);
+    pthread_mutex_unlock(&app->mutex_post);
+
+    MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+        _("PTZ %s executed for camera %d"), action.c_str(), cam->cfg->device_id);
+
+    webua->resp_page = "{\"status\":\"ok\",\"action\":\"" + action + "\"}";
 }
 
 void cls_webu_json::main()

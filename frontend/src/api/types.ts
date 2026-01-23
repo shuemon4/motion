@@ -132,8 +132,33 @@ export interface TemperatureResponse {
   fahrenheit: number;
 }
 
+// Per-camera status from /0/api/system/status
+export interface CameraStatus {
+  name: string;
+  id: number;
+  width: number;
+  height: number;
+  fps: number;
+  current_time: string;
+  missing_frame_counter: number;
+  lost_connection: boolean;
+  connection_lost_time: string;
+  detecting: boolean;
+  pause: boolean;
+  user_pause: string;
+  supportedControls?: CameraCapabilities;
+}
+
+// Status section with dynamic camera keys
+export interface StatusSection {
+  count: number;
+  [key: `cam${number}`]: CameraStatus;
+}
+
 // System status response from /0/api/system/status
 export interface SystemStatus {
+  version: string;
+  status: StatusSection;
   temperature?: {
     celsius: number;
     fahrenheit: number;
@@ -157,7 +182,10 @@ export interface SystemStatus {
     available: number;
     percent: number;
   };
-  version: string;
+  actions?: {
+    service: boolean;
+    power: boolean;
+  };
 }
 
 // API error

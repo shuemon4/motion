@@ -4,7 +4,6 @@ import { getSessionToken } from '@/api/session'
 export function useCameraStream(cameraId: number) {
   const [streamUrl, setStreamUrl] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // MJPEG stream URL - Motion uses /camId/mjpg/stream
@@ -14,23 +13,16 @@ export function useCameraStream(cameraId: number) {
     const baseUrl = `/${cameraId}/mjpg/stream`
     const url = token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl
 
-    // Test if stream is available
-    const img = new Image()
-    img.onload = () => {
-      setStreamUrl(url)
-      setIsLoading(false)
-    }
-    img.onerror = () => {
-      setError('Stream not available')
-      setIsLoading(false)
-    }
-    img.src = url
+    // Set URL directly - MJPEG streams don't work with Image.onload testing
+    // The CameraStream component handles errors via onError
+    setStreamUrl(url)
+    setIsLoading(false)
 
     return () => {
-      img.onload = null
-      img.onerror = null
+      // Cleanup - clear URL to stop stream
+      setStreamUrl('')
     }
   }, [cameraId])
 
-  return { streamUrl, isLoading, error }
+  return { streamUrl, isLoading, error: null }
 }

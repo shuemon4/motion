@@ -1,33 +1,48 @@
-import { useEffect, useRef, useLayoutEffect } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { useCameraStream } from '@/hooks/useCameraStream'
-import { useFpsTracker } from '@/hooks/useFpsTracker'
 
 interface CameraStreamProps {
   cameraId: number
   className?: string
-  onFpsChange?: (fps: number) => void
 }
 
-export function CameraStream({
-  cameraId,
-  className = '',
-  onFpsChange
-}: CameraStreamProps) {
+// Custom event name for camera restart notification
+export const CAMERA_RESTARTED_EVENT = 'camera-restarted'
+
+export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
   const { streamUrl, isLoading, error } = useCameraStream(cameraId)
   const imgRef = useRef<HTMLImageElement>(null)
-  const fps = useFpsTracker(imgRef)
+  const [streamKey, setStreamKey] = useState(0)
 
-  // Store callback in ref to avoid triggering effect when callback reference changes
-  // This prevents render loops when parent passes inline arrow functions
-  const onFpsChangeRef = useRef(onFpsChange)
-  useLayoutEffect(() => {
-    onFpsChangeRef.current = onFpsChange
-  })
+  // Force stream reconnection by changing key
+  const handleStreamError = useCallback(() => {
+    // Add small delay before retry to avoid hammering
+    setTimeout(() => {
+      setStreamKey((k) => k + 1)
+    }, 2000)
+  }, [])
 
-  // Notify parent of FPS changes - only triggers when fps actually changes
+  // Listen for camera restart events to force reconnection
   useEffect(() => {
-    onFpsChangeRef.current?.(fps)
-  }, [fps])
+    const handleCameraRestarted = (event: CustomEvent<{ cameraId?: number }>) => {
+      // Reconnect if event is for this camera or all cameras (cameraId undefined or 0)
+      const eventCamId = event.detail?.cameraId
+      if (!eventCamId || eventCamId === 0 || eventCamId === cameraId) {
+        // Force new connection by incrementing key
+        setStreamKey((k) => k + 1)
+      }
+    }
+
+    window.addEventListener(CAMERA_RESTARTED_EVENT, handleCameraRestarted as EventListener)
+    return () => {
+      window.removeEventListener(CAMERA_RESTARTED_EVENT, handleCameraRestarted as EventListener)
+    }
+  }, [cameraId])
+
+  // Reset stream key when camera changes
+  useEffect(() => {
+    setStreamKey(0)
+  }, [cameraId])
 
   if (error) {
     return (
@@ -60,14 +75,20 @@ export function CameraStream({
     )
   }
 
+  // Add cache buster to stream URL when key changes (forces reconnection)
+  const streamUrlWithKey = streamUrl
+    ? `${streamUrl}${streamUrl.includes('?') ? '&' : '?'}_k=${streamKey}`
+    : ''
+
   return (
     <div className={`w-full ${className}`}>
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
         <img
           ref={imgRef}
-          src={streamUrl}
+          src={streamUrlWithKey}
           alt={`Camera ${cameraId} stream`}
           className="absolute inset-0 w-full h-full object-contain"
+          onError={handleStreamError}
         />
       </div>
     </div>

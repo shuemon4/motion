@@ -1,5 +1,23 @@
 5.0     Major Release - Modern Web UI & Security
 
+    BREAKING CHANGES
+    * Remove legacy form-urlencoded POST command API
+      - External scripts using commands like `command=restart&camid=1` will break
+      - Migrate to new JSON REST API endpoints (see API CHANGES below)
+
+    API CHANGES
+    * Replace legacy POST commands with JSON REST API endpoints:
+      - POST /0/api/config/write (replaces command=config_write)
+      - POST /{camId}/api/camera/restart (replaces command=restart)
+      - POST /{camId}/api/camera/snapshot (replaces command=snapshot)
+      - POST /{camId}/api/camera/pause with {"action":"on|off|schedule"}
+      - POST /{camId}/api/camera/stop (replaces command=stop)
+      - POST /{camId}/api/camera/event/start (replaces command=eventstart)
+      - POST /{camId}/api/camera/event/end (replaces command=eventend)
+      - POST /{camId}/api/camera/ptz with {"action":"pan_left|pan_right|..."}
+    * All new endpoints require X-CSRF-Token header for CSRF protection
+    * All new endpoints return JSON responses: {"status":"ok"} or {"error":"..."}
+
     PLATFORM REQUIREMENTS
     * Raspberry Pi 4 or newer required (64-bit only)
     * Raspberry Pi 3 and older NOT supported due to:

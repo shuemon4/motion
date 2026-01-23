@@ -78,7 +78,6 @@ frontend/
 │   ├── hooks/               # Custom React hooks
 │   │   ├── useCameraStream.ts      # MJPEG stream URL management
 │   │   ├── useCameraCapabilities.ts # Camera hardware capability detection
-│   │   ├── useFpsTracker.ts        # Real-time FPS calculation
 │   │   ├── useProfiles.ts          # Profile CRUD operations
 │   │   └── useSheetGestures.ts     # Touch gestures for bottom sheet
 │   │
@@ -229,15 +228,6 @@ Manages MJPEG stream URL and connection state:
 
 ```typescript
 const { streamUrl, isLoading, error } = useCameraStream(1)
-```
-
-### `useFpsTracker(imgRef)`
-
-Calculates real-time FPS from MJPEG stream:
-
-```typescript
-const imgRef = useRef<HTMLImageElement>(null)
-const fps = useFpsTracker(imgRef)  // Returns current FPS number
 ```
 
 ### `useProfiles(cameraId)`

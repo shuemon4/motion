@@ -74,7 +74,6 @@
         private:
             cls_webu_file   *webu_file;
             cls_webu_json   *webu_json;
-            cls_webu_post   *webu_post;
             cls_webu_stream *webu_stream;
 
             int             mhd_first;      /* Boolean for whether it is the first connection*/

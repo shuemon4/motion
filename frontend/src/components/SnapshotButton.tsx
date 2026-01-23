@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiPostAction } from '@/api/client'
+import { takeSnapshot } from '@/api/client'
 import { useToast } from '@/components/Toast'
 
 interface SnapshotButtonProps {
@@ -17,7 +17,7 @@ export function SnapshotButton({ cameraId }: SnapshotButtonProps) {
 
     setIsPending(true)
     try {
-      await apiPostAction('snapshot', cameraId)
+      await takeSnapshot(cameraId)
       addToast('Snapshot captured', 'success')
     } catch (error) {
       addToast(

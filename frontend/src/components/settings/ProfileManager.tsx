@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useProfiles, useApplyProfile, useDeleteProfile, useSetDefaultProfile } from '@/hooks/useProfiles';
 import { ProfileSaveDialog } from '@/components/ProfileSaveDialog';
 import { useToast } from '@/components/Toast';
 import { FormSection } from '@/components/form';
+import { applyRestartRequiredChanges } from '@/api/client';
 
 interface ProfileManagerProps {
   cameraId: number;
@@ -19,6 +21,7 @@ interface ProfileManagerProps {
  * - Set default profile
  */
 export function ProfileManager({ cameraId }: ProfileManagerProps) {
+  const queryClient = useQueryClient();
   const { data: profiles, isLoading, error } = useProfiles(cameraId);
   const { mutate: applyProfile, isPending: isApplying } = useApplyProfile();
   const { mutate: deleteProfile, isPending: isDeleting } = useDeleteProfile();
@@ -30,12 +33,27 @@ export function ProfileManager({ cameraId }: ProfileManagerProps) {
 
   const handleApply = (profileId: number, profileName: string) => {
     applyProfile(profileId, {
-      onSuccess: (requiresRestart) => {
+      onSuccess: async (requiresRestart) => {
         if (requiresRestart.length > 0) {
           addToast(
-            `Profile "${profileName}" applied. Restart required for: ${requiresRestart.join(', ')}`,
-            'warning'
+            `Profile "${profileName}" applied. Restarting camera for: ${requiresRestart.join(', ')}...`,
+            'info'
           );
+          try {
+            await applyRestartRequiredChanges(cameraId);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await queryClient.invalidateQueries({ queryKey: ['config'] });
+            addToast(
+              `Profile "${profileName}" applied. Camera restarted.`,
+              'success'
+            );
+          } catch (err) {
+            console.error('Failed to restart camera:', err);
+            addToast(
+              `Profile applied but camera restart failed. Please restart manually.`,
+              'warning'
+            );
+          }
         } else {
           addToast(
             `Profile "${profileName}" applied successfully`,

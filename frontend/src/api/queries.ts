@@ -4,6 +4,7 @@ import { updateSessionCsrf } from './session';
 import type {
   MotionConfig,
   Camera,
+  CameraStatus,
   PicturesResponse,
   MoviesResponse,
   DateSummaryResponse,
@@ -23,6 +24,7 @@ export const queryKeys = {
   mediaFolders: (camId: number, path: string) => ['media-folders', camId, path] as const,
   temperature: ['temperature'] as const,
   systemStatus: ['systemStatus'] as const,
+  cameraStatus: ['cameraStatus'] as const,
 };
 
 // Fetch full Motion config (includes cameras list)
@@ -168,6 +170,32 @@ export function useSystemStatus() {
     refetchInterval: 10000, // Refresh every 10s
     refetchIntervalInBackground: false, // Pause when tab inactive to save CPU
     staleTime: 5000,
+  });
+}
+
+// Fetch camera status with FPS (faster refresh for real-time display)
+// Only enabled when user is authenticated (to avoid 401 errors during auth check)
+export function useCameraStatus(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.cameraStatus,
+    queryFn: () => apiGet<SystemStatus>('/0/api/system/status'),
+    refetchInterval: 2000, // 2 second refresh for near-real-time FPS
+    refetchIntervalInBackground: false, // Pause when tab inactive to save CPU
+    staleTime: 1000,
+    enabled: options?.enabled ?? true,
+    retry: false, // Don't retry on auth errors
+    select: (data): CameraStatus[] => {
+      // Transform status object into array of camera statuses
+      const cameras: CameraStatus[] = [];
+      if (data.status) {
+        for (const key in data.status) {
+          if (key.startsWith('cam')) {
+            cameras.push(data.status[key as `cam${number}`]);
+          }
+        }
+      }
+      return cameras;
+    },
   });
 }
 

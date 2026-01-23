@@ -49,6 +49,7 @@
             void api_system_status();
             void api_system_reboot();     /* POST /0/api/system/reboot */
             void api_system_shutdown();   /* POST /0/api/system/shutdown */
+            void api_system_service_restart(); /* POST /0/api/system/service-restart */
             void api_cameras();
             void api_config();
             void api_config_patch();  /* Batch config update via PATCH */
@@ -64,6 +65,16 @@
             void api_profiles_delete();  /* DELETE /0/api/profiles/{id} */
             void api_profiles_apply();   /* POST /0/api/profiles/{id}/apply */
             void api_profiles_set_default(); /* POST /0/api/profiles/{id}/default */
+
+            /* Camera action API endpoints (JSON replacements for legacy POST) */
+            void api_config_write();         /* POST /0/api/config/write */
+            void api_camera_restart();       /* POST /{camId}/api/camera/restart */
+            void api_camera_snapshot();      /* POST /{camId}/api/camera/snapshot */
+            void api_camera_pause();         /* POST /{camId}/api/camera/pause */
+            void api_camera_stop();          /* POST /{camId}/api/camera/stop */
+            void api_camera_event_start();   /* POST /{camId}/api/camera/event/start */
+            void api_camera_event_end();     /* POST /{camId}/api/camera/event/end */
+            void api_camera_ptz();           /* POST /{camId}/api/camera/ptz */
 
         private:
             cls_motapp      *app;
@@ -91,6 +102,11 @@
             void build_response(bool success, const std::string &parm_name,
                                const std::string &old_val, const std::string &new_val,
                                bool hot_reload);
+
+            /* CSRF validation helper for POST endpoints */
+            bool validate_csrf();
+            /* webcontrol_actions permission check helper */
+            bool check_action_permission(const std::string &action_name);
     };
 
 #endif /* _INCLUDE_WEBU_JSON_HPP_ */

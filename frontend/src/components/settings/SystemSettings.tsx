@@ -1,6 +1,7 @@
 import { FormSection, FormInput, FormSelect, FormToggle } from '@/components/form'
 import { useToast } from '@/components/Toast'
-import { systemReboot, systemShutdown } from '@/api/system'
+import { systemReboot, systemShutdown, systemServiceRestart } from '@/api/system'
+import type { SystemStatus } from '@/api/types'
 
 export interface SystemSettingsProps {
   config: Record<string, { value: string | number | boolean; password_set?: boolean }>
@@ -8,10 +9,16 @@ export interface SystemSettingsProps {
   getError?: (param: string) => string | undefined
   /** Original config from server (without pending changes) - used for modified indicators */
   originalConfig?: Record<string, { value: string | number | boolean; password_set?: boolean }>
+  /** System status for action availability */
+  systemStatus?: SystemStatus
 }
 
-export function SystemSettings({ config, onChange, getError, originalConfig }: SystemSettingsProps) {
+export function SystemSettings({ config, onChange, getError, originalConfig, systemStatus }: SystemSettingsProps) {
   const { addToast } = useToast()
+
+  // Extract action availability flags
+  const serviceEnabled = systemStatus?.actions?.service ?? false
+  const powerEnabled = systemStatus?.actions?.power ?? false
 
   const getValue = (param: string, defaultValue: string | number | boolean = '') => {
     return config[param]?.value ?? defaultValue
@@ -60,32 +67,89 @@ export function SystemSettings({ config, onChange, getError, originalConfig }: S
     }
   }
 
+  const handleServiceRestart = async () => {
+    if (window.confirm('Are you sure you want to restart the Motion service? Active streams will be interrupted briefly.')) {
+      try {
+        await systemServiceRestart()
+        addToast('Restarting Motion... Streams will resume shortly.', 'info')
+      } catch (error: unknown) {
+        const err = error as { message?: string }
+        addToast(
+          err.message || 'Failed to restart service. Service control may be disabled in config.',
+          'error'
+        )
+      }
+    }
+  }
+
   return (
     <>
       {/* Device Controls - FIRST section for quick access */}
       <FormSection
         title="Device Controls"
-        description="System power management"
+        description="Service and system power management"
         collapsible
         defaultOpen={false}
       >
-        <div className="flex gap-3">
-          <button
-            onClick={handleReboot}
-            className="px-4 py-2 bg-yellow-600/20 text-yellow-300 hover:bg-yellow-600/30 rounded-lg text-sm transition-colors"
-          >
-            Restart Pi
-          </button>
-          <button
-            onClick={handleShutdown}
-            className="px-4 py-2 bg-red-600/20 text-red-300 hover:bg-red-600/30 rounded-lg text-sm transition-colors"
-          >
-            Shutdown Pi
-          </button>
+        <div className="flex flex-col gap-4">
+          {/* Service Controls */}
+          <div>
+            <p className="text-xs text-gray-400 mb-2">Service Control</p>
+            <button
+              onClick={handleServiceRestart}
+              disabled={!serviceEnabled}
+              className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                serviceEnabled
+                  ? 'bg-blue-600/20 text-blue-300 hover:bg-blue-600/30'
+                  : 'bg-gray-600/20 text-gray-500 cursor-not-allowed'
+              }`}
+              title={!serviceEnabled ? 'Enable with webcontrol_actions service=on' : undefined}
+            >
+              Restart Motion
+            </button>
+            {!serviceEnabled && (
+              <p className="text-xs text-amber-500 mt-1">
+                Disabled - add <code className="text-xs bg-surface-base px-1 rounded">webcontrol_actions service=on</code> to enable
+              </p>
+            )}
+          </div>
+
+          {/* System Power Controls */}
+          <div>
+            <p className="text-xs text-gray-400 mb-2">System Power</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleReboot}
+                disabled={!powerEnabled}
+                className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                  powerEnabled
+                    ? 'bg-yellow-600/20 text-yellow-300 hover:bg-yellow-600/30'
+                    : 'bg-gray-600/20 text-gray-500 cursor-not-allowed'
+                }`}
+                title={!powerEnabled ? 'Enable with webcontrol_actions power=on' : undefined}
+              >
+                Restart Pi
+              </button>
+              <button
+                onClick={handleShutdown}
+                disabled={!powerEnabled}
+                className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                  powerEnabled
+                    ? 'bg-red-600/20 text-red-300 hover:bg-red-600/30'
+                    : 'bg-gray-600/20 text-gray-500 cursor-not-allowed'
+                }`}
+                title={!powerEnabled ? 'Enable with webcontrol_actions power=on' : undefined}
+              >
+                Shutdown Pi
+              </button>
+            </div>
+            {!powerEnabled && (
+              <p className="text-xs text-amber-500 mt-1">
+                Disabled - add <code className="text-xs bg-surface-base px-1 rounded">webcontrol_actions power=on</code> to enable
+              </p>
+            )}
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mt-2">
-          Requires <code className="text-xs bg-surface-base px-1 rounded">webcontrol_actions power=on</code> in config
-        </p>
       </FormSection>
 
       {/* Authentication Section */}

@@ -36,7 +36,6 @@
 #include "webu_stream.hpp"
 #include "webu_mpegts.hpp"
 #include "webu_json.hpp"
-#include "webu_post.hpp"
 #include "webu_file.hpp"
 #include "video_v4l2.hpp"
 
@@ -1323,18 +1322,25 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             /* Check if this is a JSON API endpoint (mask API, power control, profiles, auth) */
             if ((uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "") ||
                 (uri_cmd1 == "api" && uri_cmd2 == "system" &&
-                 (uri_cmd3 == "reboot" || uri_cmd3 == "shutdown")) ||
+                 (uri_cmd3 == "reboot" || uri_cmd3 == "shutdown" || uri_cmd3 == "service-restart")) ||
                 (uri_cmd1 == "api" && uri_cmd2 == "profiles") ||
                 (uri_cmd1 == "api" && uri_cmd2 == "auth" &&
                  (uri_cmd3 == "login" || uri_cmd3 == "logout"))) {
                 raw_body.clear();  /* Clear body buffer for JSON POST */
                 retcd = MHD_YES;
+            } else if (uri_cmd1 == "api" && uri_cmd2 == "config" && uri_cmd3 == "write") {
+                /* Config write handled via JSON POST */
+                raw_body.clear();
+                retcd = MHD_YES;
+            } else if (uri_cmd1 == "api" && uri_cmd2 == "camera") {
+                /* Camera action endpoints handled via JSON POST */
+                raw_body.clear();
+                retcd = MHD_YES;
             } else {
-                /* Use form post processor for legacy endpoints */
-                if (webu_post == nullptr) {
-                    webu_post = new cls_webu_post(this);
-                }
-                retcd = webu_post->processor_init();
+                /* Unknown POST endpoint */
+                bad_request();
+                mhd_send();
+                retcd = MHD_YES;
             }
         } else if (mystreq(method,"PATCH")) {
             cnct_method = WEBUI_METHOD_PATCH;
@@ -1394,6 +1400,19 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             webu_json->api_system_shutdown();
             mhd_send();
             retcd = MHD_YES;
+        } else if (uri_cmd1 == "api" && uri_cmd2 == "system" && uri_cmd3 == "service-restart") {
+            /* Motion service restart - consume body first (even if empty) */
+            if (*upload_data_size > 0) {
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            /* Body complete, process service restart */
+            if (webu_json == nullptr) {
+                webu_json = new cls_webu_json(this);
+            }
+            webu_json->api_system_service_restart();
+            mhd_send();
+            retcd = MHD_YES;
         } else if (uri_cmd1 == "api" && uri_cmd2 == "profiles") {
             /* Profile API endpoints - accumulate raw body for JSON POST */
             if (*upload_data_size > 0) {
@@ -1441,8 +1460,60 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             }
             mhd_send();
             retcd = MHD_YES;
+        } else if (uri_cmd1 == "api" && uri_cmd2 == "config" && uri_cmd3 == "write") {
+            /* POST /0/api/config/write - save configuration to file */
+            if (*upload_data_size > 0) {
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            if (webu_json == nullptr) {
+                webu_json = new cls_webu_json(this);
+            }
+            webu_json->api_config_write();
+            mhd_send();
+            retcd = MHD_YES;
+        } else if (uri_cmd1 == "api" && uri_cmd2 == "camera") {
+            /* Camera action API endpoints - accumulate body for JSON POST */
+            if (*upload_data_size > 0) {
+                raw_body.append(upload_data, *upload_data_size);
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            /* Body complete, route to appropriate handler */
+            if (webu_json == nullptr) {
+                webu_json = new cls_webu_json(this);
+            }
+            if (uri_cmd3 == "restart") {
+                /* POST /{camId}/api/camera/restart */
+                webu_json->api_camera_restart();
+            } else if (uri_cmd3 == "snapshot") {
+                /* POST /{camId}/api/camera/snapshot */
+                webu_json->api_camera_snapshot();
+            } else if (uri_cmd3 == "pause") {
+                /* POST /{camId}/api/camera/pause */
+                webu_json->api_camera_pause();
+            } else if (uri_cmd3 == "stop") {
+                /* POST /{camId}/api/camera/stop */
+                webu_json->api_camera_stop();
+            } else if (uri_cmd3 == "event" && uri_cmd4 == "start") {
+                /* POST /{camId}/api/camera/event/start */
+                webu_json->api_camera_event_start();
+            } else if (uri_cmd3 == "event" && uri_cmd4 == "end") {
+                /* POST /{camId}/api/camera/event/end */
+                webu_json->api_camera_event_end();
+            } else if (uri_cmd3 == "ptz") {
+                /* POST /{camId}/api/camera/ptz */
+                webu_json->api_camera_ptz();
+            } else {
+                bad_request();
+            }
+            mhd_send();
+            retcd = MHD_YES;
         } else {
-            retcd = webu_post->processor_start(upload_data, upload_data_size);
+            /* Unknown POST endpoint - reject */
+            bad_request();
+            mhd_send();
+            retcd = MHD_YES;
         }
     } else if (mystreq(method,"PATCH")) {
         /* Accumulate raw body for JSON endpoints */
@@ -1639,7 +1710,6 @@ cls_webu_ans::cls_webu_ans(cls_motapp *p_app, const char *uri)
     cam       = nullptr;
     webu_file = nullptr;
     webu_json = nullptr;
-    webu_post = nullptr;
     webu_stream = nullptr;
 
     url.assign(uri);
@@ -1655,7 +1725,6 @@ cls_webu_ans::~cls_webu_ans()
 
     mydelete(webu_file);
     mydelete(webu_json);
-    mydelete(webu_post);
     mydelete(webu_stream);
 
     myfree(auth_user);
