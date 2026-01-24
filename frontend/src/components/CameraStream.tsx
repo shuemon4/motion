@@ -1,19 +1,17 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
-import { useCameraStream } from '@/hooks/useCameraStream'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useMjpegStream } from '@/hooks/useMjpegStream'
 import { getStoredRestartTimestamp } from '@/lib/cameraRestart'
 
 interface CameraStreamProps {
   cameraId: number
   className?: string
+  onStreamFpsChange?: (fps: number) => void // Callback for streaming FPS updates
 }
 
 // Custom event name for camera restart notification
 export const CAMERA_RESTARTED_EVENT = 'camera-restarted'
 
-export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
-  const { streamUrl, isLoading, error } = useCameraStream(cameraId)
-  const imgRef = useRef<HTMLImageElement>(null)
-
+export function CameraStream({ cameraId, className = '', onStreamFpsChange }: CameraStreamProps) {
   // Track the last known restart timestamp to detect changes
   const lastKnownRestartRef = useRef<number>(getStoredRestartTimestamp(cameraId))
 
@@ -21,8 +19,27 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
   // This ensures fresh connections after navigation back from Settings
   const [streamKey, setStreamKey] = useState(() => getStoredRestartTimestamp(cameraId))
 
+  // Use MJPEG parser for client-side frame counting
+  const { imageUrl, streamFps, isConnected, error } = useMjpegStream(cameraId, streamKey)
+
+  // Store callback in ref to avoid triggering effect when callback reference changes
+  // This prevents render loops when parent passes inline arrow functions
+  const onStreamFpsChangeRef = useRef(onStreamFpsChange)
+
+  // Update ref whenever callback changes (synchronous to avoid stale closures)
+  useEffect(() => {
+    onStreamFpsChangeRef.current = onStreamFpsChange
+  })
+
+  // Notify parent of streaming FPS changes - only triggers when fps actually changes
+  useEffect(() => {
+    if (onStreamFpsChangeRef.current) {
+      onStreamFpsChangeRef.current(streamFps)
+    }
+  }, [streamFps])  // ← Only streamFps in deps, NOT onStreamFpsChange
+
   // Force stream reconnection by changing key
-  const handleStreamError = useCallback(() => {
+  const handleReconnect = useCallback(() => {
     // Add small delay before retry to avoid hammering
     setTimeout(() => {
       setStreamKey((k) => k + 1)
@@ -77,7 +94,14 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
     return () => clearInterval(intervalId)
   }, [cameraId])
 
-  if (error) {
+  // Handle connection errors with auto-retry
+  useEffect(() => {
+    if (error && !isConnected) {
+      handleReconnect()
+    }
+  }, [error, isConnected, handleReconnect])
+
+  if (error && !imageUrl) {
     return (
       <div className={`w-full ${className}`}>
         <div className="aspect-video flex items-center justify-center bg-gray-900 rounded-lg">
@@ -92,7 +116,7 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
     )
   }
 
-  if (isLoading) {
+  if (!imageUrl) {
     return (
       <div className={`w-full ${className}`}>
         <div className="relative aspect-video bg-gray-900 animate-pulse rounded-lg">
@@ -108,20 +132,13 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
     )
   }
 
-  // Add cache buster to stream URL when key changes (forces reconnection)
-  const streamUrlWithKey = streamUrl
-    ? `${streamUrl}${streamUrl.includes('?') ? '&' : '?'}_k=${streamKey}`
-    : ''
-
   return (
     <div className={`w-full ${className}`}>
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
         <img
-          ref={imgRef}
-          src={streamUrlWithKey}
+          src={imageUrl}
           alt={`Camera ${cameraId} stream`}
           className="absolute inset-0 w-full h-full object-contain"
-          onError={handleStreamError}
         />
       </div>
     </div>

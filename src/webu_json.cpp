@@ -2102,6 +2102,16 @@ void cls_webu_json::api_system_status()
     /* Motion Version */
     webua->resp_page += "\"version\":\"" + escstr(VERSION) + "\"";
 
+    /* Camera Status (includes FPS for each camera) */
+    webua->resp_page += ",\"status\":{";
+    webua->resp_page += "\"count\":" + std::to_string(app->cam_cnt);
+    for (int indx_cam = 0; indx_cam < app->cam_cnt; indx_cam++) {
+        webua->resp_page += ",\"cam" +
+            std::to_string(app->cam_list[indx_cam]->cfg->device_id) + "\":";
+        status_vars(indx_cam);
+    }
+    webua->resp_page += "}";
+
     webua->resp_page += "}";
     webua->resp_type = WEBUI_RESP_JSON;
 }

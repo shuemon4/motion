@@ -35,10 +35,22 @@ export function Dashboard() {
   })
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null)
+  // Track streaming FPS per camera (client-side calculated)
+  const [streamingFps, setStreamingFps] = useState<Record<number, number>>({})
 
-  // Get FPS from server-provided camera status
-  const getFps = (cameraId: number) => {
+  // Get capture FPS from server-provided camera status
+  const getCaptureFps = (cameraId: number) => {
     return cameraStatuses?.find((c) => c.id === cameraId)?.fps ?? 0
+  }
+
+  // Get streaming FPS (client-side calculated)
+  const getStreamingFps = (cameraId: number) => {
+    return streamingFps[cameraId] ?? 0
+  }
+
+  // Handle streaming FPS updates from CameraStream component
+  const handleStreamingFpsChange = (cameraId: number) => (fps: number) => {
+    setStreamingFps((prev) => ({ ...prev, [cameraId]: fps }))
   }
 
   // Fetch config when sheet is open
@@ -143,7 +155,8 @@ export function Dashboard() {
   // Single camera: streamlined layout without extra headers
   if (cameraCount === 1) {
     const camera = cameras[0]
-    const fps = getFps(camera.id)
+    const captureFps = getCaptureFps(camera.id)
+    const streamFps = getStreamingFps(camera.id)
     return (
       <div className="p-4 sm:p-6">
         <div className="max-w-5xl mx-auto">
@@ -154,10 +167,18 @@ export function Dashboard() {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <h3 className="font-medium">{camera.name}</h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {camera.width && camera.height && (
                   <span className="text-xs text-gray-500">
-                    {camera.width}x{camera.height}{fps > 0 && ` @ ${fps} fps`}
+                    {camera.width}x{camera.height}
+                  </span>
+                )}
+                {(streamFps > 0 || captureFps > 0) && (
+                  <span
+                    className="text-xs font-mono text-gray-400 cursor-help"
+                    title="streaming / capture frame rate"
+                  >
+                    {streamFps} / {captureFps} fps
                   </span>
                 )}
                 {role === 'admin' && <SnapshotButton cameraId={camera.id} />}
@@ -167,7 +188,7 @@ export function Dashboard() {
             </div>
 
             {/* Camera stream */}
-            <CameraStream cameraId={camera.id} />
+            <CameraStream cameraId={camera.id} onStreamFpsChange={handleStreamingFpsChange(camera.id)} />
           </div>
         </div>
 
@@ -207,7 +228,8 @@ export function Dashboard() {
 
       <div className={getGridClasses()}>
         {cameras.map((camera) => {
-          const fps = getFps(camera.id)
+          const captureFps = getCaptureFps(camera.id)
+          const streamFps = getStreamingFps(camera.id)
           return (
             <div
               key={camera.id}
@@ -223,7 +245,15 @@ export function Dashboard() {
                 <div className="flex items-center gap-2">
                   {camera.width && camera.height && (
                     <span className="text-xs text-gray-500">
-                      {camera.width}x{camera.height}{fps > 0 && ` @ ${fps} fps`}
+                      {camera.width}x{camera.height}
+                    </span>
+                  )}
+                  {(streamFps > 0 || captureFps > 0) && (
+                    <span
+                      className="text-xs font-mono text-gray-400 cursor-help"
+                      title="streaming / capture frame rate"
+                    >
+                      {streamFps} / {captureFps} fps
                     </span>
                   )}
                   {role === 'admin' && <SnapshotButton cameraId={camera.id} />}
@@ -233,7 +263,7 @@ export function Dashboard() {
               </div>
 
               {/* Camera stream */}
-              <CameraStream cameraId={camera.id} />
+              <CameraStream cameraId={camera.id} onStreamFpsChange={handleStreamingFpsChange(camera.id)} />
             </div>
           )
         })}
