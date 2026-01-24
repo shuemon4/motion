@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, applyRestartRequiredChanges } from '@/api/client'
 import { CAMERA_RESTARTED_EVENT } from '@/components/CameraStream'
+import { setRestartTimestamp } from '@/lib/cameraRestart'
 import { updateSessionCsrf } from '@/api/session'
 import { FormSection } from '@/components/form'
 import { useToast } from '@/components/Toast'
@@ -205,7 +206,12 @@ export function Settings() {
           // Write config and restart camera (fire-and-forget with polling)
           const cameBackOnline = await applyRestartRequiredChanges(camId)
 
-          // Notify stream components to reconnect
+          // Store restart timestamp in localStorage for cross-navigation detection
+          // This allows CameraStream to detect the restart even if user navigates
+          // back to Dashboard after Settings triggered the restart
+          setRestartTimestamp(camId)
+
+          // Notify stream components to reconnect (for same-page scenarios)
           window.dispatchEvent(
             new CustomEvent(CAMERA_RESTARTED_EVENT, { detail: { cameraId: camId } })
           )

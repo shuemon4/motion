@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useCameraStream } from '@/hooks/useCameraStream'
+import { getStoredRestartTimestamp } from '@/lib/cameraRestart'
 
 interface CameraStreamProps {
   cameraId: number
@@ -12,7 +13,13 @@ export const CAMERA_RESTARTED_EVENT = 'camera-restarted'
 export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
   const { streamUrl, isLoading, error } = useCameraStream(cameraId)
   const imgRef = useRef<HTMLImageElement>(null)
-  const [streamKey, setStreamKey] = useState(0)
+
+  // Track the last known restart timestamp to detect changes
+  const lastKnownRestartRef = useRef<number>(getStoredRestartTimestamp(cameraId))
+
+  // Initialize streamKey from stored restart timestamp
+  // This ensures fresh connections after navigation back from Settings
+  const [streamKey, setStreamKey] = useState(() => getStoredRestartTimestamp(cameraId))
 
   // Force stream reconnection by changing key
   const handleStreamError = useCallback(() => {
@@ -22,14 +29,16 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
     }, 2000)
   }, [])
 
-  // Listen for camera restart events to force reconnection
+  // Listen for camera restart events to force reconnection (same-page scenario)
   useEffect(() => {
     const handleCameraRestarted = (event: CustomEvent<{ cameraId?: number }>) => {
       // Reconnect if event is for this camera or all cameras (cameraId undefined or 0)
       const eventCamId = event.detail?.cameraId
       if (!eventCamId || eventCamId === 0 || eventCamId === cameraId) {
-        // Force new connection by incrementing key
-        setStreamKey((k) => k + 1)
+        // Force new connection by using current timestamp
+        const newTimestamp = Date.now()
+        lastKnownRestartRef.current = newTimestamp
+        setStreamKey(newTimestamp)
       }
     }
 
@@ -39,9 +48,33 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
     }
   }, [cameraId])
 
-  // Reset stream key when camera changes
+  // Check for restart timestamp changes on mount, when camera changes,
+  // and periodically. This handles:
+  // - Cross-navigation: Settings restarts camera while Dashboard is unmounted
+  // - Multi-tab: Another tab triggers restart
+  // - Edge cases: React batching delays event handling
   useEffect(() => {
-    setStreamKey(0)
+    const checkForRestart = () => {
+      const storedTimestamp = getStoredRestartTimestamp(cameraId)
+      // Also check global timestamp (camera 0) for "restart all" scenarios
+      const globalTimestamp = cameraId !== 0 ? getStoredRestartTimestamp(0) : 0
+      const latestTimestamp = Math.max(storedTimestamp, globalTimestamp)
+
+      if (latestTimestamp > lastKnownRestartRef.current) {
+        // A restart happened while we were unmounted or in another tab
+        lastKnownRestartRef.current = latestTimestamp
+        setStreamKey(latestTimestamp)
+      }
+    }
+
+    // Check immediately on mount
+    checkForRestart()
+
+    // Periodically check for restart changes (every 5 seconds)
+    // This handles multi-tab scenarios and edge cases
+    const intervalId = setInterval(checkForRestart, 5000)
+
+    return () => clearInterval(intervalId)
   }, [cameraId])
 
   if (error) {
