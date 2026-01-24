@@ -784,16 +784,19 @@ void cls_webu_json::apply_hot_reload(int parm_index, const std::string &parm_val
     if (webua->device_id == 0) {
         /* Update default config */
         app->cfg->edit_set(parm_name, parm_val);
+        app->conf_src->edit_set(parm_name, parm_val);
 
         /* Update all running cameras - currently unreachable from UI but kept for
          * future "Apply to All Cameras" feature and external API clients */
         for (int indx = 0; indx < app->cam_cnt; indx++) {
             app->cam_list[indx]->cfg->edit_set(parm_name, parm_val);
+            app->cam_list[indx]->conf_src->edit_set(parm_name, parm_val);
             apply_hot_reload_to_camera(app->cam_list[indx], parm_name, parm_val);
         }
     } else if (webua->cam != nullptr) {
         /* Update specific camera only */
         webua->cam->cfg->edit_set(parm_name, parm_val);
+        webua->cam->conf_src->edit_set(parm_name, parm_val);
         apply_hot_reload_to_camera(webua->cam, parm_name, parm_val);
     }
 
@@ -2494,8 +2497,16 @@ void cls_webu_json::api_config_patch()
                         hot_reload = true;
                         success_count++;
                     } else {
-                        /* Save to config but don't apply - requires restart */
+                        /* Save to config - requires restart to take effect */
                         cfg->edit_set(parm_name, parm_val);
+
+                        /* Also update source config for restart persistence */
+                        if (webua->cam != nullptr) {
+                            webua->cam->conf_src->edit_set(parm_name, parm_val);
+                        } else {
+                            app->conf_src->edit_set(parm_name, parm_val);
+                        }
+
                         applied = true;
                         hot_reload = false;
                         success_count++;
