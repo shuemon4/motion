@@ -71,6 +71,7 @@ echo "[3/6] Installing required dependencies..."
 sudo apt install -y \
     libjpeg-dev \
     libmicrohttpd-dev \
+    libsystemd-dev \
     zlib1g-dev
 
 # Install FFmpeg dependencies (required)
