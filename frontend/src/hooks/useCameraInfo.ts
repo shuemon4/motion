@@ -32,11 +32,12 @@ export interface CameraInfo {
  * for conditional rendering of type-specific settings components.
  *
  * @param cameraId - Camera ID (1-based)
+ * @param options - Options including enabled flag for auth-aware fetching
  * @returns CameraInfo with type detection and feature flags
  *
  * @example
  * ```tsx
- * const cameraInfo = useCameraInfo(1);
+ * const cameraInfo = useCameraInfo(1, { enabled: isAuthenticated });
  *
  * if (cameraInfo.features.hasLibcamControls) {
  *   return <LibcameraSettings ... />;
@@ -47,8 +48,8 @@ export interface CameraInfo {
  * }
  * ```
  */
-export function useCameraInfo(cameraId: number): CameraInfo {
-  const { data: status, isLoading } = useSystemStatus();
+export function useCameraInfo(cameraId: number, options?: { enabled?: boolean }): CameraInfo {
+  const { data: status, isLoading } = useSystemStatus({ enabled: options?.enabled ?? true });
 
   return useMemo(() => {
     // Return loading state if data not yet fetched

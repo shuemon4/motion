@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { useSystemStatus } from '@/api/queries'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 interface SystemStatusProps {
   /** Where to display the status - different layouts for desktop vs mobile */
@@ -12,11 +13,13 @@ interface SystemStatusProps {
  * Shows real-time system metrics (temperature, RAM, disk usage).
  * Memoized to prevent Layout re-renders when metrics update.
  * Updates every 10 seconds via useSystemStatus hook.
+ * Only fetches data when user is authenticated (to avoid 401 errors).
  */
 export const SystemStatus = memo(function SystemStatus({
   variant = 'desktop'
 }: SystemStatusProps) {
-  const { data: status } = useSystemStatus()
+  const { isAuthenticated } = useAuthContext()
+  const { data: status } = useSystemStatus({ enabled: isAuthenticated })
 
   const formatBytes = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`
@@ -99,9 +102,11 @@ export const SystemStatus = memo(function SystemStatus({
  *
  * Shows Motion version number.
  * Memoized separately from SystemStatus to avoid unnecessary re-renders.
+ * Only fetches data when user is authenticated (to avoid 401 errors).
  */
 export const VersionDisplay = memo(function VersionDisplay() {
-  const { data: status } = useSystemStatus()
+  const { isAuthenticated } = useAuthContext()
+  const { data: status } = useSystemStatus({ enabled: isAuthenticated })
 
   if (!status?.version) return null
 

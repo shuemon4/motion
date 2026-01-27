@@ -169,13 +169,16 @@ export function useTemperature() {
 }
 
 // Fetch system status (comprehensive)
-export function useSystemStatus() {
+// Only enabled when user is authenticated (to avoid 401 errors when not logged in)
+export function useSystemStatus(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.systemStatus,
     queryFn: () => apiGet<SystemStatus>('/0/api/system/status'),
     refetchInterval: 10000, // Refresh every 10s
     refetchIntervalInBackground: false, // Pause when tab inactive to save CPU
     staleTime: 5000,
+    enabled: options?.enabled ?? true,
+    retry: false, // Don't retry on auth errors
   });
 }
 
@@ -273,11 +276,14 @@ export function usePlatformInfo() {
 }
 
 // Camera Detection - Get detected cameras
-export function useDetectedCameras() {
+// Only enabled when user is authenticated (to avoid 401 errors when not logged in)
+export function useDetectedCameras(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.detectedCameras,
     queryFn: () => apiGet<DetectedCamerasResponse>("/0/api/cameras/detected"),
     staleTime: 30000, // Cache for 30 seconds
+    enabled: options?.enabled ?? true,
+    retry: false, // Don't retry on auth errors
   });
 }
 

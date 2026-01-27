@@ -37,9 +37,6 @@ dist_libstate_DATA = \
 	data/camera3-dist.conf \
 	data/sound1-dist.conf
 
-dist_libweb_DATA = \
-	data/webcontrol/samplepage.html
-
 dist_man_MANS = man/motion.1
 
 dist_doc_DATA = \
@@ -63,11 +60,9 @@ all-local:
 ###################################################################
 install-data-local:
 	@echo "Installing Motion directory structure..."
-
-	# System config directory (create if needed for cameras.d/)
+	@: System config directory - create if needed for cameras.d/
 	$(MKDIR_P) $(DESTDIR)$(pkgsysconfdir)/cameras.d
-
-	# WebUI (React SPA)
+	@: WebUI - React SPA
 	@echo "  Installing React webui..."
 	$(MKDIR_P) $(DESTDIR)$(webuiinstalldir)/assets
 	$(INSTALL_DATA) data/webui/index.html $(DESTDIR)$(webuiinstalldir)/
@@ -77,8 +72,7 @@ install-data-local:
 			$(INSTALL_DATA) "$$f" $(DESTDIR)$(webuiinstalldir)/assets/; \
 		fi; \
 	done
-
-	# User config directory (new - no sudo needed for editing)
+	@: User config directory - no sudo needed for editing
 	@echo "  Creating user-config directory..."
 	$(MKDIR_P) $(DESTDIR)$(userconfdir)/cameras
 	@echo "# Motion User Configuration Overrides" > $(DESTDIR)$(userconfdir)/local.conf
@@ -88,8 +82,7 @@ install-data-local:
 	@echo "# Example:" >> $(DESTDIR)$(userconfdir)/local.conf
 	@echo "# threshold 3000" >> $(DESTDIR)$(userconfdir)/local.conf
 	@chmod 664 $(DESTDIR)$(userconfdir)/local.conf
-
-	# Profiles directory (new - named configuration sets)
+	@: Profiles directory - named configuration sets
 	@echo "  Creating profiles directory..."
 	$(MKDIR_P) $(DESTDIR)$(profilesdir)
 	@echo "# Day Profile - Higher sensitivity, more recording" > $(DESTDIR)$(profilesdir)/day.conf
@@ -102,8 +95,7 @@ install-data-local:
 	@echo "threshold 1500" >> $(DESTDIR)$(profilesdir)/away.conf
 	@echo "event_gap 5" >> $(DESTDIR)$(profilesdir)/away.conf
 	@chmod 664 $(DESTDIR)$(profilesdir)/*.conf
-
-	# Runtime directory (new - PIDs, sockets, active profile)
+	@: Runtime directory - PIDs, sockets, active profile
 	@echo "  Creating runtime directory..."
 	$(MKDIR_P) $(DESTDIR)$(runtimedir)
 	@chmod 775 $(DESTDIR)$(runtimedir)
@@ -238,7 +230,7 @@ setup-service: install-service
 ###################################################################
 cleanall: distclean
 	@rm -rf autom4te.cache
-	# Don't remove m4/ - contains source-controlled files
+	@: Note: m4/ is not removed - it contains source-controlled files
 	@rm -f config.hpp.in config.hpp.in~ aclocal.m4 config.sub ABOUT-NLS missing
 	@rm -f compile config.guess config.rpath configure depcomp install-sh
 	@rm -f po/en@boldquot.header po/en@quot.header po/insert-header.sin

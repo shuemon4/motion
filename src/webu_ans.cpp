@@ -1170,6 +1170,15 @@ void cls_webu_ans::answer_get()
         /* Check session-based auth for protected API endpoints
          * Auth endpoints (status, login, logout) are exempt */
         if (uri_cmd2 != "auth" && app->cfg->webcontrol_authentication != "") {
+            /* Read session token from X-Session-Token header
+             * Note: This must be done here because the general auth flow
+             * at line ~1311 is skipped for API routes (authenticated=true early) */
+            const char* token = MHD_lookup_connection_value(
+                connection, MHD_HEADER_KIND, "X-Session-Token");
+            if (token != nullptr) {
+                session_token = token;
+            }
+
             /* Validate session token */
             bool has_valid_session = false;
             if (!session_token.empty()) {

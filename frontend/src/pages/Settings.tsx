@@ -83,14 +83,14 @@ export function Settings() {
 
   const batchUpdateConfigMutation = useBatchUpdateConfig()
 
-  // Fetch system status for action availability
-  const { data: systemStatus } = useSystemStatus()
+  // Fetch system status for action availability (only when authenticated as admin)
+  const { data: systemStatus } = useSystemStatus({ enabled: role === 'admin' })
 
   // Fetch camera capabilities for conditional UI rendering (e.g., autofocus controls)
   const { data: capabilities } = useCameraCapabilities(Number(selectedCamera))
 
-  // Fetch camera info for multi-camera type support
-  const cameraInfo = useCameraInfo(Number(selectedCamera))
+  // Fetch camera info for multi-camera type support (only when authenticated as admin)
+  const cameraInfo = useCameraInfo(Number(selectedCamera), { enabled: role === 'admin' })
 
   // Clear changes and errors when camera selection changes
   // This prevents race conditions where settings from one camera could be
