@@ -330,9 +330,9 @@ int cls_webu_mpegts::open_mpegts()
 
     fmtctx = avformat_alloc_context();
     fmtctx->oformat = av_guess_format("mpegts", NULL, NULL);
-    fmtctx->video_codec_id = AV_CODEC_ID_H264;
+    fmtctx->video_codec_id = MY_CODEC_ID_H264;
 
-    codec = avcodec_find_encoder(AV_CODEC_ID_H264);
+    codec = mycodec_find_encoder(MY_CODEC_ID_H264);
     strm = avformat_new_stream(fmtctx, codec);
 
     if (webua->device_id > 0) {
@@ -355,7 +355,7 @@ int cls_webu_mpegts::open_mpegts()
 
     ctx_codec = avcodec_alloc_context3(codec);
     ctx_codec->gop_size      = 15;
-    ctx_codec->codec_id      = AV_CODEC_ID_H264;
+    ctx_codec->codec_id      = MY_CODEC_ID_H264;
     ctx_codec->codec_type    = AVMEDIA_TYPE_VIDEO;
     ctx_codec->bit_rate      = 400000;
     ctx_codec->width         = img_w;

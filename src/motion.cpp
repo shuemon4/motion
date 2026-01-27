@@ -283,10 +283,8 @@ void cls_motapp::av_init()
     MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO, _("libavformat version %d.%d.%d")
         , LIBAVFORMAT_VERSION_MAJOR, LIBAVFORMAT_VERSION_MINOR, LIBAVFORMAT_VERSION_MICRO);
 
-    #if (MYFFVER < 58000)
-        av_register_all();
-        avcodec_register_all();
-    #endif
+    /* Initialize FFmpeg - Handles version-specific registration */
+    myffmpeg_init();
 
     avformat_network_init();
 

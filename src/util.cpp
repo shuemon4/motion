@@ -724,6 +724,38 @@ AVPacket *mypacket_alloc(AVPacket *pkt)
 
 }
 
+/*********************************************/
+/* FFmpeg initialization wrapper - Handles av_register_all() for old versions */
+void myffmpeg_init()
+{
+    #if (MYFFVER < 58000)  /* FFmpeg < 5.8.0 requires explicit registration */
+        av_register_all();
+        avcodec_register_all();
+    #endif
+    /* Modern FFmpeg (5.8.0+): automatic registration, no action needed */
+}
+
+/*********************************************/
+/* Codec finding wrapper - Handles const changes across FFmpeg versions */
+myAVCodec *mycodec_find_encoder(enum AVCodecID id)
+{
+    #if (MYFFVER < 59000)  /* FFmpeg < 5.9.0 - non-const return */
+        return (myAVCodec *)avcodec_find_encoder(id);
+    #else  /* FFmpeg 5.9.0+ - const return (already matches myAVCodec typedef) */
+        return avcodec_find_encoder(id);
+    #endif
+}
+
+/*********************************************/
+myAVCodec *mycodec_find_decoder(enum AVCodecID id)
+{
+    #if (MYFFVER < 59000)  /* FFmpeg < 5.9.0 - non-const return */
+        return (myAVCodec *)avcodec_find_decoder(id);
+    #else  /* FFmpeg 5.9.0+ - const return (already matches myAVCodec typedef) */
+        return avcodec_find_decoder(id);
+    #endif
+}
+
 void util_exec_command(cls_camera *cam, const char *command, const char *filename)
 {
     char stamp[PATH_MAX];

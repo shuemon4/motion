@@ -298,6 +298,54 @@ AS_IF([test "${FFMPEG}" = "no"], [
         TEMP_CPPFLAGS="$TEMP_CPPFLAGS "`pkgconf --cflags $FFMPEG_DEPS`
         TEMP_LIBS="$TEMP_LIBS "`pkgconf --libs $FFMPEG_DEPS`
         AC_MSG_RESULT(yes)
+
+        # Check FFmpeg version compatibility (Motion requires 5.0+)
+        AC_MSG_CHECKING([FFmpeg version compatibility])
+        FFMPEG_VERSION=`pkgconf --modversion libavformat`
+        FFMPEG_MAJOR=`echo $FFMPEG_VERSION | cut -d. -f1`
+        FFMPEG_MINOR=`echo $FFMPEG_VERSION | cut -d. -f2`
+
+        AC_MSG_RESULT([$FFMPEG_VERSION (major: $FFMPEG_MAJOR, minor: $FFMPEG_MINOR)])
+
+        # Require FFmpeg 5.0 or newer
+        AS_IF([test $FFMPEG_MAJOR -lt 5], [
+            AC_MSG_ERROR([
+=====================================================================
+ Motion requires FFmpeg 5.0 or newer. Found: $FFMPEG_VERSION
+
+ Your system has an older FFmpeg version that is not supported.
+
+ Solutions:
+ 1. Ubuntu 22.04/24.04: Install from universe repository
+    sudo apt install libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev
+
+ 2. Compile FFmpeg from source:
+    https://motion-project.github.io/motion_build.html
+
+ 3. Use a PPA with newer FFmpeg (Ubuntu):
+    sudo add-apt-repository ppa:savoury1/ffmpeg4 or ffmpeg5
+
+ Please check motion_guide.html for detailed instructions.
+=====================================================================])
+        ])
+
+        # Warn about FFmpeg 5.0-5.7 (suggest 5.8+)
+        AS_IF([test $FFMPEG_MAJOR -eq 5 && test $FFMPEG_MINOR -lt 8], [
+            AC_MSG_WARN([
+=====================================================================
+ FFmpeg $FFMPEG_VERSION detected. Motion works best with FFmpeg 5.8+
+
+ Your version will work but some optimizations require 5.8 or newer.
+ Consider upgrading when convenient.
+=====================================================================])
+        ])
+
+        # Notice for FFmpeg 7+ (modern API mode)
+        AS_IF([test $FFMPEG_MAJOR -ge 7], [
+            AC_MSG_NOTICE([FFmpeg $FFMPEG_VERSION detected - using modern API conventions])
+            AC_DEFINE([HAVE_FFMPEG7], [1], [Define to 1 if FFmpeg 7+ is available])
+        ])
+
       ],[
         AC_MSG_RESULT(no)
         AC_MSG_ERROR([Required ffmpeg packages 'libavutil-dev libavformat-dev libavcodec-dev libswscale-dev libavdevice-dev' were not found.  Please check motion_guide.html and install necessary dependencies])

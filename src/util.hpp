@@ -35,6 +35,40 @@ typedef const AVCodec myAVCodec;
 typedef const uint8_t myuint;
 #define MY_PROFILE_H264_HIGH   AV_PROFILE_H264_HIGH
 
+/* FFmpeg 5.0+ Compatibility Macros - Support FFmpeg 5.0 through 7.x */
+/* Minimum version check - Motion requires FFmpeg 5.0 or newer */
+#if (MYFFVER < 50000)
+    #error "Motion requires FFmpeg 5.0 or newer. Please upgrade your FFmpeg installation."
+#endif
+
+/* Codec ID compatibility macros - Provides unified API across FFmpeg versions */
+#define MY_CODEC_ID_NONE           AV_CODEC_ID_NONE
+#define MY_CODEC_ID_H264           AV_CODEC_ID_H264
+#define MY_CODEC_ID_HEVC           AV_CODEC_ID_HEVC
+#define MY_CODEC_ID_MPEG2VIDEO     AV_CODEC_ID_MPEG2VIDEO
+#define MY_CODEC_ID_MPEG4          AV_CODEC_ID_MPEG4
+#define MY_CODEC_ID_VP8            AV_CODEC_ID_VP8
+#define MY_CODEC_ID_VP9            AV_CODEC_ID_VP9
+#define MY_CODEC_ID_FLV1           AV_CODEC_ID_FLV1
+#define MY_CODEC_ID_MJPEG          AV_CODEC_ID_MJPEG
+#define MY_CODEC_ID_MSMPEG4V2      AV_CODEC_ID_MSMPEG4V2
+
+/* Pixel format compatibility macros */
+#define MY_PIX_FMT_YUV420P         AV_PIX_FMT_YUV420P
+#define MY_PIX_FMT_YUVJ420P        AV_PIX_FMT_YUVJ420P
+#define MY_PIX_FMT_RGB24           AV_PIX_FMT_RGB24
+
+/* Codec flags compatibility macros */
+#define MY_CODEC_FLAG_GLOBAL_HEADER  AV_CODEC_FLAG_GLOBAL_HEADER
+#define MY_CODEC_FLAG_QSCALE         AV_CODEC_FLAG_QSCALE
+
+/* AVIO callback typedef - Handles FFmpeg 7.0+ const buffer changes */
+#ifdef FF_API_AVIO_WRITE_NONCONST
+    typedef int (*my_avio_write_cb)(void *opaque, uint8_t *buf, int buf_size);
+#else
+    typedef int (*my_avio_write_cb)(void *opaque, const uint8_t *buf, int buf_size);
+#endif
+
 
 #ifdef HAVE_GETTEXT
     #include <libintl.h>
@@ -105,6 +139,13 @@ struct ctx_params {
     void myframe_key(AVFrame *frame);
     void myframe_interlaced(AVFrame *frame);
     AVPacket *mypacket_alloc(AVPacket *pkt);
+
+    /* FFmpeg initialization wrapper - Handles av_register_all() for old versions */
+    void myffmpeg_init();
+
+    /* Codec finding wrappers - Handles const changes across FFmpeg versions */
+    myAVCodec *mycodec_find_encoder(enum AVCodecID id);
+    myAVCodec *mycodec_find_decoder(enum AVCodecID id);
 
     void util_parms_parse(ctx_params *params, std::string parm_desc, std::string confline);
     void util_parms_add_default(ctx_params *params, std::string parm_nm, std::string parm_vl);

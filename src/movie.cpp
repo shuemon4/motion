@@ -133,7 +133,7 @@ int cls_movie::get_oformat()
 {
     if (tlapse == TIMELAPSE_APPEND) {
         oc->oformat = av_guess_format("mpeg2video", nullptr, nullptr);
-        oc->video_codec_id = AV_CODEC_ID_MPEG2VIDEO;
+        oc->video_codec_id = MY_CODEC_ID_MPEG2VIDEO;
         full_nm += ".mpg";
         file_nm += ".mpg";
         if (oc->oformat == nullptr) {
@@ -150,36 +150,36 @@ int cls_movie::get_oformat()
         oc->oformat = av_guess_format("mov", nullptr, nullptr);
         full_nm += ".mov";
         file_nm += ".mov";
-        oc->video_codec_id = AV_CODEC_ID_H264;
+        oc->video_codec_id = MY_CODEC_ID_H264;
     }
 
     if (container == "webm") {
         oc->oformat = av_guess_format("webm", nullptr, nullptr);
         full_nm += ".webm";
         file_nm += ".webm";
-        oc->video_codec_id = AV_CODEC_ID_VP8;
+        oc->video_codec_id = MY_CODEC_ID_VP8;
     }
 
     if (container == "mp4") {
         oc->oformat = av_guess_format("mp4", nullptr, nullptr);
         full_nm += ".mp4";
         file_nm += ".mp4";
-        oc->video_codec_id = AV_CODEC_ID_H264;
+        oc->video_codec_id = MY_CODEC_ID_H264;
     }
 
     if (container == "mkv") {
         oc->oformat = av_guess_format("matroska", nullptr, nullptr);
         full_nm += ".mkv";
         file_nm += ".mkv";
-        oc->video_codec_id = AV_CODEC_ID_H264;
+        oc->video_codec_id = MY_CODEC_ID_H264;
     }
 
     if (container == "hevc") {
-        oc->video_codec_id = AV_CODEC_ID_HEVC;
+        oc->video_codec_id = MY_CODEC_ID_HEVC;
         oc->oformat = av_guess_format("mp4", nullptr, nullptr);
         full_nm += ".mp4";
         file_nm += ".mp4";
-        oc->video_codec_id = AV_CODEC_ID_HEVC;
+        oc->video_codec_id = MY_CODEC_ID_HEVC;
     }
 
     if (oc->oformat == nullptr) {
@@ -190,7 +190,7 @@ int cls_movie::get_oformat()
         return -1;
     }
 
-    if (oc->oformat->video_codec == AV_CODEC_ID_NONE) {
+    if (oc->oformat->video_codec == MY_CODEC_ID_NONE) {
         MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO, _("Could not get the container"));
         free_context();
         return -1;
@@ -283,8 +283,8 @@ int cls_movie::set_quality()
     if (quality > 100) {
         quality = 100;
     }
-    if (ctx_codec->codec_id == AV_CODEC_ID_H264 ||
-        ctx_codec->codec_id == AV_CODEC_ID_HEVC) {
+    if (ctx_codec->codec_id == MY_CODEC_ID_H264 ||
+        ctx_codec->codec_id == MY_CODEC_ID_HEVC) {
         if (quality <= 0) {
             quality = 45; // default to 45%
         }
@@ -313,7 +313,7 @@ int cls_movie::set_quality()
             char crf[10];
             quality = (int)(( (100-quality) * 51)/100);
             snprintf(crf, 10, "%d", quality);
-            if (ctx_codec->codec_id == AV_CODEC_ID_H264) {
+            if (ctx_codec->codec_id == MY_CODEC_ID_H264) {
                 av_opt_set(ctx_codec->priv_data, "profile", "high", 0);
             }
             av_opt_set(ctx_codec->priv_data, "crf", crf, 0);
@@ -343,13 +343,13 @@ int cls_movie::set_codec_preferred()
             MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
                 ,_("Failed to find user requested codec %s")
                 , preferred_codec.c_str());
-            codec = avcodec_find_encoder(oc->video_codec_id);
+            codec = mycodec_find_encoder(oc->video_codec_id);
         } else {
             MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
                 ,_("Using codec %s"), preferred_codec.c_str());
         }
     } else {
-        codec = avcodec_find_encoder(oc->video_codec_id);
+        codec = mycodec_find_encoder(oc->video_codec_id);
     }
     if (codec == nullptr) {
         MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO

@@ -1073,7 +1073,7 @@ int cls_netcam::init_swdecoder()
         }
     }
     if (decoder == nullptr) {
-        decoder = avcodec_find_decoder(strm->codecpar->codec_id);
+        decoder = mycodec_find_decoder(strm->codecpar->codec_id);
     }
     if ((decoder == nullptr) || (interrupted)) {
         decoder_error(0, "avcodec_find_decoder");

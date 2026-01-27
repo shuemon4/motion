@@ -23,8 +23,11 @@ SUBDIRS = src po
 
 pkgsysconfdir = $(sysconfdir)/@PACKAGE@
 libstatedir = @localstatedir@/lib/@PACKAGE@
-libwebdir = @localstatedir@/lib/@PACKAGE@/webcontrol
-webuiinstalldir = @localstatedir@/lib/@PACKAGE@/webui
+# libwebdir deprecated - legacy webcontrol removed
+webuiinstalldir = $(libstatedir)/webui
+userconfdir = $(libstatedir)/user-config
+profilesdir = $(libstatedir)/profiles
+runtimedir = $(libstatedir)/runtime
 scriptsdir = $(srcdir)/scripts
 
 dist_libstate_DATA = \
@@ -56,10 +59,16 @@ all-local:
 	@sed -e 's|$${prefix}|$(prefix)|' data/motion-dist.conf > data/motion-dist.conf.tmp && mv -f data/motion-dist.conf.tmp data/motion-dist.conf
 
 ###################################################################
-## Install React webui files (handles dynamic asset filenames)
+## Install React webui files and hybrid directory structure
 ###################################################################
 install-data-local:
-	@echo "Installing React webui..."
+	@echo "Installing Motion directory structure..."
+
+	# System config directory (create if needed for cameras.d/)
+	$(MKDIR_P) $(DESTDIR)$(pkgsysconfdir)/cameras.d
+
+	# WebUI (React SPA)
+	@echo "  Installing React webui..."
 	$(MKDIR_P) $(DESTDIR)$(webuiinstalldir)/assets
 	$(INSTALL_DATA) data/webui/index.html $(DESTDIR)$(webuiinstalldir)/
 	$(INSTALL_DATA) data/webui/vite.svg $(DESTDIR)$(webuiinstalldir)/ 2>/dev/null || true
@@ -69,8 +78,110 @@ install-data-local:
 		fi; \
 	done
 
+	# User config directory (new - no sudo needed for editing)
+	@echo "  Creating user-config directory..."
+	$(MKDIR_P) $(DESTDIR)$(userconfdir)/cameras
+	@echo "# Motion User Configuration Overrides" > $(DESTDIR)$(userconfdir)/local.conf
+	@echo "# Edit this file to customize Motion without needing sudo" >> $(DESTDIR)$(userconfdir)/local.conf
+	@echo "# Changes here override system defaults in $(pkgsysconfdir)/motion.conf" >> $(DESTDIR)$(userconfdir)/local.conf
+	@echo "#" >> $(DESTDIR)$(userconfdir)/local.conf
+	@echo "# Example:" >> $(DESTDIR)$(userconfdir)/local.conf
+	@echo "# threshold 3000" >> $(DESTDIR)$(userconfdir)/local.conf
+	@chmod 664 $(DESTDIR)$(userconfdir)/local.conf
+
+	# Profiles directory (new - named configuration sets)
+	@echo "  Creating profiles directory..."
+	$(MKDIR_P) $(DESTDIR)$(profilesdir)
+	@echo "# Day Profile - Higher sensitivity, more recording" > $(DESTDIR)$(profilesdir)/day.conf
+	@echo "threshold 2000" >> $(DESTDIR)$(profilesdir)/day.conf
+	@echo "framerate 15" >> $(DESTDIR)$(profilesdir)/day.conf
+	@echo "# Night Profile - Lower sensitivity, noise reduction" > $(DESTDIR)$(profilesdir)/night.conf
+	@echo "threshold 3500" >> $(DESTDIR)$(profilesdir)/night.conf
+	@echo "framerate 10" >> $(DESTDIR)$(profilesdir)/night.conf
+	@echo "# Away Profile - Maximum sensitivity" > $(DESTDIR)$(profilesdir)/away.conf
+	@echo "threshold 1500" >> $(DESTDIR)$(profilesdir)/away.conf
+	@echo "event_gap 5" >> $(DESTDIR)$(profilesdir)/away.conf
+	@chmod 664 $(DESTDIR)$(profilesdir)/*.conf
+
+	# Runtime directory (new - PIDs, sockets, active profile)
+	@echo "  Creating runtime directory..."
+	$(MKDIR_P) $(DESTDIR)$(runtimedir)
+	@chmod 775 $(DESTDIR)$(runtimedir)
+
+	@echo "Motion directory structure installed."
+
 uninstall-local:
 	rm -rf $(DESTDIR)$(webuiinstalldir)
+	rm -rf $(DESTDIR)$(userconfdir)
+	rm -rf $(DESTDIR)$(profilesdir)
+	rm -rf $(DESTDIR)$(runtimedir)
+
+###################################################################
+## Platform detection and optional extensions
+###################################################################
+install-exec-hook:
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "  Motion installed successfully!"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "  Binary: $(DESTDIR)$(bindir)/motion"
+	@echo "  Config: $(DESTDIR)$(pkgsysconfdir)/motion.conf"
+	@echo "  WebUI:  $(DESTDIR)$(libstatedir)/webui/"
+	@echo ""
+	@if [ -f /proc/device-tree/model ]; then \
+		MODEL=$$(tr -d '\0' < /proc/device-tree/model 2>/dev/null); \
+		if echo "$$MODEL" | grep -q "Raspberry Pi"; then \
+			echo "═══════════════════════════════════════════════════════════"; \
+			echo "  Raspberry Pi detected: $$MODEL"; \
+			echo "═══════════════════════════════════════════════════════════"; \
+			echo ""; \
+			echo "  Optional Pi-specific tools are available:"; \
+			echo "    • Optimized build scripts"; \
+			echo "    • Interactive camera configuration"; \
+			echo "    • Pi-specific examples"; \
+			echo ""; \
+			echo "  Install Pi extensions (recommended):"; \
+			echo "    sudo make install-pi-tools"; \
+			echo ""; \
+		fi; \
+	fi
+	@echo "  Start Motion: sudo systemctl start motion"
+	@echo "  Or test run: motion -c $(pkgsysconfdir)/motion.conf -n -d"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo ""
+
+###################################################################
+## Optional: Install Pi-specific tools (only on Raspberry Pi)
+###################################################################
+install-pi-tools:
+	@echo "Installing Raspberry Pi tools..."
+	@if [ -f /proc/device-tree/model ]; then \
+		MODEL=$$(tr -d '\0' < /proc/device-tree/model 2>/dev/null); \
+		if echo "$$MODEL" | grep -q "Raspberry Pi"; then \
+			$(MKDIR_P) $(DESTDIR)$(bindir)/motion-pi-tools; \
+			$(INSTALL_SCRIPT) $(scriptsdir)/pi-build.sh $(DESTDIR)$(bindir)/motion-pi-tools/; \
+			$(INSTALL_SCRIPT) $(scriptsdir)/pi-configure.sh $(DESTDIR)$(bindir)/motion-pi-tools/; \
+			$(INSTALL_SCRIPT) $(scriptsdir)/pi-setup.sh $(DESTDIR)$(bindir)/motion-pi-tools/; \
+			ln -sf $(bindir)/motion-pi-tools/pi-configure.sh $(DESTDIR)$(bindir)/motion-setup-pi; \
+			echo ""; \
+			echo "✓ Pi tools installed to $(bindir)/motion-pi-tools/"; \
+			echo "✓ Quick setup: motion-setup-pi"; \
+			echo ""; \
+		else \
+			echo "ERROR: This is not a Raspberry Pi."; \
+			echo "Pi tools are only compatible with Raspberry Pi systems."; \
+			exit 1; \
+		fi; \
+	else \
+		echo "ERROR: Cannot detect platform."; \
+		exit 1; \
+	fi
+
+uninstall-pi-tools:
+	rm -rf $(DESTDIR)$(bindir)/motion-pi-tools
+	rm -f $(DESTDIR)$(bindir)/motion-setup-pi
+	@echo "Pi tools uninstalled."
 
 ###################################################################
 ## Systemd service installation
@@ -126,7 +237,8 @@ setup-service: install-service
 ## Create pristine directories to match exactly distributed files
 ###################################################################
 cleanall: distclean
-	@rm -rf autom4te.cache m4
+	@rm -rf autom4te.cache
+	# Don't remove m4/ - contains source-controlled files
 	@rm -f config.hpp.in config.hpp.in~ aclocal.m4 config.sub ABOUT-NLS missing
 	@rm -f compile config.guess config.rpath configure depcomp install-sh
 	@rm -f po/en@boldquot.header po/en@quot.header po/insert-header.sin

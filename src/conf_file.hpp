@@ -29,6 +29,7 @@
 
 #include <string>
 #include <cstdio>
+#include <map>
 
 /* Forward declarations */
 class cls_motapp;
@@ -66,6 +67,16 @@ public:
 private:
     cls_motapp *app;
     cls_config *config;
+
+    /* Layered configuration support */
+    std::map<std::string, std::string> config_sources;  /* param → source file */
+    void process_layered();
+    void process_file(const std::string &filename, const std::string &layer_name, bool allow_cameras);
+    std::string get_active_profile();
+    void log_config_sources();
+    bool file_exists(const std::string &path);
+    bool dir_exists(const std::string &path);
+    void load_user_camera_configs(const std::string &user_cam_dir);
 
     /* File processing helpers */
     void process_line(const std::string &line);

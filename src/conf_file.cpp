@@ -31,6 +31,10 @@
 #include "sound.hpp"
 #include "conf.hpp"
 #include "conf_file.hpp"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <fstream>
 
 extern struct ctx_parm config_parms[];
 
@@ -45,90 +49,127 @@ cls_config_file::cls_config_file(cls_motapp *p_app, cls_config *p_config)
 /*
  * Initialize configuration from command line and config files
  *
- * Search order for motion.conf:
- * 1. Command line -c option
- * 2. Current working directory
- * 3. ~/.motion/motion.conf
- * 4. $configdir/motion.conf (build-time default)
- * 5. $sysconfdir/motion.conf (deprecated location)
+ * Motion 5.0 supports two configuration modes:
+ * 1. Layered mode (new) - Detected by presence of /var/lib/motion/user-config/
+ *    - System config: /etc/motion/motion.conf
+ *    - User overrides: /var/lib/motion/user-config/local.conf
+ *    - Active profile: /var/lib/motion/profiles/{name}.conf
+ *    - Command line overrides
+ *
+ * 2. Legacy mode (backward compatible) - Single config file
+ *    Search order for motion.conf:
+ *    - Command line -c option
+ *    - Current working directory
+ *    - ~/.motion/motion.conf
+ *    - $configdir/motion.conf (build-time default)
+ *    - $sysconfdir/motion.conf (deprecated location)
  */
 void cls_config_file::init()
 {
     std::string filename;
     char path[PATH_MAX];
     struct stat statbuf;
+    bool use_layered = false;
 
     /* Process command line arguments first */
     cmdline();
 
-    /* Check if config file was specified on command line */
-    filename = "";
-    if (app->conf_src->conf_filename != "") {
-        filename = app->conf_src->conf_filename;
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
+    /* Check if layered configuration mode is available */
+    std::string userconf_dir = std::string(configdir) + "/user-config";
+    if (dir_exists(userconf_dir)) {
+        use_layered = true;
+        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+            _("Using layered configuration mode (Motion 5.0)"));
     }
 
-    /* Try current working directory */
-    if (filename == "") {
-        if (getcwd(path, sizeof(path)) == NULL) {
-            MOTION_LOG(ERR, TYPE_ALL, SHOW_ERRNO, _("Error getcwd"));
+    if (use_layered) {
+        /* Use layered configuration loading */
+        cls_config_file main_file(app, app->conf_src);
+        main_file.process_layered();
+
+        /* Set config filename for logging purposes */
+        filename = std::string(sysconfdir) + "/motion.conf";
+        if (!file_exists(filename)) {
+            filename = std::string(configdir) + "/motion.conf";
+        }
+        config->edit_set("conf_filename", filename);
+        app->conf_src->conf_filename = filename;
+        app->conf_src->from_conf_dir = false;
+
+    } else {
+        /* Legacy single-file configuration mode */
+        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+            _("Using legacy single-file configuration mode"));
+
+        /* Check if config file was specified on command line */
+        filename = "";
+        if (app->conf_src->conf_filename != "") {
+            filename = app->conf_src->conf_filename;
+            if (stat(filename.c_str(), &statbuf) != 0) {
+                filename = "";
+            }
+        }
+
+        /* Try current working directory */
+        if (filename == "") {
+            if (getcwd(path, sizeof(path)) == NULL) {
+                MOTION_LOG(ERR, TYPE_ALL, SHOW_ERRNO, _("Error getcwd"));
+                exit(-1);
+            }
+            filename = path + std::string("/motion.conf");
+            if (stat(filename.c_str(), &statbuf) != 0) {
+                filename = "";
+            }
+        }
+
+        /* Try home directory */
+        if (filename == "") {
+            filename = std::string(getenv("HOME")) + std::string("/.motion/motion.conf");
+            if (stat(filename.c_str(), &statbuf) != 0) {
+                filename = "";
+            }
+        }
+
+        /* Try build-time configdir */
+        if (filename == "") {
+            filename = std::string(configdir) + std::string("/motion.conf");
+            if (stat(filename.c_str(), &statbuf) != 0) {
+                filename = "";
+            }
+        }
+
+        /* Try deprecated sysconfdir */
+        if (filename == "") {
+            filename = std::string(sysconfdir) + std::string("/motion.conf");
+            if (stat(filename.c_str(), &statbuf) != 0) {
+                filename = "";
+            }
+            if (filename != "") {
+                MOTION_LOG(WRN, TYPE_ALL, SHOW_ERRNO,
+                    _("The configuration file location '%s' is deprecated."),
+                    sysconfdir);
+                MOTION_LOG(WRN, TYPE_ALL, SHOW_ERRNO,
+                    _("The new default configuration file location is '%s'"),
+                    configdir);
+            }
+        }
+
+        if (filename == "") {
+            MOTION_LOG(ALR, TYPE_ALL, SHOW_ERRNO,
+                _("Could not open configuration file"));
             exit(-1);
         }
-        filename = path + std::string("/motion.conf");
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
+
+        config->edit_set("conf_filename", filename);
+
+        /* Process the main config file */
+        app->conf_src->conf_filename = filename;
+        app->conf_src->from_conf_dir = false;
+
+        /* Create a temporary file handler for the main config */
+        cls_config_file main_file(app, app->conf_src);
+        main_file.process();
     }
-
-    /* Try home directory */
-    if (filename == "") {
-        filename = std::string(getenv("HOME")) + std::string("/.motion/motion.conf");
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
-    }
-
-    /* Try build-time configdir */
-    if (filename == "") {
-        filename = std::string(configdir) + std::string("/motion.conf");
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
-    }
-
-    /* Try deprecated sysconfdir */
-    if (filename == "") {
-        filename = std::string(sysconfdir) + std::string("/motion.conf");
-        if (stat(filename.c_str(), &statbuf) != 0) {
-            filename = "";
-        }
-        if (filename != "") {
-            MOTION_LOG(WRN, TYPE_ALL, SHOW_ERRNO,
-                _("The configuration file location '%s' is deprecated."),
-                sysconfdir);
-            MOTION_LOG(WRN, TYPE_ALL, SHOW_ERRNO,
-                _("The new default configuration file location is '%s'"),
-                configdir);
-        }
-    }
-
-    if (filename == "") {
-        MOTION_LOG(ALR, TYPE_ALL, SHOW_ERRNO,
-            _("Could not open configuration file"));
-        exit(-1);
-    }
-
-    config->edit_set("conf_filename", filename);
-
-    /* Process the main config file */
-    app->conf_src->conf_filename = filename;
-    app->conf_src->from_conf_dir = false;
-
-    /* Create a temporary file handler for the main config */
-    cls_config_file main_file(app, app->conf_src);
-    main_file.process();
 
     /* If no cameras or sounds defined, add a default camera */
     if ((app->cam_cnt == 0) && (app->snd_cnt == 0)) {
@@ -648,4 +689,255 @@ void cls_config_file::parms_write()
     write_app();
     write_cam();
     write_snd();
+}
+
+/*
+ * ============================================================================
+ * Layered Configuration Support (Motion 5.0)
+ * ============================================================================
+ */
+
+/*
+ * Check if a file exists
+ */
+bool cls_config_file::file_exists(const std::string &path)
+{
+    struct stat statbuf;
+    return (stat(path.c_str(), &statbuf) == 0 && S_ISREG(statbuf.st_mode));
+}
+
+/*
+ * Check if a directory exists
+ */
+bool cls_config_file::dir_exists(const std::string &path)
+{
+    struct stat statbuf;
+    return (stat(path.c_str(), &statbuf) == 0 && S_ISDIR(statbuf.st_mode));
+}
+
+/*
+ * Get active profile name from runtime directory
+ * Returns empty string if no active profile is set
+ */
+std::string cls_config_file::get_active_profile()
+{
+    std::string profile_file = std::string(configdir) + "/runtime/active-profile.txt";
+    std::string profile_name;
+    std::ifstream ifs;
+
+    ifs.open(profile_file);
+    if (ifs.is_open()) {
+        std::getline(ifs, profile_name);
+        mytrim(profile_name);
+        ifs.close();
+
+        if (profile_name != "") {
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+                _("Active profile detected: %s"), profile_name.c_str());
+        }
+    }
+
+    return profile_name;
+}
+
+/*
+ * Log all configuration sources (which file set each parameter)
+ */
+void cls_config_file::log_config_sources()
+{
+    if (config_sources.empty()) {
+        return;
+    }
+
+    MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+        _("Configuration sources summary:"));
+
+    for (auto const& entry : config_sources) {
+        MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,
+            _("  %s: %s"), entry.first.c_str(), entry.second.c_str());
+    }
+}
+
+/*
+ * Load user camera configuration files from user-config/cameras/
+ */
+void cls_config_file::load_user_camera_configs(const std::string &user_cam_dir)
+{
+    if (!dir_exists(user_cam_dir)) {
+        return;
+    }
+
+    DIR *dp;
+    dirent *ep;
+    std::string file;
+
+    dp = opendir(user_cam_dir.c_str());
+    if (dp != NULL) {
+        while ((ep = readdir(dp))) {
+            file.assign(ep->d_name);
+            if (file.length() >= 5) {
+                if (file.substr(file.length() - 5, 5) == ".conf") {
+                    file = user_cam_dir + "/" + file;
+                    MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+                        _("Loading user camera config: %s"), file.c_str());
+                    config->camera_add(file, true);
+                }
+            }
+        }
+        closedir(dp);
+    }
+}
+
+/*
+ * Process a single configuration file with layer restrictions
+ *
+ * Parameters:
+ *   filename - path to config file
+ *   layer_name - descriptive name for logging (e.g., "system", "user", "profile:day")
+ *   allow_cameras - if false, "camera" and "sound" directives are not allowed
+ */
+void cls_config_file::process_file(const std::string &filename,
+                                   const std::string &layer_name,
+                                   bool allow_cameras)
+{
+    size_t stpos;
+    std::string line, parm_nm, parm_vl;
+    std::ifstream ifs;
+
+    if (!file_exists(filename)) {
+        MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,
+            _("Config file not found: %s (layer: %s)"),
+            filename.c_str(), layer_name.c_str());
+        return;
+    }
+
+    ifs.open(filename);
+    if (ifs.is_open() == false) {
+        MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+            _("Cannot open config file: %s (layer: %s)"),
+            filename.c_str(), layer_name.c_str());
+        return;
+    }
+
+    MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
+        _("Loading config layer [%s]: %s"),
+        layer_name.c_str(), filename.c_str());
+
+    while (std::getline(ifs, line)) {
+        mytrim(line);
+        stpos = line.find(" ");
+        if (line.find('\t') != std::string::npos) {
+            if (line.find('\t') < stpos) {
+                stpos = line.find('\t');
+            }
+        }
+        if (stpos > line.find("=")) {
+            stpos = line.find("=");
+        }
+        if ((stpos != line.length() - 1) &&
+            (stpos != 0) &&
+            (line.substr(0, 1) != ";") &&
+            (line.substr(0, 1) != "#")) {
+            parm_nm = line.substr(0, stpos);
+            if (stpos != std::string::npos) {
+                parm_vl = line.substr(stpos + 1, line.length() - stpos);
+            } else {
+                parm_vl = "";
+            }
+            myunquote(parm_nm);
+            myunquote(parm_vl);
+
+            /* Handle camera/sound directives only in system config */
+            if ((parm_nm == "camera") || (parm_nm == "sound")) {
+                if (!allow_cameras) {
+                    MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+                        _("Ignoring '%s' directive in %s (only allowed in system config)"),
+                        parm_nm.c_str(), layer_name.c_str());
+                    continue;
+                }
+
+                if (parm_nm == "camera" && app->conf_src == config) {
+                    config->camera_add(parm_vl, false);
+                } else if (parm_nm == "sound" && app->conf_src == config) {
+                    config->sound_add(parm_vl, false);
+                }
+            } else if (parm_nm == "config_dir") {
+                if (!allow_cameras) {
+                    MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+                        _("Ignoring 'config_dir' in %s (only allowed in system config)"),
+                        layer_name.c_str());
+                    continue;
+                }
+                config->edit_set("config_dir", parm_vl);
+            } else {
+                /* Track config source for debugging */
+                config_sources[parm_nm] = layer_name;
+
+                /* Set parameter value */
+                config->edit_set(parm_nm, parm_vl);
+            }
+        } else if ((line != "") &&
+                   (line.substr(0, 1) != ";") &&
+                   (line.substr(0, 1) != "#")) {
+            MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO,
+                _("Unable to parse line in %s: %s"),
+                layer_name.c_str(), line.c_str());
+        }
+    }
+    ifs.close();
+}
+
+/*
+ * Process configuration using layered approach (Motion 5.0)
+ *
+ * Loading order (later layers override earlier ones):
+ * 1. System config (/etc/motion/motion.conf)
+ * 2. User overrides (/var/lib/motion/user-config/local.conf)
+ * 3. Active profile (/var/lib/motion/profiles/{name}.conf)
+ * 4. Camera configs (system cameras.d/ + user cameras/)
+ */
+void cls_config_file::process_layered()
+{
+    std::string syscfg, usercfg, profile_name, prof_cfg;
+    std::string user_cam_dir;
+
+    /* 1. System config - required */
+    syscfg = std::string(sysconfdir) + "/motion.conf";
+    if (!file_exists(syscfg)) {
+        /* Try alternate location */
+        syscfg = std::string(configdir) + "/motion.conf";
+    }
+
+    if (!file_exists(syscfg)) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO,
+            _("System config file not found: %s"), syscfg.c_str());
+        exit(-1);
+    }
+
+    process_file(syscfg, "system", true);
+
+    /* 2. User overrides - optional */
+    usercfg = std::string(configdir) + "/user-config/local.conf";
+    if (file_exists(usercfg)) {
+        process_file(usercfg, "user", false);
+    }
+
+    /* 3. Active profile - optional */
+    profile_name = get_active_profile();
+    if (profile_name != "") {
+        prof_cfg = std::string(configdir) + "/profiles/" + profile_name + ".conf";
+        if (file_exists(prof_cfg)) {
+            process_file(prof_cfg, "profile:" + profile_name, false);
+        } else {
+            MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO,
+                _("Active profile config not found: %s"), prof_cfg.c_str());
+        }
+    }
+
+    /* 4. User camera configs - optional */
+    user_cam_dir = std::string(configdir) + "/user-config/cameras";
+    load_user_camera_configs(user_cam_dir);
+
+    /* Log configuration sources for debugging */
+    log_config_sources();
 }
