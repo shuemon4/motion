@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useMjpegStream } from '@/hooks/useMjpegStream'
 import { getStoredRestartTimestamp } from '@/lib/cameraRestart'
+import { PtzControls } from '@/components/PtzControls'
 
 interface CameraStreamProps {
   cameraId: number
@@ -140,6 +141,7 @@ export function CameraStream({ cameraId, className = '', onStreamFpsChange }: Ca
           alt={`Camera ${cameraId} stream`}
           className="absolute inset-0 w-full h-full object-contain"
         />
+        <PtzControls cameraId={cameraId} />
       </div>
     </div>
   )

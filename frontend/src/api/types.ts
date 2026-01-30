@@ -293,3 +293,15 @@ export interface CameraCapabilities {
   DigitalGain?: boolean;
   ScalerCrop?: boolean;
 }
+
+// PTZ capabilities derived from camera config
+export interface PtzCapabilities {
+  enabled: boolean;           // stream_preview_ptz
+  hasPanLeft: boolean;        // ptz_pan_left non-empty
+  hasPanRight: boolean;       // ptz_pan_right non-empty
+  hasTiltUp: boolean;         // ptz_tilt_up non-empty
+  hasTiltDown: boolean;       // ptz_tilt_down non-empty
+  hasZoomIn: boolean;         // ptz_zoom_in non-empty
+  hasZoomOut: boolean;        // ptz_zoom_out non-empty
+  hasAnyControl: boolean;     // At least one command is available
+}

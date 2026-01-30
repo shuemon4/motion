@@ -27,6 +27,7 @@ import { PlaybackSettings } from '@/components/settings/PlaybackSettings'
 import { MaskEditor } from '@/components/settings/MaskEditor'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import { UploadSettings } from '@/components/settings/UploadSettings'
+import { PtzSettings } from '@/components/settings/PtzSettings'
 import { ConfigurationPresets } from '@/components/ConfigurationPresets'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { useCameraCapabilities } from '@/hooks/useCameraCapabilities'
@@ -488,6 +489,13 @@ export function Settings() {
 
           {/* 5. Video Streaming */}
           <StreamSettings
+            config={activeConfig}
+            onChange={handleChange}
+            getError={getError}
+          />
+
+          {/* 5a. PTZ Controls */}
+          <PtzSettings
             config={activeConfig}
             onChange={handleChange}
             getError={getError}

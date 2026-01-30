@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiDelete, apiPatch, apiPost } from './client';
+import { apiGet, apiDelete, apiPatch, apiPost, sendPtzCommand } from './client';
 import { updateSessionCsrf } from './session';
 import type {
   MotionConfig,
@@ -16,6 +16,7 @@ import type {
   DetectedCamerasResponse,
   AddCameraRequest,
   TestNetcamRequest,
+  PtzCapabilities,
 } from './types';
 
 // Query keys for cache management
@@ -326,6 +327,74 @@ export function useTestNetcam() {
   return useMutation({
     mutationFn: async (request: TestNetcamRequest) => {
       return apiPost<{ status: string; message: string }>("/0/api/cameras/test", request as unknown as Record<string, unknown>);
+    },
+  });
+}
+
+// PTZ Capabilities - Derive from camera config
+export function usePtzCapabilities(cameraId: number) {
+  const { data: config } = useMotionConfig();
+
+  return useQuery({
+    queryKey: ['ptzCapabilities', cameraId],
+    queryFn: (): PtzCapabilities => {
+      if (!config) {
+        return {
+          enabled: false,
+          hasPanLeft: false,
+          hasPanRight: false,
+          hasTiltUp: false,
+          hasTiltDown: false,
+          hasZoomIn: false,
+          hasZoomOut: false,
+          hasAnyControl: false,
+        };
+      }
+
+      // Get camera config (merge default + camera-specific)
+      const defaultConfig = (config.configuration.default || {}) as Record<string, { value: string | number | boolean }>;
+      const cameraConfig: Record<string, { value: string | number | boolean }> = cameraId === 0
+        ? defaultConfig
+        : { ...defaultConfig, ...((config.configuration[`cam${cameraId}`] || {}) as Record<string, { value: string | number | boolean }>) };
+
+      // Check if PTZ overlay is enabled
+      const enabled = Boolean(cameraConfig.stream_preview_ptz?.value ?? false);
+
+      // Check which commands are configured (non-empty strings)
+      const getCommandValue = (param: string): string => {
+        return String(cameraConfig[param]?.value ?? '').trim();
+      };
+
+      const hasPanLeft = getCommandValue('ptz_pan_left').length > 0;
+      const hasPanRight = getCommandValue('ptz_pan_right').length > 0;
+      const hasTiltUp = getCommandValue('ptz_tilt_up').length > 0;
+      const hasTiltDown = getCommandValue('ptz_tilt_down').length > 0;
+      const hasZoomIn = getCommandValue('ptz_zoom_in').length > 0;
+      const hasZoomOut = getCommandValue('ptz_zoom_out').length > 0;
+
+      const hasAnyControl = hasPanLeft || hasPanRight || hasTiltUp || hasTiltDown || hasZoomIn || hasZoomOut;
+
+      return {
+        enabled,
+        hasPanLeft,
+        hasPanRight,
+        hasTiltUp,
+        hasTiltDown,
+        hasZoomIn,
+        hasZoomOut,
+        hasAnyControl,
+      };
+    },
+    enabled: !!config,
+    staleTime: 60000, // Cache for 1 minute
+  });
+}
+
+// PTZ Command - Send PTZ command to camera
+export function useSendPtzCommand() {
+  return useMutation({
+    mutationFn: async ({ camId, action }: { camId: number; action: string }) => {
+      return sendPtzCommand(camId, action);
     },
   });
 }
