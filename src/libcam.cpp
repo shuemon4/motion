@@ -1769,7 +1769,7 @@ cls_libcam::~cls_libcam()
 /* Stub implementations for libcam hot-reload methods when libcam is not available */
 void cls_libcam::set_brightness(float value) { (void)value; }
 void cls_libcam::set_contrast(float value) { (void)value; }
-void cls_libcam::set_iso(float value) { (void)value; }
+void cls_libcam::set_gain(float value) { (void)value; }
 void cls_libcam::set_awb_enable(bool value) { (void)value; }
 void cls_libcam::set_awb_mode(int value) { (void)value; }
 void cls_libcam::set_awb_locked(bool value) { (void)value; }

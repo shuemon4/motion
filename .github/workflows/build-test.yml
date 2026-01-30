@@ -21,9 +21,9 @@ jobs:
             deps_install: |
               apt-get update -qq
               apt-get install -y -qq \
-                build-essential autoconf automake libtool pkg-config gettext \
+                build-essential autoconf automake autoconf-archive libtool pkg-config gettext autopoint git \
                 libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
-                libmicrohttpd-dev libjpeg-dev libsqlite3-dev
+                libmicrohttpd-dev libjpeg-dev libsqlite3-dev zlib1g-dev
 
           # Ubuntu 24.04 - FFmpeg 6.x
           - distro: ubuntu:24.04
@@ -31,17 +31,17 @@ jobs:
             deps_install: |
               apt-get update -qq
               DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-                build-essential autoconf automake libtool pkg-config gettext \
+                build-essential autoconf automake autoconf-archive libtool pkg-config gettext autopoint git \
                 libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
-                libmicrohttpd-dev libjpeg-dev libsqlite3-dev
+                libmicrohttpd-dev libjpeg-dev libsqlite3-dev zlib1g-dev
 
           # Fedora 40 - FFmpeg 6.x
           - distro: fedora:40
             ffmpeg: "6.x"
             deps_install: |
               dnf install -y -q \
-                gcc gcc-c++ make autoconf automake libtool pkgconfig gettext \
-                ffmpeg-free-devel libmicrohttpd-devel libjpeg-turbo-devel sqlite-devel
+                gcc gcc-c++ make autoconf automake autoconf-archive libtool pkgconfig gettext-devel git \
+                ffmpeg-free-devel libmicrohttpd-devel libjpeg-turbo-devel sqlite-devel zlib-devel
 
     container:
       image: ${{ matrix.distro }}
@@ -81,21 +81,21 @@ jobs:
           test -f /tmp/motion-install/usr/local/bin/motion-setup || exit 1
 
           # Check hybrid directory layout
-          test -d /tmp/motion-install/var/lib/motion/user-config || exit 1
-          test -d /tmp/motion-install/var/lib/motion/profiles || exit 1
-          test -d /tmp/motion-install/var/lib/motion/runtime || exit 1
-          test -d /tmp/motion-install/var/lib/motion/webui || exit 1
+          test -d /tmp/motion-install/usr/local/var/lib/motion/user-config || exit 1
+          test -d /tmp/motion-install/usr/local/var/lib/motion/profiles || exit 1
+          test -d /tmp/motion-install/usr/local/var/lib/motion/runtime || exit 1
+          test -d /tmp/motion-install/usr/local/var/lib/motion/webui || exit 1
 
           # Check config templates
-          test -f /tmp/motion-install/var/lib/motion/user-config/local.conf || exit 1
+          test -f /tmp/motion-install/usr/local/var/lib/motion/user-config/local.conf || exit 1
 
           # Check profiles
-          test -f /tmp/motion-install/var/lib/motion/profiles/day.conf || exit 1
-          test -f /tmp/motion-install/var/lib/motion/profiles/night.conf || exit 1
-          test -f /tmp/motion-install/var/lib/motion/profiles/away.conf || exit 1
+          test -f /tmp/motion-install/usr/local/var/lib/motion/profiles/day.conf || exit 1
+          test -f /tmp/motion-install/usr/local/var/lib/motion/profiles/night.conf || exit 1
+          test -f /tmp/motion-install/usr/local/var/lib/motion/profiles/away.conf || exit 1
 
           # Check WebUI files
-          test -f /tmp/motion-install/var/lib/motion/webui/index.html || exit 1
+          test -f /tmp/motion-install/usr/local/var/lib/motion/webui/index.html || exit 1
 
           echo "Directory structure verification passed!"
 

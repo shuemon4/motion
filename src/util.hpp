@@ -33,7 +33,13 @@
 /* Modern FFmpeg (6.0+) - Pi 5 with 64-bit OS uses current FFmpeg APIs */
 typedef const AVCodec myAVCodec;
 typedef const uint8_t myuint;
-#define MY_PROFILE_H264_HIGH   AV_PROFILE_H264_HIGH
+
+/* Profile constants - handle FFmpeg rename from AV_PROFILE_* to FF_PROFILE_* */
+#ifdef FF_PROFILE_H264_HIGH
+    #define MY_PROFILE_H264_HIGH   FF_PROFILE_H264_HIGH
+#else
+    #define MY_PROFILE_H264_HIGH   AV_PROFILE_H264_HIGH
+#endif
 
 /* FFmpeg 5.0+ Compatibility Macros - Support FFmpeg 5.0 through 7.x */
 /* Minimum version check - Motion requires FFmpeg 5.0 or newer */
