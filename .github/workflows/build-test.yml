@@ -1,0 +1,141 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ master, legacy-compat, NetCam ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-matrix:
+    name: Build on ${{ matrix.distro }} (FFmpeg ${{ matrix.ffmpeg }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Debian 12 - FFmpeg 5.x
+          - distro: debian:12
+            ffmpeg: "5.x"
+            deps_install: |
+              apt-get update -qq
+              apt-get install -y -qq \
+                build-essential autoconf automake libtool pkg-config gettext \
+                libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
+                libmicrohttpd-dev libjpeg-dev libsqlite3-dev
+
+          # Ubuntu 24.04 - FFmpeg 6.x
+          - distro: ubuntu:24.04
+            ffmpeg: "6.x"
+            deps_install: |
+              apt-get update -qq
+              DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+                build-essential autoconf automake libtool pkg-config gettext \
+                libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
+                libmicrohttpd-dev libjpeg-dev libsqlite3-dev
+
+          # Fedora 40 - FFmpeg 6.x
+          - distro: fedora:40
+            ffmpeg: "6.x"
+            deps_install: |
+              dnf install -y -q \
+                gcc gcc-c++ make autoconf automake libtool pkgconfig gettext \
+                ffmpeg-free-devel libmicrohttpd-devel libjpeg-turbo-devel sqlite-devel
+
+    container:
+      image: ${{ matrix.distro }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: ${{ matrix.deps_install }}
+
+      - name: Check FFmpeg version
+        run: |
+          FFMPEG_VER=$(pkg-config --modversion libavformat || echo "unknown")
+          echo "FFmpeg version: $FFMPEG_VER"
+          echo "ffmpeg_version=$FFMPEG_VER" >> $GITHUB_OUTPUT
+        id: ffmpeg_check
+
+      - name: Run autoreconf
+        run: autoreconf -fiv
+
+      - name: Configure
+        run: ./configure --with-sqlite3
+
+      - name: Build
+        run: make -j$(nproc)
+
+      - name: Test installation
+        run: make install DESTDIR=/tmp/motion-install
+
+      - name: Verify directory structure
+        run: |
+          echo "Checking installed directory structure..."
+
+          # Check binaries
+          test -f /tmp/motion-install/usr/local/bin/motion || exit 1
+          test -f /tmp/motion-install/usr/local/bin/motion-setup || exit 1
+
+          # Check hybrid directory layout
+          test -d /tmp/motion-install/var/lib/motion/user-config || exit 1
+          test -d /tmp/motion-install/var/lib/motion/profiles || exit 1
+          test -d /tmp/motion-install/var/lib/motion/runtime || exit 1
+          test -d /tmp/motion-install/var/lib/motion/webui || exit 1
+
+          # Check config templates
+          test -f /tmp/motion-install/var/lib/motion/user-config/local.conf || exit 1
+
+          # Check profiles
+          test -f /tmp/motion-install/var/lib/motion/profiles/day.conf || exit 1
+          test -f /tmp/motion-install/var/lib/motion/profiles/night.conf || exit 1
+          test -f /tmp/motion-install/var/lib/motion/profiles/away.conf || exit 1
+
+          # Check WebUI files
+          test -f /tmp/motion-install/var/lib/motion/webui/index.html || exit 1
+
+          echo "Directory structure verification passed!"
+
+      - name: Test motion binary
+        run: |
+          /tmp/motion-install/usr/local/bin/motion --help
+
+      - name: Check for compiler warnings
+        run: |
+          # Rebuild with warnings as errors (informational, don't fail)
+          make clean
+          ./configure --with-sqlite3 CFLAGS="-Wall -Wextra" CXXFLAGS="-Wall -Wextra" || true
+          make -j$(nproc) 2>&1 | tee build.log || true
+
+          # Count warnings (informational)
+          WARNING_COUNT=$(grep -c "warning:" build.log || true)
+          echo "Warning count: $WARNING_COUNT"
+
+          if [ $WARNING_COUNT -gt 0 ]; then
+            echo "Build produced $WARNING_COUNT warnings (informational only)"
+          fi
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.distro }}-${{ matrix.ffmpeg }}
+          path: |
+            build.log
+            config.log
+          retention-days: 7
+
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: build-matrix
+    if: always()
+
+    steps:
+      - name: Check build results
+        run: |
+          echo "Build matrix completed"
+          echo "Check individual job results above"
