@@ -3,9 +3,10 @@ import { login } from '@/api/auth';
 
 interface LoginPageProps {
   onSuccess: () => void;
+  sessionExpired?: boolean;
 }
 
-export function LoginPage({ onSuccess }: LoginPageProps) {
+export function LoginPage({ onSuccess, sessionExpired }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -46,6 +47,13 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
         {/* Login Card */}
         <div className="bg-surface-elevated rounded-lg shadow-xl p-6">
           <h2 className="text-xl font-semibold mb-6">Sign In</h2>
+
+          {sessionExpired && (
+            <div className="mb-4 p-3 bg-yellow-600/10 border border-yellow-600/30
+                          rounded-lg text-yellow-200 text-sm">
+              Session expired. Please sign in again.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <div className="mb-4">

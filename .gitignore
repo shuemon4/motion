@@ -38,6 +38,7 @@ doc/aar/
 doc/Screenshots/
 doc/sub-agent-plans/
 doc/MOTION_PI5_CHANGES.md
+doc/testing/
 
 #data
 data/motion-dist.service

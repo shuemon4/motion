@@ -9,7 +9,8 @@ interface SessionData {
   sessionToken: string;
   csrfToken: string;
   role: 'admin' | 'user';
-  expiresAt: number;  // Unix timestamp
+  expiresAt: number;  // Unix timestamp (ms)
+  expiresInMs: number; // Original TTL in ms, for refreshing
 }
 
 // In-memory storage (default - clears on page close)
@@ -27,11 +28,13 @@ export function setSession(data: {
   role: 'admin' | 'user';
   expires_in: number;
 }, persist: boolean = false): void {
+  const expiresInMs = data.expires_in * 1000;
   session = {
     sessionToken: data.session_token,
     csrfToken: data.csrf_token,
     role: data.role,
-    expiresAt: Date.now() + (data.expires_in * 1000),
+    expiresAt: Date.now() + expiresInMs,
+    expiresInMs,
   };
 
   if (persist) {
@@ -69,6 +72,24 @@ export function updateSessionCsrf(newCsrfToken: string): void {
   session.csrfToken = newCsrfToken;
 
   // Persist if using sessionStorage
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Refresh local session expiry to stay in sync with backend's sliding window.
+ * Called on successful API responses since the backend extends the session on every request.
+ */
+export function refreshSessionExpiry(): void {
+  if (!session) return;
+  session.expiresAt = Date.now() + session.expiresInMs;
+
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {

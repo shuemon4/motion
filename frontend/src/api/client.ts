@@ -1,4 +1,5 @@
-import { getSessionToken, getCsrfToken, clearSession, updateSessionCsrf } from './session';
+import { getSessionToken, getCsrfToken, clearSession, updateSessionCsrf, refreshSessionExpiry } from './session';
+import type { QueryClient } from '@tanstack/react-query';
 
 /**
  * Request timeout in milliseconds
@@ -37,12 +38,32 @@ type AuthErrorCallback = (status: number) => void;
 
 /** Global auth error callback - set by AuthProvider */
 let authErrorCallback: AuthErrorCallback | null = null;
+/** QueryClient reference for invalidating auth queries on 401 */
+let queryClientRef: QueryClient | null = null;
 
 /**
  * Register a callback to be called on authentication errors
  */
 export function setAuthErrorCallback(callback: AuthErrorCallback | null): void {
   authErrorCallback = callback;
+}
+
+/**
+ * Provide QueryClient so API layer can invalidate auth queries on session expiry.
+ * Call once from main.tsx after creating the QueryClient.
+ */
+export function setQueryClient(qc: QueryClient): void {
+  queryClientRef = qc;
+}
+
+/**
+ * Handle session expiry: clear session, invalidate auth query, notify callback.
+ * This immediately updates AuthContext so polling queries disable themselves.
+ */
+function handleSessionExpired(status: number): void {
+  clearSession();
+  queryClientRef?.invalidateQueries({ queryKey: ['auth', 'status'] });
+  authErrorCallback?.(status);
 }
 
 class ApiClientError extends Error {
@@ -118,8 +139,7 @@ export async function apiGet<T>(endpoint: string, retryCount = 0): Promise<T> {
       // Handle authentication errors
       if (response.status === 401) {
         // Session expired or invalid
-        clearSession();
-        authErrorCallback?.(401);
+        handleSessionExpired(401);
         throw new ApiClientError('Session expired', 401);
       }
 
@@ -132,6 +152,7 @@ export async function apiGet<T>(endpoint: string, retryCount = 0): Promise<T> {
       throw new ApiClientError(`HTTP ${response.status}: ${response.statusText}`, response.status);
     }
 
+    refreshSessionExpiry();
     return safeJsonParse<T>(response);
   } catch (error) {
     clearTimeout(timeoutId);
@@ -173,8 +194,7 @@ export async function apiPost<T>(
 
     // Handle authentication errors
     if (response.status === 401) {
-      clearSession();
-      authErrorCallback?.(401);
+      handleSessionExpired(401);
       throw new ApiClientError('Session expired', 401);
     }
 
@@ -219,8 +239,7 @@ export async function apiPost<T>(
             // Retry failed - now we can report the error
             if (retryResponse.status === 401 || retryResponse.status === 403) {
               // Session is truly invalid
-              clearSession();
-              authErrorCallback?.(retryResponse.status);
+              handleSessionExpired(retryResponse.status);
             }
             throw new ApiClientError('Request failed after CSRF refresh', retryResponse.status);
           }
@@ -231,8 +250,7 @@ export async function apiPost<T>(
       }
 
       // Couldn't refresh CSRF - session may be invalid
-      clearSession();
-      authErrorCallback?.(403);
+      handleSessionExpired(403);
       throw new ApiClientError('CSRF validation failed', 403);
     }
 
@@ -291,8 +309,7 @@ export async function apiPatch<T>(
 
     // Handle authentication errors
     if (response.status === 401) {
-      clearSession();
-      authErrorCallback?.(401);
+      handleSessionExpired(401);
       throw new ApiClientError('Session expired', 401);
     }
 
@@ -337,8 +354,7 @@ export async function apiPatch<T>(
             // Retry failed - now we can report the error
             if (retryResponse.status === 401 || retryResponse.status === 403) {
               // Session is truly invalid
-              clearSession();
-              authErrorCallback?.(retryResponse.status);
+              handleSessionExpired(retryResponse.status);
             }
             throw new ApiClientError('Request failed after CSRF refresh', retryResponse.status);
           }
@@ -349,8 +365,7 @@ export async function apiPatch<T>(
       }
 
       // Couldn't refresh CSRF - session may be invalid
-      clearSession();
-      authErrorCallback?.(403);
+      handleSessionExpired(403);
       throw new ApiClientError('CSRF validation failed', 403);
     }
 
@@ -402,8 +417,7 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
 
     // Handle authentication errors
     if (response.status === 401) {
-      clearSession();
-      authErrorCallback?.(401);
+      handleSessionExpired(401);
       throw new ApiClientError('Session expired', 401);
     }
 
@@ -446,8 +460,7 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
             // Retry failed - now we can report the error
             if (retryResponse.status === 401 || retryResponse.status === 403) {
               // Session is truly invalid
-              clearSession();
-              authErrorCallback?.(retryResponse.status);
+              handleSessionExpired(retryResponse.status);
             }
             throw new ApiClientError('Request failed after CSRF refresh', retryResponse.status);
           }
@@ -458,8 +471,7 @@ export async function apiDelete<T>(endpoint: string): Promise<T> {
       }
 
       // Couldn't refresh CSRF - session may be invalid
-      clearSession();
-      authErrorCallback?.(403);
+      handleSessionExpired(403);
       throw new ApiClientError('CSRF validation failed', 403);
     }
 

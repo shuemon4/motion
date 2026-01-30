@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getAuthStatus } from '@/api/auth';
@@ -15,6 +15,8 @@ interface AuthGateProps {
 export function AuthGate({ children }: AuthGateProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  // Track whether user was previously authenticated (to detect session expiry)
+  const wasAuthenticated = useRef(false);
 
   // Check auth status from server
   const { data: authStatus, isLoading, error } = useQuery({
@@ -24,8 +26,17 @@ export function AuthGate({ children }: AuthGateProps) {
     staleTime: 30000,  // 30 seconds
   });
 
+  // Track auth state transitions
+  if (authStatus?.authenticated) {
+    wasAuthenticated.current = true;
+  }
+
+  // Determine if this is a session expiry (was logged in, now not)
+  const sessionExpired = wasAuthenticated.current && authStatus?.auth_required && !authStatus?.authenticated;
+
   // Handle successful login - redirect to Dashboard
   const handleLoginSuccess = () => {
+    wasAuthenticated.current = true;
     queryClient.invalidateQueries({ queryKey: ['auth'] });
     navigate('/');  // Redirect to Dashboard after login
   };
@@ -57,7 +68,7 @@ export function AuthGate({ children }: AuthGateProps) {
 
   // Auth required - check if authenticated (trust the query result)
   if (!authStatus?.authenticated) {
-    return <LoginPage onSuccess={handleLoginSuccess} />;
+    return <LoginPage onSuccess={handleLoginSuccess} sessionExpired={sessionExpired} />;
   }
 
   // Authenticated - show app
