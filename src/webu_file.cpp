@@ -260,6 +260,17 @@ void cls_webu_file::main() {
             webua->bad_request();
             return;
         }
+        /* Set Content-Type based on file extension */
+        std::string ext = full_nm.substr(full_nm.rfind('.') + 1);
+        const char *mime = "application/octet-stream";
+        if (ext == "jpg" || ext == "jpeg") mime = "image/jpeg";
+        else if (ext == "png") mime = "image/png";
+        else if (ext == "gif") mime = "image/gif";
+        else if (ext == "mkv") mime = "video/x-matroska";
+        else if (ext == "mp4" || ext == "m4v") mime = "video/mp4";
+        else if (ext == "avi") mime = "video/x-msvideo";
+        else if (ext == "webm") mime = "video/webm";
+        MHD_add_response_header(response, "Content-Type", mime);
         retcd = MHD_queue_response (webua->connection, MHD_HTTP_OK, response);
         MHD_destroy_response (response);
     }

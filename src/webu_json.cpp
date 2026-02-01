@@ -1195,7 +1195,9 @@ void cls_webu_json::api_media_pictures()
         webua->resp_page += "{";
         webua->resp_page += "\"id\":" + std::to_string(flst[i].record_id) + ",";
         webua->resp_page += "\"filename\":\"" + escstr(flst[i].file_nm) + "\",";
-        webua->resp_page += "\"path\":\"" + escstr(flst[i].full_nm) + "\",";
+        /* Return URL path for browser access, not filesystem path */
+        webua->resp_page += "\"path\":\"/" + std::to_string(webua->cam->cfg->device_id) +
+            "/movies/" + escstr(flst[i].file_nm) + "\",";
         webua->resp_page += "\"date\":\"" + std::to_string(flst[i].file_dtl) + "\",";
         webua->resp_page += "\"time\":\"" + escstr(flst[i].file_tml) + "\",";
         webua->resp_page += "\"size\":" + std::to_string(flst[i].file_sz);
@@ -1823,8 +1825,11 @@ void cls_webu_json::api_media_folders()
                 webua->resp_page += "\"thumbnail\":\"" + escstr(url_path + ".thumb.jpg") + "\",";
             }
         } else {
-            /* Pictures use direct file path */
-            webua->resp_page += "\"path\":\"" + escstr(file_path) + "\",";
+            /* Pictures use URL path like movies */
+            std::string pic_url = "/" + cam_id + "/movies/";
+            if (!rel_path.empty()) pic_url += rel_path + "/";
+            pic_url += filename;
+            webua->resp_page += "\"path\":\"" + escstr(pic_url) + "\",";
         }
 
         webua->resp_page += "\"type\":\"" + file_type + "\",";

@@ -8,7 +8,7 @@ export default function CameraManagement() {
   const [showWizard, setShowWizard] = useState(false);
   const { data: cameras = [], isLoading: camerasLoading } = useCameras();
   const { data: platformInfo, isLoading: platformLoading } = usePlatformInfo();
-  const { data: detectedData, isLoading: detectedLoading, refetch: refetchDetected } = useDetectedCameras();
+  const { data: detectedData, isLoading: detectedLoading, refetch: refetchDetected } = useDetectedCameras({ enabled: false });
 
   const detectedCameras = detectedData?.cameras || [];
   const hasDetectedCameras = detectedCameras.length > 0;

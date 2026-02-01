@@ -3,14 +3,13 @@
  *
  * Stores session tokens in memory by default (most secure).
  * Can optionally use sessionStorage for persistence across page reloads.
+ * Backend is the single source of truth for session validity.
  */
 
 interface SessionData {
   sessionToken: string;
   csrfToken: string;
   role: 'admin' | 'user';
-  expiresAt: number;  // Unix timestamp (ms)
-  expiresInMs: number; // Original TTL in ms, for refreshing
 }
 
 // In-memory storage (default - clears on page close)
@@ -26,15 +25,11 @@ export function setSession(data: {
   session_token: string;
   csrf_token: string;
   role: 'admin' | 'user';
-  expires_in: number;
 }, persist: boolean = false): void {
-  const expiresInMs = data.expires_in * 1000;
   session = {
     sessionToken: data.session_token,
     csrfToken: data.csrf_token,
     role: data.role,
-    expiresAt: Date.now() + expiresInMs,
-    expiresInMs,
   };
 
   if (persist) {
@@ -83,24 +78,6 @@ export function updateSessionCsrf(newCsrfToken: string): void {
 }
 
 /**
- * Refresh local session expiry to stay in sync with backend's sliding window.
- * Called on successful API responses since the backend extends the session on every request.
- */
-export function refreshSessionExpiry(): void {
-  if (!session) return;
-  session.expiresAt = Date.now() + session.expiresInMs;
-
-  try {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-    }
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-/**
  * Get user role
  */
 export function getRole(): 'admin' | 'user' | null {
@@ -109,19 +86,11 @@ export function getRole(): 'admin' | 'user' | null {
 }
 
 /**
- * Check if user is authenticated
+ * Check if user has a session stored locally.
+ * Backend is the authority on whether the session is still valid.
  */
 export function isAuthenticated(): boolean {
-  const s = getSession();
-  if (!s) return false;
-
-  // Check expiration
-  if (Date.now() > s.expiresAt) {
-    clearSession();
-    return false;
-  }
-
-  return true;
+  return getSession() !== null;
 }
 
 /**
@@ -146,13 +115,6 @@ export function restoreSession(): boolean {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
       session = JSON.parse(stored);
-
-      // Validate expiration
-      if (session && Date.now() > session.expiresAt) {
-        clearSession();
-        return false;
-      }
-
       return session !== null;
     }
   } catch {

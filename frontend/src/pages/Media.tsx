@@ -408,7 +408,7 @@ export function Media() {
       )}
 
       {/* Delete All for current folder (when viewing a folder with files) */}
-      {viewMode === 'folders' && isAdmin && currentFolderPath && foldersData && foldersData.total_files > 0 && (
+      {viewMode === 'folders' && isAdmin && foldersData && foldersData.total_files > 0 && (
         <div className="mb-4 flex justify-end">
           <button
             onClick={() => handleDeleteAllClick(currentFolderPath, foldersData.total_files)}
@@ -491,6 +491,17 @@ export function Media() {
                       alt={item.filename}
                       className="w-full h-full object-cover"
                       loading="lazy"
+                      decoding="async"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const fallback = parent.querySelector('.fallback-icon');
+                          if (fallback) {
+                            (fallback as HTMLElement).style.display = 'flex';
+                          }
+                        }
+                      }}
                     />
                   ) : thumbnail ? (
                     <img
@@ -510,11 +521,17 @@ export function Media() {
                       }}
                     />
                   ) : null}
-                  <div className={`fallback-icon text-gray-400 absolute inset-0 flex items-center justify-center ${thumbnail ? 'hidden' : ''}`}>
-                    <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                  <div className={`fallback-icon text-gray-400 absolute inset-0 flex items-center justify-center ${(thumbnail || itemType === 'picture') ? 'hidden' : ''}`}>
+                    {itemType === 'picture' ? (
+                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
                   </div>
                 </div>
                 <div className="p-3">
@@ -585,7 +602,7 @@ export function Media() {
               </div>
             </div>
             <div className="p-4">
-              {('type' in selectedItem ? selectedItem.type : mediaType) === 'picture' ? (
+              {('type' in selectedItem ? selectedItem.type : (mediaType === 'pictures' ? 'picture' : 'movie')) === 'picture' ? (
                 <img
                   src={getAuthenticatedUrl(selectedItem.path)}
                   alt={selectedItem.filename}

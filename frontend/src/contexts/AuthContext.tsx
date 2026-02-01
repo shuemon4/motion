@@ -3,6 +3,7 @@
  *
  * Provides reactive authentication state management for the application.
  * Uses TanStack Query to automatically update when auth state changes.
+ * Backend is the single source of truth for session validity.
  */
 
 import {
@@ -12,7 +13,6 @@ import {
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAuthStatus } from '@/api/auth'
-import { isAuthenticated as checkSession, getRole as getSessionRole } from '@/api/session'
 
 interface AuthContextValue {
   /** Whether user is currently authenticated */
@@ -32,18 +32,13 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  // Use TanStack Query - automatically updates when queries are invalidated
-  // This fixes the reactivity issue where auth state wasn't updating after login
   const { data: authStatus, isLoading } = useQuery({
     queryKey: ['auth', 'status'],
     queryFn: getAuthStatus,
-    staleTime: 30000,
-    // Use session data as placeholder while loading
-    placeholderData: () => ({
-      auth_required: true,
-      authenticated: checkSession(),
-      role: getSessionRole() ?? undefined,
-    }),
+    staleTime: 5000,
+    refetchInterval: 120000,
+    refetchIntervalInBackground: false,
+    retry: 1,
   })
 
   const value: AuthContextValue = {

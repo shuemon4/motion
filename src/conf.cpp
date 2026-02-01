@@ -723,7 +723,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "webcontrol_parms") return edit_generic_int(webcontrol_parms, parm, pact, 3, 0, 3);
     if (name == "webcontrol_lock_minutes") return edit_generic_int(webcontrol_lock_minutes, parm, pact, 5, 0, INT_MAX);
     if (name == "webcontrol_lock_attempts") return edit_generic_int(webcontrol_lock_attempts, parm, pact, 5, 1, INT_MAX);
-    if (name == "webcontrol_session_timeout") return edit_generic_int(webcontrol_session_timeout, parm, pact, 3600, 60, INT_MAX);
+    if (name == "webcontrol_session_timeout") return edit_generic_int(webcontrol_session_timeout, parm, pact, 86400, 60, INT_MAX);
     if (name == "stream_preview_scale") return edit_generic_int(stream_preview_scale, parm, pact, 25, 1, 100);
     if (name == "stream_quality") return edit_generic_int(stream_quality, parm, pact, 60, 1, 100);
     if (name == "stream_maxrate") return edit_generic_int(stream_maxrate, parm, pact, 1, 0, 100);

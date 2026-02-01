@@ -847,7 +847,9 @@ mhdrslt cls_webu_ans::mhd_auth()
      * Only streams (mjpg, mpegts, static) use HTTP auth as fallback for
      * clients that don't support session tokens.
      */
-    if (device_id < 0 || uri_cmd1.empty() || uri_cmd1 == "api") {
+    if (device_id < 0 || uri_cmd1.empty() || uri_cmd1 == "api" ||
+        uri_cmd1 == "config.json" || uri_cmd1 == "movies.json" ||
+        uri_cmd1 == "status.json" || uri_cmd1 == "config") {
         authenticated = true;  /* Skip HTTP auth, use session auth */
         return MHD_YES;
     }
@@ -1257,7 +1259,26 @@ void cls_webu_ans::answer_get()
         }
 
     } else if (uri_cmd1 == "config") {
-        /* Treat /config like /config.json */
+        /* Treat /config like /config.json - requires session auth */
+        if (app->cfg->webcontrol_authentication != "") {
+            const char* token = MHD_lookup_connection_value(
+                connection, MHD_HEADER_KIND, "X-Session-Token");
+            if (token != nullptr) {
+                session_token = token;
+            }
+            bool has_valid_session = false;
+            if (!session_token.empty()) {
+                auth_role = webu->session_validate(session_token, clientip);
+                has_valid_session = !auth_role.empty();
+            }
+            if (!has_valid_session) {
+                resp_type = WEBUI_RESP_JSON;
+                resp_code = 401;
+                resp_page = "{\"error\":\"Authentication required\",\"auth_required\":true}";
+                mhd_send();
+                return;
+            }
+        }
         if (webu_json == nullptr) {
             webu_json = new cls_webu_json(this);
         }
@@ -1265,6 +1286,26 @@ void cls_webu_ans::answer_get()
 
     } else if ((uri_cmd1 == "config.json") || (uri_cmd1 == "log") ||
         (uri_cmd1 == "movies.json") || (uri_cmd1 == "status.json")) {
+        /* Legacy JSON endpoints: require session auth when authentication is configured */
+        if (app->cfg->webcontrol_authentication != "") {
+            const char* token = MHD_lookup_connection_value(
+                connection, MHD_HEADER_KIND, "X-Session-Token");
+            if (token != nullptr) {
+                session_token = token;
+            }
+            bool has_valid_session = false;
+            if (!session_token.empty()) {
+                auth_role = webu->session_validate(session_token, clientip);
+                has_valid_session = !auth_role.empty();
+            }
+            if (!has_valid_session) {
+                resp_type = WEBUI_RESP_JSON;
+                resp_code = 401;
+                resp_page = "{\"error\":\"Authentication required\",\"auth_required\":true}";
+                mhd_send();
+                return;
+            }
+        }
         if (webu_json == nullptr) {
             webu_json = new cls_webu_json(this);
         }

@@ -194,7 +194,21 @@ std::vector<ctx_detected_cam> cls_cam_detect::detect_libcam()
     std::vector<ctx_detected_cam> cameras;
 
     try {
-        /* Create camera manager directly */
+        /* Check if any camera is already using libcamera.
+         * libcamera does not support multiple CameraManager instances in the
+         * same process — creating a second one while cameras are active will
+         * crash (SIGSEGV).  Skip detection when libcamera is already in use. */
+        for (int i = 0; i < app->cam_cnt; i++) {
+            if (app->cam_list[i] != nullptr &&
+                app->cam_list[i]->has_libcam()) {
+                MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+                    , "libcamera already active on camera %d, skipping detection"
+                    , i + 1);
+                return cameras;
+            }
+        }
+
+        /* No active libcamera session — safe to create our own */
         std::unique_ptr<CameraManager> cam_mgr = std::make_unique<CameraManager>();
 
         int retcd = cam_mgr->start();

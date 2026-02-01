@@ -863,6 +863,9 @@ int jpgutl_put_yuv420p(u_char *dest_image, int image_size,
     JSAMPROW y[16],cb[16],cr[16]; // y[2][5] = color sample of row 2 and pixel column 5; (one plane)
     JSAMPARRAY data[3]; // t[0][2][5] = color sample 0 of row 2 and column 5
 
+    /* Zero-filled row for padding when height is not a multiple of 16 */
+    u_char *pad_row = nullptr;
+
     struct jpeg_compress_struct cinfo;
     struct jpgutl_error_mgr jerr;
 
@@ -915,25 +918,34 @@ int jpgutl_put_yuv420p(u_char *dest_image, int image_size,
         put_jpeg_exif(&cinfo, cam, ts1, box);
     }
 
-    /* If the image is not a multiple of 16, this overruns the buffers
-     * we'll just pad those last bytes with zeros
+    /* If the image height is not a multiple of 16, pad with a zero-filled row.
+     * libjpeg's raw data API processes 16-row MCU blocks; padding rows must
+     * point to valid memory (not NULL) to avoid segfaults.
      */
+    if (height % 16 != 0) {
+        pad_row = (u_char*)calloc(1, (size_t)width);
+    }
+
     for (j = 0; j < height; j += 16) {
         for (i = 0; i < 16; i++) {
-            if ((width * (i + j)) < (width * height)) {
+            if ((i + j) < height) {
                 y[i] = input_image + width * (i + j);
                 if (i % 2 == 0) {
                     cb[i / 2] = input_image + width * height + width / 2 * ((i + j) /2);
                     cr[i / 2] = input_image + width * height + width * height / 4 + width / 2 * ((i + j) / 2);
                 }
             } else {
-                y[i] = 0x00;
-                cb[i] = 0x00;
-                cr[i] = 0x00;
+                y[i] = pad_row;
+                if (i % 2 == 0) {
+                    cb[i / 2] = pad_row;
+                    cr[i / 2] = pad_row;
+                }
             }
         }
         jpeg_write_raw_data(&cinfo, data, 16);
     }
+
+    free(pad_row);
 
     jpeg_finish_compress(&cinfo);
     jpeg_image_size = _jpeg_mem_size(&cinfo);

@@ -1,4 +1,5 @@
 import { setSession, clearSession, getSessionToken } from './session';
+import { apiGet } from './client';
 
 interface LoginResponse {
   session_token: string;
@@ -76,33 +77,23 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Check current authentication status
+ * Check current authentication status.
+ * Uses apiGet so session token is sent consistently and backend sliding window is extended.
  */
 export async function getAuthStatus(): Promise<AuthStatusResponse> {
-  const token = getSessionToken();
-
-  const response = await fetch('/0/api/auth/status', {
-    headers: {
-      'Accept': 'application/json',
-      ...(token && { 'X-Session-Token': token }),
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Auth check failed: ${response.status}`);
+  try {
+    const data = await apiGet<AuthStatusResponse>('/0/api/auth/status');
+    if (data.session_token && data.csrf_token && data.role) {
+      setSession({
+        session_token: data.session_token,
+        csrf_token: data.csrf_token,
+        role: data.role as 'admin' | 'user',
+      }, false);
+    }
+    return data;
+  } catch {
+    // Auth status endpoint should not 401 (it returns authenticated:false instead)
+    // But if it does (server error), return safe default
+    return { auth_required: true, authenticated: false };
   }
-
-  const data: AuthStatusResponse = await response.json();
-
-  /* When auth not required, backend creates pseudo-session for CSRF protection */
-  if (data.session_token && data.csrf_token && data.role) {
-    setSession({
-      session_token: data.session_token,
-      csrf_token: data.csrf_token,
-      role: data.role as 'admin' | 'user',
-      expires_in: 86400, // Default 24h expiry for pseudo-sessions
-    }, false); // Don't persist to localStorage for pseudo-sessions
-  }
-
-  return data;
 }

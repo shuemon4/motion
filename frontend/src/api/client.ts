@@ -1,4 +1,4 @@
-import { getSessionToken, getCsrfToken, clearSession, updateSessionCsrf, refreshSessionExpiry } from './session';
+import { getSessionToken, getCsrfToken, clearSession, updateSessionCsrf } from './session';
 import type { QueryClient } from '@tanstack/react-query';
 
 /**
@@ -57,13 +57,22 @@ export function setQueryClient(qc: QueryClient): void {
 }
 
 /**
- * Handle session expiry: clear session, invalidate auth query, notify callback.
- * This immediately updates AuthContext so polling queries disable themselves.
+ * Handle session expiry: clear session, cancel all queries, invalidate auth, notify callback.
+ * Debounced to prevent cascading 401s from multiple in-flight queries.
  */
+let sessionExpiredPending = false;
+
 function handleSessionExpired(status: number): void {
+  if (sessionExpiredPending) return;
+  sessionExpiredPending = true;
+
   clearSession();
+  queryClientRef?.cancelQueries();
   queryClientRef?.invalidateQueries({ queryKey: ['auth', 'status'] });
   authErrorCallback?.(status);
+
+  // Reset guard after auth query has time to settle
+  setTimeout(() => { sessionExpiredPending = false; }, 3000);
 }
 
 class ApiClientError extends Error {
@@ -152,7 +161,6 @@ export async function apiGet<T>(endpoint: string, retryCount = 0): Promise<T> {
       throw new ApiClientError(`HTTP ${response.status}: ${response.statusText}`, response.status);
     }
 
-    refreshSessionExpiry();
     return safeJsonParse<T>(response);
   } catch (error) {
     clearTimeout(timeoutId);
