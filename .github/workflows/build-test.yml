@@ -17,6 +17,7 @@ jobs:
         include:
           # Debian 12 - FFmpeg 5.x
           - distro: debian:12
+            artifact_name: debian-12
             ffmpeg: "5.x"
             deps_install: |
               apt-get update -qq
@@ -27,6 +28,7 @@ jobs:
 
           # Ubuntu 24.04 - FFmpeg 6.x
           - distro: ubuntu:24.04
+            artifact_name: ubuntu-24.04
             ffmpeg: "6.x"
             deps_install: |
               apt-get update -qq
@@ -37,6 +39,7 @@ jobs:
 
           # Fedora 40 - FFmpeg 6.x
           - distro: fedora:40
+            artifact_name: fedora-40
             ffmpeg: "6.x"
             deps_install: |
               dnf install -y -q \
@@ -122,7 +125,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log-${{ matrix.distro }}-${{ matrix.ffmpeg }}
+          name: build-log-${{ matrix.artifact_name }}-${{ matrix.ffmpeg }}
           path: |
             build.log
             config.log

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiDelete, apiPatch, apiPost, sendPtzCommand } from './client';
+import { apiGet, apiDelete, apiPatch, apiPost, sendPtzCommand, BULK_DELETE_TIMEOUT } from './client';
 import { updateSessionCsrf } from './session';
 import type {
   MotionConfig,
@@ -143,7 +143,8 @@ export function useDeleteFolderFiles() {
   return useMutation({
     mutationFn: async ({ camId, path }: { camId: number; path: string }) => {
       return apiDelete<DeleteFolderFilesResponse>(
-        `/${camId}/api/media/folders/files?path=${encodeURIComponent(path)}`
+        `/${camId}/api/media/folders/files?path=${encodeURIComponent(path)}`,
+        BULK_DELETE_TIMEOUT
       );
     },
     onSuccess: (_, { camId, path }) => {

@@ -12,6 +12,11 @@ const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT ?? '10000', 10);
  * These involve disk I/O and process management which can take longer
  */
 const ACTION_TIMEOUT = 30000;
+/**
+ * Very long timeout for bulk delete operations
+ * Deleting thousands of files can take several minutes
+ */
+const BULK_DELETE_TIMEOUT = 300000; // 5 minutes
 const MAX_RETRIES = 1; // Max retries for transient failures
 
 /**
@@ -401,10 +406,12 @@ export async function apiPatch<T>(
 
 /**
  * DELETE request for media file deletion
+ * @param endpoint API endpoint
+ * @param timeout Optional timeout in ms (default: API_TIMEOUT)
  */
-export async function apiDelete<T>(endpoint: string): Promise<T> {
+export async function apiDelete<T>(endpoint: string, timeout: number = API_TIMEOUT): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   const sessionToken = getSessionToken();
   const csrfToken = getCsrfToken();
@@ -711,4 +718,4 @@ export async function applyRestartRequiredChanges(camId: number): Promise<boolea
   return waitForCameraOnline(camId, 30, 1000);
 }
 
-export { ApiClientError };
+export { ApiClientError, BULK_DELETE_TIMEOUT };
