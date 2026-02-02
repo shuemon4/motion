@@ -10,6 +10,7 @@ import type {
   DateSummaryResponse,
   FolderContentsResponse,
   DeleteFolderFilesResponse,
+  DeleteProgressResponse,
   TemperatureResponse,
   SystemStatus,
   PlatformInfo,
@@ -157,6 +158,25 @@ export function useDeleteFolderFiles() {
       queryClient.invalidateQueries({ queryKey: queryKeys.pictures(camId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.movies(camId) });
     },
+  });
+}
+
+// Poll delete progress during bulk operations
+export function useDeleteProgress(
+  camId: number,
+  path: string,
+  enabled: boolean = false
+) {
+  return useQuery({
+    queryKey: ['delete-progress', camId, path],
+    queryFn: () => {
+      const url = `/${camId}/api/media/delete-progress?path=${encodeURIComponent(path)}`;
+      return apiGet<DeleteProgressResponse>(url);
+    },
+    refetchInterval: enabled ? 1000 : false, // Poll every 1s when enabled
+    refetchIntervalInBackground: false,      // Pause when tab inactive
+    enabled,
+    staleTime: 0, // Always fetch fresh data
   });
 }
 

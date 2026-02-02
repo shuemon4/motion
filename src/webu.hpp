@@ -121,6 +121,18 @@
         time_t          expires;        /* Expiration timestamp */
     };
 
+    /* Progress tracking for bulk delete operations */
+    struct ctx_delete_progress {
+        bool in_progress;
+        int total_files;
+        int current_index;
+        int deleted_movies;
+        int deleted_pictures;
+        int deleted_thumbnails;
+        std::string path;
+        time_t completion_time;  // For auto-cleanup
+    };
+
     class cls_webu {
         public:
             cls_webu(cls_motapp *p_app);

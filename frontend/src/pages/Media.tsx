@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCameras, usePictures, useMovies, useMediaFolders, useDeletePicture, useDeleteMovie, useDeleteFolderFiles, queryKeys } from '@/api/queries'
+import { useCameras, usePictures, useMovies, useMediaFolders, useDeletePicture, useDeleteMovie, useDeleteFolderFiles, useDeleteProgress, queryKeys } from '@/api/queries'
 import { useToast } from '@/components/Toast'
 import { Pagination } from '@/components/Pagination'
 import { getSessionToken } from '@/api/session'
@@ -126,6 +126,17 @@ export function Media() {
   const deletePictureMutation = useDeletePicture()
   const deleteMovieMutation = useDeleteMovie()
   const deleteFolderFilesMutation = useDeleteFolderFiles()
+
+  // Poll progress when delete is in progress
+  const { data: progressData } = useDeleteProgress(
+    selectedCamera,
+    deleteAllConfirm?.path ?? '',
+    deleteFolderFilesMutation.isPending // Only poll when mutation is active
+  )
+
+  const progressPercent = progressData?.total
+    ? Math.round((progressData.current / progressData.total) * 100)
+    : 0
 
   const isLoading = viewMode === 'folders'
     ? foldersLoading
@@ -671,29 +682,62 @@ export function Media() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
-              <h3 className="text-xl font-bold mb-2 text-red-400">Delete All Media Files?</h3>
-              <p className="text-gray-400 mb-4">
-                Are you sure you want to delete <span className="font-medium text-white">all {deleteAllConfirm.fileCount} media files</span> in folder <span className="font-mono text-primary">{deleteAllConfirm.path || 'root'}</span>?
-              </p>
-              <p className="text-sm text-yellow-500 mb-4">
-                This will delete movies, pictures, and their thumbnails. Subfolders will NOT be deleted. This action cannot be undone.
-              </p>
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={handleDeleteAllCancel}
-                  disabled={isDeletingAll}
-                  className="px-4 py-2 bg-surface hover:bg-surface-elevated rounded-lg disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteAllConfirm}
-                  disabled={isDeletingAll}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50"
-                >
-                  {isDeletingAll ? 'Deleting...' : 'Delete All'}
-                </button>
-              </div>
+              {isDeletingAll ? (
+                // Progress view
+                <>
+                  <h3 className="text-xl font-bold mb-4">Deleting Media Files...</h3>
+
+                  {/* Progress bar */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm text-gray-400 mb-2">
+                      <span>
+                        Deleting {progressData?.current ?? 0} of {progressData?.total ?? deleteAllConfirm.fileCount} files
+                      </span>
+                      <span>{progressPercent}%</span>
+                    </div>
+                    <div className="h-2 bg-surface rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Deletion stats */}
+                  <div className="text-sm text-gray-400 space-y-1">
+                    <div>Movies: {progressData?.deleted.movies ?? 0}</div>
+                    <div>Pictures: {progressData?.deleted.pictures ?? 0}</div>
+                    <div>Thumbnails: {progressData?.deleted.thumbnails ?? 0}</div>
+                  </div>
+                </>
+              ) : (
+                // Confirmation view
+                <>
+                  <h3 className="text-xl font-bold mb-2 text-red-400">Delete All Media Files?</h3>
+                  <p className="text-gray-400 mb-4">
+                    Are you sure you want to delete <span className="font-medium text-white">all {deleteAllConfirm.fileCount} media files</span> in folder <span className="font-mono text-primary">{deleteAllConfirm.path || 'root'}</span>?
+                  </p>
+                  <p className="text-sm text-yellow-500 mb-4">
+                    This will delete movies, pictures, and their thumbnails. Subfolders will NOT be deleted. This action cannot be undone.
+                  </p>
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      onClick={handleDeleteAllCancel}
+                      disabled={isDeletingAll}
+                      className="px-4 py-2 bg-surface hover:bg-surface-elevated rounded-lg disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDeleteAllConfirm}
+                      disabled={isDeletingAll}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50"
+                    >
+                      Delete All
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

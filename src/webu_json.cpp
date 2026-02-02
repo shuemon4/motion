@@ -1957,6 +1957,24 @@ void cls_webu_json::api_delete_folder_files()
 
     std::string cam_id = std::to_string(webua->cam->cfg->device_id);
 
+    /* Build progress key and initialize tracking */
+    std::string progress_key = std::to_string(webua->cam->cfg->device_id) + ":" + rel_path;
+
+    pthread_mutex_lock(&app->mutex_delete_progress);
+    app->delete_progress_map[progress_key] = {
+        .in_progress = true,
+        .total_files = static_cast<int>(files_to_delete.size()),
+        .current_index = 0,
+        .deleted_movies = 0,
+        .deleted_pictures = 0,
+        .deleted_thumbnails = 0,
+        .path = rel_path,
+        .completion_time = 0
+    };
+    pthread_mutex_unlock(&app->mutex_delete_progress);
+
+    int current_index = 0;
+
     /* Delete files */
     for (const auto& file_path : files_to_delete) {
         std::string ext = get_file_extension(file_path);
@@ -1983,6 +2001,20 @@ void cls_webu_json::api_delete_folder_files()
             MOTION_LOG(ERR, TYPE_STREAM, SHOW_ERRNO,
                 _("Failed to delete file: %s"), file_path.c_str());
         }
+
+        current_index++;
+
+        /* Update progress every 10 files to minimize mutex contention */
+        if ((current_index % 10 == 0) || (current_index == static_cast<int>(files_to_delete.size()))) {
+            pthread_mutex_lock(&app->mutex_delete_progress);
+            auto it = app->delete_progress_map.find(progress_key);
+            if (it != app->delete_progress_map.end()) {
+                it->second.current_index = current_index;
+                it->second.deleted_movies = deleted_movies;
+                it->second.deleted_pictures = deleted_pictures;
+            }
+            pthread_mutex_unlock(&app->mutex_delete_progress);
+        }
     }
 
     /* Delete thumbnails */
@@ -1991,6 +2023,17 @@ void cls_webu_json::api_delete_folder_files()
             deleted_thumbnails++;
         }
     }
+
+    /* Mark operation complete */
+    pthread_mutex_lock(&app->mutex_delete_progress);
+    auto it = app->delete_progress_map.find(progress_key);
+    if (it != app->delete_progress_map.end()) {
+        it->second.in_progress = false;
+        it->second.current_index = it->second.total_files;
+        it->second.deleted_thumbnails = deleted_thumbnails;
+        it->second.completion_time = time(nullptr);
+    }
+    pthread_mutex_unlock(&app->mutex_delete_progress);
 
     MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
         "Deleted %d movies, %d pictures, %d thumbnails from '%s'",
@@ -2011,6 +2054,59 @@ void cls_webu_json::api_delete_folder_files()
     }
     webua->resp_page += "],";
     webua->resp_page += "\"path\":\"" + escstr(rel_path) + "\"";
+    webua->resp_page += "}";
+}
+
+/*
+ * React UI API: Delete Progress Query
+ * GET /{camId}/api/media/delete-progress?path=rel/path
+ * Returns progress of ongoing bulk delete operation
+ */
+void cls_webu_json::api_delete_progress()
+{
+    std::string progress_key;
+    const char* path_param = nullptr;
+
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Camera not specified\"}";
+        return;
+    }
+
+    /* Get path parameter */
+    path_param = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "path");
+    std::string path = path_param ? path_param : "";
+
+    /* Build progress key */
+    progress_key = std::to_string(webua->cam->cfg->device_id) + ":" + path;
+
+    /* Lock and read progress */
+    pthread_mutex_lock(&app->mutex_delete_progress);
+
+    auto it = app->delete_progress_map.find(progress_key);
+    if (it == app->delete_progress_map.end()) {
+        pthread_mutex_unlock(&app->mutex_delete_progress);
+        webua->resp_page = "{\"in_progress\":false,\"total\":0,\"current\":0,"
+                          "\"deleted\":{\"movies\":0,\"pictures\":0,\"thumbnails\":0}}";
+        return;
+    }
+
+    ctx_delete_progress prog = it->second;  /* Copy before unlock */
+    pthread_mutex_unlock(&app->mutex_delete_progress);
+
+    /* Build JSON response */
+    webua->resp_page = "{";
+    webua->resp_page += "\"in_progress\":" + std::string(prog.in_progress ? "true" : "false") + ",";
+    webua->resp_page += "\"total\":" + std::to_string(prog.total_files) + ",";
+    webua->resp_page += "\"current\":" + std::to_string(prog.current_index) + ",";
+    webua->resp_page += "\"deleted\":{";
+    webua->resp_page += "\"movies\":" + std::to_string(prog.deleted_movies) + ",";
+    webua->resp_page += "\"pictures\":" + std::to_string(prog.deleted_pictures) + ",";
+    webua->resp_page += "\"thumbnails\":" + std::to_string(prog.deleted_thumbnails);
+    webua->resp_page += "},";
+    webua->resp_page += "\"path\":\"" + escstr(prog.path) + "\"";
     webua->resp_page += "}";
 }
 

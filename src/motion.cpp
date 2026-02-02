@@ -499,6 +499,29 @@ bool cls_motapp::check_devices()
 
 }
 
+void cls_motapp::cleanup_delete_progress()
+{
+    time_t now = time(nullptr);
+    std::vector<std::string> keys_to_remove;
+
+    pthread_mutex_lock(&mutex_delete_progress);
+
+    for (auto &entry : delete_progress_map) {
+        /* Remove completed operations older than 60 seconds */
+        if (!entry.second.in_progress &&
+            entry.second.completion_time > 0 &&
+            (now - entry.second.completion_time) > 60) {
+            keys_to_remove.push_back(entry.first);
+        }
+    }
+
+    for (const auto &key : keys_to_remove) {
+        delete_progress_map.erase(key);
+    }
+
+    pthread_mutex_unlock(&mutex_delete_progress);
+}
+
 void cls_motapp::init(int p_argc, char *p_argv[])
 {
     int indx;
@@ -524,6 +547,7 @@ void cls_motapp::init(int p_argc, char *p_argv[])
 
     pthread_mutex_init(&mutex_camlst, NULL);
     pthread_mutex_init(&mutex_post, NULL);
+    pthread_mutex_init(&mutex_delete_progress, NULL);
 
     conf_src = new cls_config(this);
     conf_src->init();
@@ -676,6 +700,8 @@ int main (int p_argc, char **p_argv)
 
     mythreadname_set("mo",0,"");
 
+    int cleanup_counter = 0;  /* Counter for periodic cleanup tasks */
+
     while (true) {
         app->init(p_argc, p_argv);
         while (app->check_devices()) {
@@ -689,6 +715,13 @@ int main (int p_argc, char **p_argv)
             app->camera_add();
             app->camera_delete();
             app->check_restart();
+
+            /* Periodic cleanup of completed delete progress entries (every 60 seconds) */
+            cleanup_counter++;
+            if (cleanup_counter >= 60) {
+                app->cleanup_delete_progress();
+                cleanup_counter = 0;
+            }
         }
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Motion devices finished"));
         if (app->reload_all) {

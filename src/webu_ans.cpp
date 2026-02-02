@@ -1221,6 +1221,9 @@ void cls_webu_ans::answer_get()
         } else if (uri_cmd2 == "media" && uri_cmd3 == "folders") {
             webu_json->api_media_folders();
             mhd_send();
+        } else if (uri_cmd2 == "media" && uri_cmd3 == "delete-progress") {
+            webu_json->api_delete_progress();
+            mhd_send();
         } else if (uri_cmd2 == "system" && uri_cmd3 == "temperature") {
             webu_json->api_system_temperature();
             mhd_send();

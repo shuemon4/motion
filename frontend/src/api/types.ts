@@ -168,6 +168,19 @@ export interface DeleteFolderFilesResponse {
   path: string;
 }
 
+// Delete progress response from GET /{cam}/api/media/delete-progress
+export interface DeleteProgressResponse {
+  in_progress: boolean;
+  total: number;
+  current: number;
+  deleted: {
+    movies: number;
+    pictures: number;
+    thumbnails: number;
+  };
+  path?: string;
+}
+
 // System temperature response from /0/api/system/temperature
 export interface TemperatureResponse {
   celsius: number;

@@ -45,6 +45,7 @@
             void api_delete_picture();
             void api_delete_movie();
             void api_delete_folder_files();    /* DELETE /{camId}/api/media/folders/files */
+            void api_delete_progress();        /* GET /{camId}/api/media/delete-progress */
             void api_system_temperature();
             void api_system_status();
             void api_system_reboot();     /* POST /0/api/system/reboot */

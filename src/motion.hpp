@@ -55,6 +55,7 @@
 #include <string>
 #include <list>
 #include <vector>
+#include <map>
 #include <iostream>
 #include <fstream>
 #include <regex.h>
@@ -186,6 +187,9 @@ struct ctx_stream {
     ctx_stream_data  secondary;  /* Copy of the image to use for web stream*/
 };
 
+/* Forward declaration for delete progress tracking (defined in webu.hpp) */
+struct ctx_delete_progress;
+
 class cls_motapp {
     public:
         cls_motapp();
@@ -217,7 +221,12 @@ class cls_motapp {
         pthread_mutex_t     mutex_camlst;       /* Lock the list of cams while adding/removing */
         pthread_mutex_t     mutex_post;         /* mutex to allow for processing of post actions*/
 
+        /* Delete progress tracking */
+        std::map<std::string, ctx_delete_progress> delete_progress_map;
+        pthread_mutex_t     mutex_delete_progress;
+
         void signal_process();
+        void cleanup_delete_progress();
         bool check_devices();
         void check_restart();
         void init(int p_argc, char *p_argv[]);
