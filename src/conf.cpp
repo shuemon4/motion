@@ -159,6 +159,9 @@ ctx_parm config_parms[] = {
     {"on_secondary_detect",       PARM_TYP_STRING, PARM_CAT_08, PARM_LEVEL_RESTRICTED, true},
     {"on_action_user",            PARM_TYP_STRING, PARM_CAT_08, PARM_LEVEL_RESTRICTED, true},
     {"on_sound_alert",            PARM_TYP_STRING, PARM_CAT_08, PARM_LEVEL_RESTRICTED, true},
+    {"on_reboot",                 PARM_TYP_STRING, PARM_CAT_08, PARM_LEVEL_RESTRICTED, false},
+    {"on_shutdown",               PARM_TYP_STRING, PARM_CAT_08, PARM_LEVEL_RESTRICTED, false},
+    {"on_service_restart",        PARM_TYP_STRING, PARM_CAT_08, PARM_LEVEL_RESTRICTED, false},
 
     /* Category 09 - Picture parameters - mostly HOT RELOADABLE */
     {"picture_output",            PARM_TYP_LIST,   PARM_CAT_09, PARM_LEVEL_LIMITED,  true},
@@ -802,6 +805,9 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "on_secondary_detect") return edit_generic_string(on_secondary_detect, parm, pact, "");
     if (name == "on_action_user") return edit_generic_string(on_action_user, parm, pact, "");
     if (name == "on_sound_alert") return edit_generic_string(on_sound_alert, parm, pact, "");
+    if (name == "on_reboot") return edit_generic_string(on_reboot, parm, pact, "");
+    if (name == "on_shutdown") return edit_generic_string(on_shutdown, parm, pact, "");
+    if (name == "on_service_restart") return edit_generic_string(on_service_restart, parm, pact, "");
     if (name == "picture_exif") return edit_generic_string(picture_exif, parm, pact, "");
     if (name == "movie_extpipe") return edit_generic_string(movie_extpipe, parm, pact, "");
     if (name == "video_pipe") return edit_generic_string(video_pipe, parm, pact, "");

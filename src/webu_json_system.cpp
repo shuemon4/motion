@@ -264,13 +264,27 @@ void cls_webu_json::api_system_reboot()
         "System reboot requested by %s", webua->clientip.c_str());
 
     /* Schedule reboot with 2-second delay to allow HTTP response to complete */
-    std::thread([]() {
+    std::string reboot_cmd = app->cfg->on_reboot;
+    std::thread([reboot_cmd]() {
+        int rc;
         sleep(2);
-        /* Try reboot commands in sequence (like MotionEye) */
-        if (system("sudo /sbin/reboot") != 0) {
-            if (system("sudo /sbin/shutdown -r now") != 0) {
-                if (system("sudo /usr/bin/systemctl reboot") != 0) {
-                    (void)system("sudo /sbin/init 6");
+        if (!reboot_cmd.empty()) {
+            rc = system(reboot_cmd.c_str());
+            if (rc != 0) {
+                MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO,
+                    "Custom reboot command failed with code %d", rc);
+            }
+        } else {
+            /* Try reboot commands in sequence (like MotionEye) */
+            rc = system("sudo /sbin/reboot");
+            if (rc != 0) {
+                rc = system("sudo /sbin/shutdown -r now");
+                if (rc != 0) {
+                    rc = system("sudo /usr/bin/systemctl reboot");
+                    if (rc != 0) {
+                        rc = system("sudo /sbin/init 6");
+                        (void)rc;
+                    }
                 }
             }
         }
@@ -316,13 +330,27 @@ void cls_webu_json::api_system_shutdown()
         "System shutdown requested by %s", webua->clientip.c_str());
 
     /* Schedule shutdown with 2-second delay to allow HTTP response to complete */
-    std::thread([]() {
+    std::string shutdown_cmd = app->cfg->on_shutdown;
+    std::thread([shutdown_cmd]() {
+        int rc;
         sleep(2);
-        /* Try shutdown commands in sequence (like MotionEye) */
-        if (system("sudo /sbin/poweroff") != 0) {
-            if (system("sudo /sbin/shutdown -h now") != 0) {
-                if (system("sudo /usr/bin/systemctl poweroff") != 0) {
-                    (void)system("sudo /sbin/init 0");
+        if (!shutdown_cmd.empty()) {
+            rc = system(shutdown_cmd.c_str());
+            if (rc != 0) {
+                MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO,
+                    "Custom shutdown command failed with code %d", rc);
+            }
+        } else {
+            /* Try shutdown commands in sequence (like MotionEye) */
+            rc = system("sudo /sbin/poweroff");
+            if (rc != 0) {
+                rc = system("sudo /sbin/shutdown -h now");
+                if (rc != 0) {
+                    rc = system("sudo /usr/bin/systemctl poweroff");
+                    if (rc != 0) {
+                        rc = system("sudo /sbin/init 0");
+                        (void)rc;
+                    }
                 }
             }
         }
@@ -368,9 +396,23 @@ void cls_webu_json::api_system_service_restart()
         "Motion service restart requested by %s", webua->clientip.c_str());
 
     /* Schedule restart with 2-second delay to allow HTTP response to complete */
-    std::thread([]() {
+    std::string restart_cmd = app->cfg->on_service_restart;
+    std::thread([restart_cmd]() {
+        int rc;
         sleep(2);
-        (void)system("sudo /usr/bin/systemctl restart motion");
+        if (!restart_cmd.empty()) {
+            rc = system(restart_cmd.c_str());
+            if (rc != 0) {
+                MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO,
+                    "Custom service restart command failed with code %d", rc);
+            }
+        } else {
+            rc = system("sudo /usr/bin/systemctl restart motion");
+            if (rc != 0) {
+                MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO,
+                    "Service restart command failed with code %d", rc);
+            }
+        }
     }).detach();
 
     webua->resp_page = "{\"success\":true,\"operation\":\"service-restart\",\"message\":\"Motion service will restart in 2 seconds\"}";

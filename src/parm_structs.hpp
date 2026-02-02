@@ -94,6 +94,11 @@ struct ctx_parm_app {
     std::string     sql_movie_start;
     std::string     sql_movie_end;
     std::string     sql_pic_save;
+
+    /* System command parameters (PARM_CAT_08) */
+    std::string     on_reboot;
+    std::string     on_shutdown;
+    std::string     on_service_restart;
 };
 
 /*

@@ -71,6 +71,18 @@ post_capture 10
 on_event_start
 on_event_end
 
+; Command to reboot the system (leave empty for built-in defaults)
+; Example: sudo /sbin/reboot
+on_reboot
+
+; Command to shut down the system (leave empty for built-in defaults)
+; Example: sudo /sbin/poweroff
+on_shutdown
+
+; Command to restart the Motion service (leave empty for built-in defaults)
+; Example: sudo /usr/bin/systemctl restart motion
+on_service_restart
+
 ;*************************************************
 ;*****   Picture
 ;*************************************************

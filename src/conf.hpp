@@ -314,6 +314,11 @@
             std::string&    sql_movie_end           = parm_app.sql_movie_end;
             std::string&    sql_pic_save            = parm_app.sql_pic_save;
 
+            /* System command parameters (-> parm_app) */
+            std::string&    on_reboot               = parm_app.on_reboot;
+            std::string&    on_shutdown             = parm_app.on_shutdown;
+            std::string&    on_service_restart      = parm_app.on_service_restart;
+
             /* Tracking/PTZ parameters (-> parm_cam) */
             bool&           ptz_auto_track          = parm_cam.ptz_auto_track;
             int&            ptz_wait                = parm_cam.ptz_wait;
