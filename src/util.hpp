@@ -69,7 +69,8 @@ typedef const uint8_t myuint;
 #define MY_CODEC_FLAG_QSCALE         AV_CODEC_FLAG_QSCALE
 
 /* AVIO callback typedef - Handles FFmpeg 7.0+ const buffer changes */
-#ifdef FF_API_AVIO_WRITE_NONCONST
+/* FFmpeg 7.0+ (libavformat >= 61) changed write_packet to const uint8_t* */
+#if LIBAVFORMAT_VERSION_MAJOR < 61
     typedef int (*my_avio_write_cb)(void *opaque, uint8_t *buf, int buf_size);
 #else
     typedef int (*my_avio_write_cb)(void *opaque, const uint8_t *buf, int buf_size);

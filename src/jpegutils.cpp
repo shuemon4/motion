@@ -864,7 +864,7 @@ int jpgutl_put_yuv420p(u_char *dest_image, int image_size,
     JSAMPARRAY data[3]; // t[0][2][5] = color sample 0 of row 2 and column 5
 
     /* Zero-filled row for padding when height is not a multiple of 16 */
-    u_char *pad_row = nullptr;
+    u_char * volatile pad_row = nullptr;
 
     struct jpeg_compress_struct cinfo;
     struct jpgutl_error_mgr jerr;

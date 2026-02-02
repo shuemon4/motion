@@ -32,7 +32,7 @@
         public:
             cls_webu_mpegts(cls_webu_ans *p_webua, cls_webu_stream *p_webus);
             ~cls_webu_mpegts();
-            #ifdef FF_API_AVIO_WRITE_NONCONST
+            #if LIBAVFORMAT_VERSION_MAJOR < 61
             int avio_buf(uint8_t *buf, int buf_size);
             #else
             int avio_buf(const uint8_t *buf, int buf_size);

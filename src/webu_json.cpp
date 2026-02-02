@@ -1197,7 +1197,7 @@ void cls_webu_json::api_media_pictures()
         webua->resp_page += "\"filename\":\"" + escstr(flst[i].file_nm) + "\",";
         /* Return URL path for browser access, not filesystem path */
         webua->resp_page += "\"path\":\"/" + std::to_string(webua->cam->cfg->device_id) +
-            "/movies/" + escstr(flst[i].file_nm) + "\",";
+            "/media/" + std::to_string(flst[i].record_id) + "/" + escstr(flst[i].file_nm) + "\",";
         webua->resp_page += "\"date\":\"" + std::to_string(flst[i].file_dtl) + "\",";
         webua->resp_page += "\"time\":\"" + escstr(flst[i].file_tml) + "\",";
         webua->resp_page += "\"size\":" + std::to_string(flst[i].file_sz);
@@ -1463,7 +1463,7 @@ void cls_webu_json::api_media_movies()
         webua->resp_page += "\"id\":" + std::to_string(flst[i].record_id) + ",";
         webua->resp_page += "\"filename\":\"" + escstr(flst[i].file_nm) + "\",";
         /* Return URL path for browser access, not filesystem path */
-        webua->resp_page += "\"path\":\"/" + cam_id + "/movies/" + escstr(flst[i].file_nm) + "\",";
+        webua->resp_page += "\"path\":\"/" + cam_id + "/media/" + std::to_string(flst[i].record_id) + "/" + escstr(flst[i].file_nm) + "\",";
         webua->resp_page += "\"date\":\"" + std::to_string(flst[i].file_dtl) + "\",";
         webua->resp_page += "\"time\":\"" + escstr(flst[i].file_tml) + "\",";
         webua->resp_page += "\"size\":" + std::to_string(flst[i].file_sz);
@@ -1472,8 +1472,8 @@ void cls_webu_json::api_media_movies()
         std::string thumb_path = flst[i].full_nm + ".thumb.jpg";
         struct stat st;
         if (stat(thumb_path.c_str(), &st) == 0) {
-            webua->resp_page += ",\"thumbnail\":\"/" + cam_id + "/movies/" +
-                                escstr(flst[i].file_nm) + ".thumb.jpg\"";
+            webua->resp_page += ",\"thumbnail\":\"/" + cam_id + "/media/" +
+                                std::to_string(flst[i].record_id) + "/" + escstr(flst[i].file_nm) + ".thumb.jpg\"";
         }
 
         webua->resp_page += "}";
@@ -1813,7 +1813,7 @@ void cls_webu_json::api_media_folders()
 
         /* Build URL path for access */
         if (file_type == "movie") {
-            std::string url_path = "/" + cam_id + "/movies/";
+            std::string url_path = "/" + cam_id + "/media/";
             if (!rel_path.empty()) url_path += rel_path + "/";
             url_path += filename;
             webua->resp_page += "\"path\":\"" + escstr(url_path) + "\",";
@@ -1826,7 +1826,7 @@ void cls_webu_json::api_media_folders()
             }
         } else {
             /* Pictures use URL path like movies */
-            std::string pic_url = "/" + cam_id + "/movies/";
+            std::string pic_url = "/" + cam_id + "/media/";
             if (!rel_path.empty()) pic_url += rel_path + "/";
             pic_url += filename;
             webua->resp_page += "\"path\":\"" + escstr(pic_url) + "\",";
@@ -2192,7 +2192,7 @@ void cls_webu_json::api_system_status()
 
         if (mem_total > 0) {
             unsigned long mem_used = mem_total - mem_available;
-            double mem_percent = (double)mem_used / mem_total * 100.0;
+            double mem_percent = (double)mem_used / static_cast<double>(mem_total) * 100.0;
             webua->resp_page += "\"memory\":{";
             webua->resp_page += "\"total\":" + std::to_string(mem_total * 1024) + ",";
             webua->resp_page += "\"used\":" + std::to_string(mem_used * 1024) + ",";
@@ -2209,7 +2209,7 @@ void cls_webu_json::api_system_status()
         unsigned long long free_bytes = (unsigned long long)fs_stat.f_bfree * fs_stat.f_frsize;
         unsigned long long avail_bytes = (unsigned long long)fs_stat.f_bavail * fs_stat.f_frsize;
         unsigned long long used_bytes = total_bytes - free_bytes;
-        double disk_percent = (double)used_bytes / total_bytes * 100.0;
+        double disk_percent = (double)used_bytes / static_cast<double>(total_bytes) * 100.0;
 
         webua->resp_page += "\"disk\":{";
         webua->resp_page += "\"total\":" + std::to_string(total_bytes) + ",";
@@ -2342,7 +2342,7 @@ void cls_webu_json::api_system_reboot()
         if (system("sudo /sbin/reboot") != 0) {
             if (system("sudo /sbin/shutdown -r now") != 0) {
                 if (system("sudo /usr/bin/systemctl reboot") != 0) {
-                    system("sudo /sbin/init 6");
+                    (void)system("sudo /sbin/init 6");
                 }
             }
         }
@@ -2399,7 +2399,7 @@ void cls_webu_json::api_system_shutdown()
         if (system("sudo /sbin/poweroff") != 0) {
             if (system("sudo /sbin/shutdown -h now") != 0) {
                 if (system("sudo /usr/bin/systemctl poweroff") != 0) {
-                    system("sudo /sbin/init 0");
+                    (void)system("sudo /sbin/init 0");
                 }
             }
         }
@@ -2452,7 +2452,7 @@ void cls_webu_json::api_system_service_restart()
     /* Schedule restart with 2-second delay to allow HTTP response to complete */
     std::thread([]() {
         sleep(2);
-        system("sudo /usr/bin/systemctl restart motion");
+        (void)system("sudo /usr/bin/systemctl restart motion");
     }).detach();
 
     webua->resp_page = "{\"success\":true,\"operation\":\"service-restart\",\"message\":\"Motion service will restart in 2 seconds\"}";

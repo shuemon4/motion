@@ -104,7 +104,9 @@ jobs:
 
       - name: Test motion binary
         run: |
-          /tmp/motion-install/usr/local/bin/motion --help
+          /tmp/motion-install/usr/local/bin/motion -h || true
+          # Verify binary actually runs (not a missing library issue)
+          /tmp/motion-install/usr/local/bin/motion -h 2>&1 | grep -q "Motion version"
 
       - name: Check for compiler warnings
         run: |

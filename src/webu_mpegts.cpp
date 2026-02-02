@@ -39,7 +39,7 @@
 
 /****** Callback functions for MHD ****************************************/
 
-#ifdef FF_API_AVIO_WRITE_NONCONST
+#if LIBAVFORMAT_VERSION_MAJOR < 61
 /* FFmpeg 6.x and earlier - write_packet callback uses non-const uint8_t* */
 static int webu_mpegts_avio_buf(void *opaque, uint8_t *buf, int buf_size)
 #else
@@ -236,7 +236,7 @@ int cls_webu_mpegts::getimg()
     return 0;
 }
 
-#ifdef FF_API_AVIO_WRITE_NONCONST
+#if LIBAVFORMAT_VERSION_MAJOR < 61
 /* FFmpeg 6.x and earlier - write_packet callback uses non-const uint8_t* */
 int cls_webu_mpegts::avio_buf(uint8_t *buf, int buf_size)
 #else

@@ -495,6 +495,8 @@ std::vector<ctx_detected_cam> cls_cam_detect::detect_cameras()
 bool cls_cam_detect::test_netcam(const std::string &url, const std::string &user,
                                 const std::string &pass, int timeout_sec)
 {
+    (void)user;
+    (void)pass;
     /* TODO: Implement netcam connection testing
      * This will require making a test HTTP/RTSP request to the URL
      * and verifying we can get a response within the timeout.
