@@ -44,7 +44,7 @@
 static int webu_mpegts_avio_buf(void *opaque, uint8_t *buf, int buf_size)
 #else
 /* FFmpeg 7.0+ - write_packet callback uses const uint8_t* */
-static int webu_mpegts_avio_buf(void *opaque, uint8_t *buf, int buf_size)
+static int webu_mpegts_avio_buf(void *opaque, const uint8_t *buf, int buf_size)
 #endif
 {
     cls_webu_mpegts *webu_mpegts;
