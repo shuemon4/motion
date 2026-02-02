@@ -4003,9 +4003,9 @@ void cls_webu_json::api_cameras_add()
     detected.default_fps = fps;
 
     /* Add camera to configuration */
-    pthread_mutex_lock(&app->mutex_post);
+    pthread_mutex_lock(&app->mutex_camlst);
     app->conf_src->camera_add_from_detection(detected);
-    pthread_mutex_unlock(&app->mutex_post);
+    pthread_mutex_unlock(&app->mutex_camlst);
 
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
         "Camera added via API: %s [%s]", device_name.c_str(), device_path.c_str());

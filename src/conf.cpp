@@ -1343,8 +1343,11 @@ void cls_config::camera_add_from_detection(const ctx_detected_cam &detected)
     } else if (detected.type == CAM_DETECT_V4L2) {
         /* Use persistent device ID if available, otherwise use device path */
         cam->conf_src->edit_set("v4l2_device", detected.device_id);
+        cam->conf_src->edit_set("libcam_device", "");
     } else if (detected.type == CAM_DETECT_NETCAM) {
         cam->conf_src->edit_set("netcam_url", detected.device_path);
+        cam->conf_src->edit_set("libcam_device", "");
+        cam->conf_src->edit_set("v4l2_device", "");
     }
 
     /* Set common parameters */

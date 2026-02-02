@@ -464,6 +464,8 @@ bool cls_motapp::check_devices()
     int indx;
     bool retcd;
 
+    pthread_mutex_lock(&mutex_camlst);
+
     for (indx=0; indx<cam_cnt; indx++) {
         watchdog(indx);
     }
@@ -489,6 +491,8 @@ bool cls_motapp::check_devices()
             retcd = true;
         }
     }
+
+    pthread_mutex_unlock(&mutex_camlst);
 
     if ((webu->finish == false) &&
         (webu->wb_daemon != NULL)) {

@@ -198,14 +198,21 @@ std::vector<ctx_detected_cam> cls_cam_detect::detect_libcam()
          * libcamera does not support multiple CameraManager instances in the
          * same process — creating a second one while cameras are active will
          * crash (SIGSEGV).  Skip detection when libcamera is already in use. */
+        pthread_mutex_lock(&app->mutex_camlst);
+        bool libcam_active = false;
         for (int i = 0; i < app->cam_cnt; i++) {
             if (app->cam_list[i] != nullptr &&
                 app->cam_list[i]->has_libcam()) {
                 MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
                     , "libcamera already active on camera %d, skipping detection"
                     , i + 1);
-                return cameras;
+                libcam_active = true;
+                break;
             }
+        }
+        pthread_mutex_unlock(&app->mutex_camlst);
+        if (libcam_active) {
+            return cameras;
         }
 
         /* No active libcamera session — safe to create our own */
