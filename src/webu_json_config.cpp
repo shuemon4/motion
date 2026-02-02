@@ -61,13 +61,13 @@ namespace {
 
     const std::unordered_map<std::string, HotReloadFunc> hot_reload_map = {
         {"libcam_brightness", [](cls_camera *cam, const std::string &val) {
-            cam->set_libcam_brightness(atof(val.c_str()));
+            cam->set_libcam_brightness(strtof(val.c_str(), nullptr));
         }},
         {"libcam_contrast", [](cls_camera *cam, const std::string &val) {
-            cam->set_libcam_contrast(atof(val.c_str()));
+            cam->set_libcam_contrast(strtof(val.c_str(), nullptr));
         }},
         {"libcam_gain", [](cls_camera *cam, const std::string &val) {
-            cam->set_libcam_gain(atof(val.c_str()));
+            cam->set_libcam_gain(strtof(val.c_str(), nullptr));
         }},
         {"libcam_awb_enable", [](cls_camera *cam, const std::string &val) {
             cam->set_libcam_awb_enable(val == "true" || val == "1");
@@ -82,20 +82,20 @@ namespace {
             cam->set_libcam_colour_temp(atoi(val.c_str()));
         }},
         {"libcam_colour_gain_r", [](cls_camera *cam, const std::string &val) {
-            float r = atof(val.c_str());
+            float r = strtof(val.c_str(), nullptr);
             float b = cam->cfg->parm_cam.libcam_colour_gain_b;
             cam->set_libcam_colour_gains(r, b);
         }},
         {"libcam_colour_gain_b", [](cls_camera *cam, const std::string &val) {
             float r = cam->cfg->parm_cam.libcam_colour_gain_r;
-            float b = atof(val.c_str());
+            float b = strtof(val.c_str(), nullptr);
             cam->set_libcam_colour_gains(r, b);
         }},
         {"libcam_af_mode", [](cls_camera *cam, const std::string &val) {
             cam->set_libcam_af_mode(atoi(val.c_str()));
         }},
         {"libcam_lens_position", [](cls_camera *cam, const std::string &val) {
-            cam->set_libcam_lens_position(atof(val.c_str()));
+            cam->set_libcam_lens_position(strtof(val.c_str(), nullptr));
         }},
         {"libcam_af_range", [](cls_camera *cam, const std::string &val) {
             cam->set_libcam_af_range(atoi(val.c_str()));
