@@ -58,7 +58,7 @@ export default function AddCameraWizard({ onClose, detectedCameras }: AddCameraW
       {
         onSuccess: (data) => {
           if (data.status === 'ok') {
-            setStep('complete');
+            handleAddCamera();
           }
         },
       }

@@ -69,10 +69,11 @@ export function Media() {
     setPage(0)
   }, [selectedCamera, mediaType, currentFolderPath])
 
-  // Reset folder path when switching view modes
+  // Reset folder path and media type when switching view modes
   useEffect(() => {
     if (viewMode === 'all') {
       setCurrentFolderPath('')
+      setMediaType('pictures')
     }
   }, [viewMode])
 
@@ -473,7 +474,7 @@ export function Media() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <div key={`grid-${viewMode}-${mediaType}`} className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
           {items.map((item) => {
             const itemType = 'type' in item ? item.type : (mediaType === 'pictures' ? 'picture' : 'movie')
             const thumbnail = item.thumbnail || undefined

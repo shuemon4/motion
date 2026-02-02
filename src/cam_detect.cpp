@@ -495,18 +495,69 @@ std::vector<ctx_detected_cam> cls_cam_detect::detect_cameras()
 bool cls_cam_detect::test_netcam(const std::string &url, const std::string &user,
                                 const std::string &pass, int timeout_sec)
 {
-    (void)user;
-    (void)pass;
-    /* TODO: Implement netcam connection testing
-     * This will require making a test HTTP/RTSP request to the URL
-     * and verifying we can get a response within the timeout.
-     * For now, return true as a placeholder.
-     */
+    AVFormatContext *fmt_ctx = nullptr;
+    AVDictionary *opts = nullptr;
+    int retcd;
+    std::string full_url;
 
     MOTION_LOG(INF, TYPE_ALL, NO_ERRNO
         , "Testing netcam connection: %s (timeout: %ds)"
         , url.c_str(), timeout_sec);
 
-    /* Placeholder - actual implementation would test the connection */
+    /* Build URL with credentials if provided */
+    if (!user.empty()) {
+        /* Insert user:pass into URL after the scheme:// */
+        size_t pos = url.find("://");
+        if (pos != std::string::npos) {
+            full_url = url.substr(0, pos + 3) + user;
+            if (!pass.empty()) {
+                full_url += ":" + pass;
+            }
+            full_url += "@" + url.substr(pos + 3);
+        } else {
+            full_url = url;
+        }
+    } else {
+        full_url = url;
+    }
+
+    /* Set timeout options */
+    std::string timeout_us = std::to_string(timeout_sec * 1000000);
+    av_dict_set(&opts, "timeout", timeout_us.c_str(), 0);
+    av_dict_set(&opts, "stimeout", timeout_us.c_str(), 0);
+    av_dict_set(&opts, "analyzeduration", "1000000", 0);
+    av_dict_set(&opts, "probesize", "100000", 0);
+
+    /* Detect protocol and set appropriate options */
+    if (full_url.find("rtsp") == 0) {
+        av_dict_set(&opts, "rtsp_transport", "tcp", 0);
+    } else if (full_url.find("http") == 0) {
+        av_dict_set(&opts, "input_format", "mjpeg", 0);
+    }
+
+    fmt_ctx = avformat_alloc_context();
+    if (!fmt_ctx) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, "Failed to allocate format context");
+        av_dict_free(&opts);
+        return false;
+    }
+
+    retcd = avformat_open_input(&fmt_ctx, full_url.c_str(), nullptr, &opts);
+    av_dict_free(&opts);
+
+    if (retcd < 0) {
+        char errstr[128];
+        av_strerror(retcd, errstr, sizeof(errstr));
+        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+            , "Netcam test failed for %s: %s"
+            , url.c_str(), errstr);
+        /* fmt_ctx is freed by avformat_open_input on failure */
+        return false;
+    }
+
+    MOTION_LOG(INF, TYPE_ALL, NO_ERRNO
+        , "Netcam test successful for %s", url.c_str());
+
+    avformat_close_input(&fmt_ctx);
     return true;
 }

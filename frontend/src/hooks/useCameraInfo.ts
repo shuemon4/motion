@@ -101,9 +101,11 @@ export function useCameraInfo(cameraId: number, options?: { enabled?: boolean })
         // libcam: Has supportedControls map
         hasLibcamControls: cameraType === 'libcam',
         // v4l2: Has v4l2_controls array
-        hasV4L2Controls: cameraType === 'v4l2',
+        // TEMP: forced true for UI preview (revert: cameraType === 'v4l2')
+        hasV4L2Controls: true,
         // netcam: Has netcam_url and related config
-        hasNetcamConfig: cameraType === 'netcam',
+        // TEMP: forced true for UI preview (revert: cameraType === 'netcam')
+        hasNetcamConfig: true,
         // netcam dual stream: has_high_stream is true
         hasDualStream: cameraType === 'netcam' && cam.has_high_stream === true,
         // netcam passthrough: only netcam supports movie passthrough

@@ -1156,7 +1156,7 @@ void cls_webu_ans::answer_get()
         gzip_encode = false;
         webu_stream->main();
 
-    } else if (uri_cmd1 == "movies") {
+    } else if (uri_cmd1 == "movies" || uri_cmd1 == "media") {
         if (webu_file == nullptr) {
             webu_file = new cls_webu_file(this);
         }
@@ -1417,6 +1417,10 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
                 retcd = MHD_YES;
             } else if (uri_cmd1 == "api" && uri_cmd2 == "camera") {
                 /* Camera action endpoints handled via JSON POST */
+                raw_body.clear();
+                retcd = MHD_YES;
+            } else if (uri_cmd1 == "api" && uri_cmd2 == "cameras") {
+                /* Camera detection/test endpoints handled via JSON POST */
                 raw_body.clear();
                 retcd = MHD_YES;
             } else if (is_form_urlencoded() && (uri_cmd1.empty() || device_id >= 0)) {

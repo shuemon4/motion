@@ -163,15 +163,6 @@ void cls_webu_file::main() {
     }
 
 
-    sql  = " select * from motion ";
-    sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
-    sql += " order by file_dtl, file_tml;";
-    app->dbse->filelist_get(sql, flst);
-    if (flst.size() == 0) {
-        webua->bad_request();
-        return;
-    }
-
     full_nm = "";
 
     /* Check if this is a thumbnail request (.thumb.jpg suffix) */
@@ -186,22 +177,52 @@ void cls_webu_file::main() {
         is_thumbnail = true;
     }
 
-    /* Extract just the filename from the request (may include subdirectory path) */
-    std::string requested_filename = requested_file;
-    size_t last_slash = requested_file.rfind('/');
-    if (last_slash != std::string::npos) {
-        requested_filename = requested_file.substr(last_slash + 1);
+    /* Try to extract record_id from URL (new format: "123/filename.jpg") */
+    int record_id = 0;
+    size_t first_slash = requested_file.find('/');
+    if (first_slash != std::string::npos) {
+        std::string id_str = requested_file.substr(0, first_slash);
+        bool is_numeric = !id_str.empty();
+        for (char c : id_str) {
+            if (!isdigit(c)) { is_numeric = false; break; }
+        }
+        if (is_numeric) {
+            record_id = atoi(id_str.c_str());
+            requested_file = requested_file.substr(first_slash + 1);
+        }
     }
 
-    for (indx=0;indx<(int)flst.size();indx++) {
-        if (flst[indx].file_nm == requested_filename) {
-            if (is_thumbnail) {
-                /* Serve the thumbnail file alongside the video */
-                full_nm = flst[indx].full_nm + ".thumb.jpg";
-            } else {
-                full_nm = flst[indx].full_nm;
+    if (record_id > 0) {
+        /* Direct record_id lookup - O(1) with primary key index */
+        sql = "SELECT * FROM motion WHERE record_id = " + std::to_string(record_id) +
+              " AND device_id = " + std::to_string(webua->cam->cfg->device_id) + ";";
+        app->dbse->filelist_get(sql, flst);
+        if (!flst.empty()) {
+            full_nm = is_thumbnail ? flst[0].full_nm + ".thumb.jpg" : flst[0].full_nm;
+        }
+    } else {
+        /* Legacy filename-based lookup (backwards compat) */
+        sql  = " select * from motion ";
+        sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
+        sql += " order by file_dtl, file_tml;";
+        app->dbse->filelist_get(sql, flst);
+
+        /* Extract just the filename from the request (may include subdirectory path) */
+        std::string requested_filename = requested_file;
+        size_t last_slash = requested_file.rfind('/');
+        if (last_slash != std::string::npos) {
+            requested_filename = requested_file.substr(last_slash + 1);
+        }
+
+        for (indx=0;indx<(int)flst.size();indx++) {
+            if (flst[indx].file_nm == requested_filename) {
+                if (is_thumbnail) {
+                    full_nm = flst[indx].full_nm + ".thumb.jpg";
+                } else {
+                    full_nm = flst[indx].full_nm;
+                }
+                break;
             }
-            break;
         }
     }
 
