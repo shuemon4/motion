@@ -654,6 +654,7 @@ void cls_motapp::camera_add()
 void cls_motapp::camera_delete()
 {
     cls_camera *cam;
+    std::string cam_conf_filename;
 
     if (cam_delete < 0) {
         return;
@@ -670,6 +671,9 @@ void cls_motapp::camera_delete()
 
     MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO, _("Stopping %s device_id %d")
         , cam->cfg->device_name.c_str(), cam->cfg->device_id);
+
+    /* Save config filename before destroying the camera object */
+    cam_conf_filename = cam->conf_src->conf_filename;
 
     cam->finish = true;
     cam->handler_shutdown();
@@ -689,6 +693,20 @@ void cls_motapp::camera_delete()
 
     cam_delete = -1;
     allcam->all_sizes.reset = true;
+
+    /* Delete the camera config file from disk */
+    if (!cam_conf_filename.empty()) {
+        if (remove(cam_conf_filename.c_str()) == 0) {
+            MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+                , _("Deleted camera config file: %s"), cam_conf_filename.c_str());
+        } else {
+            MOTION_LOG(ERR, TYPE_ALL, SHOW_ERRNO
+                , _("Failed to delete camera config file: %s"), cam_conf_filename.c_str());
+        }
+    }
+
+    /* Rewrite main config to remove the camera reference */
+    conf_src->parms_write();
 
 }
 

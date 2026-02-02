@@ -529,6 +529,8 @@ void cls_webu_json::api_cameras_add()
 
 void cls_webu_json::api_cameras_delete()
 {
+    int indx, maxcnt;
+
     webua->resp_type = WEBUI_RESP_JSON;
 
     if (!validate_csrf()) {
@@ -540,14 +542,29 @@ void cls_webu_json::api_cameras_delete()
         return;
     }
 
-    pthread_mutex_lock(&app->mutex_post);
-    app->cam_delete = webua->device_id;
-    pthread_mutex_unlock(&app->mutex_post);
-
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
         "Camera delete requested via API: camera %d", webua->device_id);
 
-    webua->resp_page = "{\"status\":\"ok\",\"message\":\"Camera will be removed\"}";
+    pthread_mutex_lock(&app->mutex_post);
+    app->cam_delete = webua->camindx;
+    pthread_mutex_unlock(&app->mutex_post);
+
+    /* Wait for main loop to complete the deletion */
+    maxcnt = 100;
+    indx = 0;
+    while ((app->cam_delete != -1) && (indx < maxcnt)) {
+        SLEEP(0, 50000000)
+        indx++;
+    }
+
+    if (indx == maxcnt) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, "Error deleting camera. Timed out shutting down");
+        app->cam_delete = -1;
+        webua->resp_page = "{\"status\":\"error\",\"message\":\"Camera deletion timed out\"}";
+        return;
+    }
+
+    webua->resp_page = "{\"status\":\"ok\",\"message\":\"Camera removed successfully\"}";
 }
 
 void cls_webu_json::api_cameras_test_netcam()
