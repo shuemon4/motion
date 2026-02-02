@@ -60,6 +60,14 @@ motion_SOURCES = \
 	webu_auth.hpp      webu_auth.cpp \
 	webu_file.hpp      webu_file.cpp \
 	webu_json.hpp      webu_json.cpp \
+	webu_json_auth.cpp \
+	webu_json_media.cpp \
+	webu_json_system.cpp \
+	webu_json_camera.cpp \
+	webu_json_config.cpp \
+	webu_json_mask.cpp \
+	webu_json_profiles.cpp \
+	webu_json_legacy.cpp \
 	webu_post.hpp      webu_post.cpp \
 	webu_stream.hpp    webu_stream.cpp \
 	webu_getimg.hpp    webu_getimg.cpp \
