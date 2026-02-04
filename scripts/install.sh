@@ -93,6 +93,14 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Get the original user (for running build steps without root)
+ORIGINAL_USER="${SUDO_USER:-$USER}"
+if [ "$ORIGINAL_USER" = "root" ]; then
+    echo -e "${YELLOW}Warning: Running as root user directly${NC}"
+    echo "Build files will be owned by root, which may cause issues."
+    echo "Consider running: sudo -u <user> scripts/install.sh"
+fi
+
 # Validate unattended mode requirements (fail fast before any installation begins)
 if [ "$UNATTENDED" = true ]; then
     if [ -z "$ADMIN_PASS" ] || [ -z "$VIEWER_PASS" ]; then
@@ -191,12 +199,17 @@ cd "$PROJECT_DIR"
 bash "$SCRIPT_DIR/pi-setup.sh"
 echo -e "${GREEN}✅ Dependencies installed${NC}"
 
-# Step 2: Build Motion
+# Step 2: Build Motion (run as original user to avoid permission issues)
 echo ""
 echo -e "${BLUE}[2/5] Building Motion...${NC}"
 echo "═══════════════════════════════════════════════════════════════"
 cd "$PROJECT_DIR"
-bash "$SCRIPT_DIR/pi-build.sh"
+# Run build as the original user to avoid root-owned files in the source directory
+if [ "$ORIGINAL_USER" != "root" ]; then
+    sudo -u "$ORIGINAL_USER" bash "$SCRIPT_DIR/pi-build.sh"
+else
+    bash "$SCRIPT_DIR/pi-build.sh"
+fi
 echo -e "${GREEN}✅ Build complete${NC}"
 
 # Step 3: Install binaries and service

@@ -61,6 +61,7 @@ sudo apt install -y \
     autoconf \
     autoconf-archive \
     automake \
+    autopoint \
     libtool \
     pkgconf \
     gettext \

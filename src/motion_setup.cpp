@@ -517,8 +517,9 @@ int main(int argc, char **argv) {
         std::cout << "╚══════════════════════════════════════════════════════════════╝\n\n";
     }
 
-    std::cout << "Restart Motion to apply changes:\n";
-    std::cout << "  sudo systemctl restart motion\n\n";
+    std::cout << "To start Motion:\n";
+    std::cout << "  If service is set up:  sudo systemctl restart motion\n";
+    std::cout << "  Manual/foreground:     motion -n\n\n";
 
     return 0;
 }

@@ -250,7 +250,9 @@ class cls_camera {
 
         /* V4L2 accessors for web API */
         bool has_v4l2() const;
+#ifdef HAVE_V4L2
         vec_v4l2ctrl get_v4l2_controls();
+#endif
 
         /* NETCAM accessors for web API */
         bool has_netcam() const;

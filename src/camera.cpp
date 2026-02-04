@@ -2417,15 +2417,15 @@ bool cls_camera::has_v4l2() const
     return v4l2cam != nullptr;
 }
 
+#ifdef HAVE_V4L2
 vec_v4l2ctrl cls_camera::get_v4l2_controls()
 {
-    #ifdef HAVE_V4L2
     if (v4l2cam != nullptr) {
         return v4l2cam->get_device_ctrls();
     }
-    #endif
     return vec_v4l2ctrl();
 }
+#endif
 
 /* NETCAM accessors for web API */
 bool cls_camera::has_netcam() const
