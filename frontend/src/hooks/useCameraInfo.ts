@@ -18,6 +18,7 @@ export interface CameraInfo {
     hasNetcamConfig: boolean;
     hasDualStream: boolean;
     supportsPassthrough: boolean;
+    hasPtz: boolean;
   };
   // Type-specific data
   libcamCapabilities?: CameraCapabilities;
@@ -65,6 +66,7 @@ export function useCameraInfo(cameraId: number, options?: { enabled?: boolean })
           hasNetcamConfig: false,
           hasDualStream: false,
           supportsPassthrough: false,
+          hasPtz: false,
         },
       };
     }
@@ -86,6 +88,7 @@ export function useCameraInfo(cameraId: number, options?: { enabled?: boolean })
           hasNetcamConfig: false,
           hasDualStream: false,
           supportsPassthrough: false,
+          hasPtz: false,
         },
       };
     }
@@ -101,15 +104,15 @@ export function useCameraInfo(cameraId: number, options?: { enabled?: boolean })
         // libcam: Has supportedControls map
         hasLibcamControls: cameraType === 'libcam',
         // v4l2: Has v4l2_controls array
-        // TEMP: forced true for UI preview (revert: cameraType === 'v4l2')
-        hasV4L2Controls: true,
+        hasV4L2Controls: cameraType === 'v4l2',
         // netcam: Has netcam_url and related config
-        // TEMP: forced true for UI preview (revert: cameraType === 'netcam')
-        hasNetcamConfig: true,
+        hasNetcamConfig: cameraType === 'netcam',
         // netcam dual stream: has_high_stream is true
         hasDualStream: cameraType === 'netcam' && cam.has_high_stream === true,
         // netcam passthrough: only netcam supports movie passthrough
         supportsPassthrough: cameraType === 'netcam',
+        // PTZ: only netcam supports PTZ (ONVIF/external PTZ mechanisms)
+        hasPtz: cameraType === 'netcam',
       },
       // Type-specific data (conditionally included)
       ...(cameraType === 'libcam' && { libcamCapabilities: cam.supportedControls }),

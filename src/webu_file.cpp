@@ -167,6 +167,7 @@ void cls_webu_file::main() {
 
     /* Check if this is a thumbnail request (.thumb.jpg suffix) */
     std::string requested_file = webua->uri_cmd2;
+    std::string original_requested_file = requested_file;  /* Preserve FULL path for fallback (including .thumb.jpg if present) */
     bool is_thumbnail = false;
     const std::string thumb_suffix = ".thumb.jpg";
 
@@ -174,10 +175,13 @@ void cls_webu_file::main() {
         requested_file.substr(requested_file.length() - thumb_suffix.length()) == thumb_suffix) {
         /* Strip suffix to get base video filename for database lookup */
         requested_file = requested_file.substr(0, requested_file.length() - thumb_suffix.length());
+        /* Note: original_requested_file keeps the .thumb.jpg suffix for direct path fallback */
         is_thumbnail = true;
     }
 
-    /* Try to extract record_id from URL (new format: "123/filename.jpg") */
+    /* Try to extract record_id from URL (new format: "123/filename.jpg")
+     * Only treat as record_id if it's a reasonable database ID (< 10000000)
+     * to avoid confusing date folders like "20250130" with record IDs */
     int record_id = 0;
     size_t first_slash = requested_file.find('/');
     if (first_slash != std::string::npos) {
@@ -187,8 +191,12 @@ void cls_webu_file::main() {
             if (!isdigit(c)) { is_numeric = false; break; }
         }
         if (is_numeric) {
-            record_id = atoi(id_str.c_str());
-            requested_file = requested_file.substr(first_slash + 1);
+            int potential_id = atoi(id_str.c_str());
+            /* Only treat as record_id if it looks like a database ID, not a date folder */
+            if (potential_id > 0 && potential_id < 10000000) {
+                record_id = potential_id;
+                requested_file = requested_file.substr(first_slash + 1);
+            }
         }
     }
 
@@ -226,12 +234,12 @@ void cls_webu_file::main() {
         }
     }
 
-    /* If not found in database, try direct path construction for subfolder files */
-    if (full_nm.empty() && !requested_file.empty()) {
-        std::string direct_path = webua->cam->cfg->target_dir + "/" + requested_file;
-        if (is_thumbnail) {
-            direct_path += ".thumb.jpg";
-        }
+    /* If not found in database, try direct path construction for subfolder files
+     * Only use this fallback for date-folder URLs (record_id == 0), not for record_id URLs
+     * because the numeric prefix in record_id URLs is a database ID, not a folder name.
+     * original_requested_file already contains the full path including .thumb.jpg if applicable */
+    if (full_nm.empty() && !original_requested_file.empty() && record_id == 0) {
+        std::string direct_path = webua->cam->cfg->target_dir + "/" + original_requested_file;
         struct stat st;
         if (stat(direct_path.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
             full_nm = direct_path;

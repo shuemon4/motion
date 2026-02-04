@@ -48,6 +48,72 @@ function parseDateAndTime(dateStr: string, timeStr?: string): Date | null {
   return isNaN(date.getTime()) ? null : date
 }
 
+/**
+ * MediaThumbnail component that properly manages image loading state
+ * Uses React state instead of DOM manipulation to handle load/error states
+ */
+function MediaThumbnail({
+  item,
+  itemType,
+  thumbnail,
+  getAuthenticatedUrl,
+}: {
+  item: MediaItem | FolderFileItem
+  itemType: string
+  thumbnail: string | undefined
+  getAuthenticatedUrl: (url: string) => string
+}) {
+  const [imageError, setImageError] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+
+  // Reset state when the image source changes
+  const imageSrc = itemType === 'picture' ? item.path : thumbnail
+  useEffect(() => {
+    setImageError(false)
+    setImageLoaded(false)
+  }, [imageSrc])
+
+  const showFallback = imageError || (!imageSrc && itemType !== 'picture')
+
+  return (
+    <div className="aspect-video bg-surface flex items-center justify-center relative overflow-hidden">
+      {itemType === 'picture' ? (
+        <img
+          src={getAuthenticatedUrl(item.path)}
+          alt={item.filename}
+          className={`w-full h-full object-cover transition-opacity ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageError(true)}
+        />
+      ) : thumbnail ? (
+        <img
+          src={getAuthenticatedUrl(thumbnail)}
+          alt={item.filename}
+          className={`w-full h-full object-cover transition-opacity ${imageLoaded && !imageError ? 'opacity-100' : 'opacity-0'}`}
+          loading="lazy"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageError(true)}
+        />
+      ) : null}
+      {/* Fallback icon - shown when no thumbnail or on error */}
+      <div className={`text-gray-400 absolute inset-0 flex items-center justify-center transition-opacity ${showFallback ? 'opacity-100' : 'opacity-0'}`}>
+        {itemType === 'picture' ? (
+          <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        ) : (
+          <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function Media() {
   const { addToast } = useToast()
   const { role } = useAuthContext()
@@ -69,11 +135,10 @@ export function Media() {
     setPage(0)
   }, [selectedCamera, mediaType, currentFolderPath])
 
-  // Reset folder path and media type when switching view modes
+  // Reset folder path when switching to 'all' view mode
   useEffect(() => {
     if (viewMode === 'all') {
       setCurrentFolderPath('')
-      setMediaType('pictures')
     }
   }, [viewMode])
 
@@ -144,14 +209,19 @@ export function Media() {
     : (mediaType === 'pictures' ? picturesLoading : moviesLoading)
 
   // Get current media data based on view mode
+  // In folders view, filter files by the selected media type
+  const folderFiles = (foldersData?.files ?? []).filter(file =>
+    mediaType === 'pictures' ? file.type === 'picture' : file.type === 'movie'
+  )
+
   const items: (MediaItem | FolderFileItem)[] = viewMode === 'folders'
-    ? (foldersData?.files ?? [])
+    ? folderFiles
     : (mediaType === 'pictures'
         ? (picturesData?.pictures ?? [])
         : (moviesData?.movies ?? []))
 
   const totalCount = viewMode === 'folders'
-    ? (foldersData?.total_files ?? 0)
+    ? folderFiles.length
     : (mediaType === 'pictures'
         ? (picturesData?.total_count ?? 0)
         : (moviesData?.total_count ?? 0))
@@ -283,7 +353,6 @@ export function Media() {
                   ? 'bg-primary text-white'
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
-              disabled={viewMode === 'folders'}
             >
               Pictures
             </button>
@@ -294,7 +363,6 @@ export function Media() {
                   ? 'bg-primary text-white'
                   : 'bg-surface-elevated hover:bg-surface'
               }`}
-              disabled={viewMode === 'folders'}
             >
               Movies
             </button>
@@ -378,9 +446,9 @@ export function Media() {
       )}
 
       {/* Folder List (when in folders view) */}
-      {viewMode === 'folders' && foldersData && foldersData.folders.length > 0 && (
+      {viewMode === 'folders' && (foldersData?.folders?.length ?? 0) > 0 && (
         <div className="mb-6 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-          {foldersData.folders.map((folder) => (
+          {foldersData!.folders!.map((folder) => (
             <div
               key={folder.path}
               className="bg-surface-elevated rounded-lg p-4 hover:ring-2 hover:ring-primary cursor-pointer transition-all group"
@@ -478,9 +546,11 @@ export function Media() {
           {items.map((item) => {
             const itemType = 'type' in item ? item.type : (mediaType === 'pictures' ? 'picture' : 'movie')
             const thumbnail = item.thumbnail || undefined
+            // Create a unique key that includes all context to force fresh DOM elements
+            const itemKey = `${viewMode}-${mediaType}-${currentFolderPath}-${itemType}-${item.id}`
             return (
               <button
-                key={`${viewMode}-${currentFolderPath}-${item.id}`}
+                key={itemKey}
                 className="bg-surface-elevated rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary focus:ring-2 focus:ring-primary focus:outline-none transition-all group relative text-left w-full"
                 onClick={() => setSelectedItem(item)}
                 aria-label={`View ${item.filename}`}
@@ -496,56 +566,13 @@ export function Media() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
-                <div className="aspect-video bg-surface flex items-center justify-center relative overflow-hidden">
-                  {itemType === 'picture' ? (
-                    <img
-                      src={getAuthenticatedUrl(item.path)}
-                      alt={item.filename}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          const fallback = parent.querySelector('.fallback-icon');
-                          if (fallback) {
-                            (fallback as HTMLElement).style.display = 'flex';
-                          }
-                        }
-                      }}
-                    />
-                  ) : thumbnail ? (
-                    <img
-                      src={getAuthenticatedUrl(thumbnail)}
-                      alt={item.filename}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          const fallback = parent.querySelector('.fallback-icon');
-                          if (fallback) {
-                            (fallback as HTMLElement).style.display = 'flex';
-                          }
-                        }
-                      }}
-                    />
-                  ) : null}
-                  <div className={`fallback-icon text-gray-400 absolute inset-0 flex items-center justify-center ${(thumbnail || itemType === 'picture') ? 'hidden' : ''}`}>
-                    {itemType === 'picture' ? (
-                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    ) : (
-                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
+                <MediaThumbnail
+                  key={`thumb-${itemKey}`}
+                  item={item}
+                  itemType={itemType}
+                  thumbnail={thumbnail}
+                  getAuthenticatedUrl={getAuthenticatedUrl}
+                />
                 <div className="p-3">
                   <p className="text-sm font-medium truncate">{item.filename}</p>
                   <div className="flex justify-between text-xs text-gray-400 mt-1">

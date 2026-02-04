@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { apiGet } from '@/api/client';
 
 export interface DeviceInfo {
   device_model?: string;
@@ -32,18 +33,13 @@ export interface DeviceInfo {
   version?: string;
 }
 
-export function useDeviceInfo() {
+export function useDeviceInfo(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['deviceInfo'],
-    queryFn: async (): Promise<DeviceInfo> => {
-      const response = await fetch('/0/api/system/status');
-      if (!response.ok) {
-        throw new Error('Failed to fetch device info');
-      }
-      return response.json();
-    },
+    queryFn: () => apiGet<DeviceInfo>('/0/api/system/status'),
     staleTime: 60000, // Cache for 1 minute
-    retry: 1,
+    retry: false, // Don't retry on auth errors
+    enabled: options?.enabled ?? true,
   });
 }
 

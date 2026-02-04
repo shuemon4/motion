@@ -494,12 +494,14 @@ export function Settings() {
             getError={getError}
           />
 
-          {/* 5a. PTZ Controls */}
-          <PtzSettings
-            config={activeConfig}
-            onChange={handleChange}
-            getError={getError}
-          />
+          {/* 5a. PTZ Controls - netcam only */}
+          {cameraInfo.features.hasPtz && (
+            <PtzSettings
+              config={activeConfig}
+              onChange={handleChange}
+              getError={getError}
+            />
+          )}
 
           {/* 6. Picture Settings */}
           <PictureSettings
