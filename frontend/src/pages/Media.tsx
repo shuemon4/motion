@@ -150,7 +150,7 @@ export function Media() {
     }
   }, [viewMode, selectedCamera, queryClient])
 
-  // Invalidate folder queries when folder path changes
+  // Invalidate folder queries when folder path or media type changes
   useEffect(() => {
     if (viewMode === 'folders') {
       queryClient.invalidateQueries({
@@ -160,7 +160,7 @@ export function Media() {
           query.queryKey[1] === selectedCamera
       })
     }
-  }, [viewMode, currentFolderPath, selectedCamera, queryClient])
+  }, [viewMode, currentFolderPath, selectedCamera, mediaType, queryClient])
 
   const { data: cameras } = useCameras()
 
@@ -181,11 +181,13 @@ export function Media() {
   )
 
   // Fetch folder contents for "Folders" view
+  // Server-side filtering by mediaType ensures accurate pagination
   const { data: foldersData, isLoading: foldersLoading } = useMediaFolders(
     selectedCamera,
     currentFolderPath,
     offset,
     PAGE_SIZE,
+    mediaType,  // Pass mediaType for server-side filtering
     { enabled: viewMode === 'folders' }
   )
 
@@ -209,19 +211,16 @@ export function Media() {
     : (mediaType === 'pictures' ? picturesLoading : moviesLoading)
 
   // Get current media data based on view mode
-  // In folders view, filter files by the selected media type
-  const folderFiles = (foldersData?.files ?? []).filter(file =>
-    mediaType === 'pictures' ? file.type === 'picture' : file.type === 'movie'
-  )
-
+  // Server-side filtering applied via mediaType parameter - files already filtered
   const items: (MediaItem | FolderFileItem)[] = viewMode === 'folders'
-    ? folderFiles
+    ? (foldersData?.files ?? [])
     : (mediaType === 'pictures'
         ? (picturesData?.pictures ?? [])
         : (moviesData?.movies ?? []))
 
+  // Server returns accurate filtered count for folders view
   const totalCount = viewMode === 'folders'
-    ? folderFiles.length
+    ? (foldersData?.total_files ?? 0)
     : (mediaType === 'pictures'
         ? (picturesData?.total_count ?? 0)
         : (moviesData?.total_count ?? 0))

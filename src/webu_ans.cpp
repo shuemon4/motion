@@ -189,8 +189,8 @@ int cls_webu_ans::parseurl()
         return 0;
     }
 
-    if (uri_cmd1 == "movies") {
-        /* Whole remaining url is the movie name and possibly subdir */
+    if (uri_cmd1 == "movies" || uri_cmd1 == "media") {
+        /* Whole remaining url is the file path including record_id and filename */
         uri_cmd2 = url.substr(pos_slash1);
         return 0;
     } else {

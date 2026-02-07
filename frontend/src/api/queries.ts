@@ -118,18 +118,21 @@ export function useMediaDates(
 }
 
 // Fetch folder contents for media browsing
+// mediaType parameter enables server-side filtering for accurate pagination
 export function useMediaFolders(
   camId: number,
   path: string = '',
   offset: number = 0,
   limit: number = 100,
+  mediaType?: 'pictures' | 'movies',
   options?: { enabled?: boolean }
 ) {
   return useQuery({
-    queryKey: [...queryKeys.mediaFolders(camId, path), offset, limit],
+    queryKey: [...queryKeys.mediaFolders(camId, path), offset, limit, mediaType],
     queryFn: () => {
       let url = `/${camId}/api/media/folders?offset=${offset}&limit=${limit}`;
       if (path) url += `&path=${encodeURIComponent(path)}`;
+      if (mediaType) url += `&type=${mediaType === 'pictures' ? 'picture' : 'movie'}`;
       return apiGet<FolderContentsResponse>(url);
     },
     staleTime: 30000, // Cache for 30 seconds

@@ -583,6 +583,7 @@ int cls_movie::set_outputfile()
 {
     int retcd;
     char errstr[128];
+    AVDictionary *fmt_opts = nullptr;
 
     /* Open the output file, if needed. */
     if ((timelapse_exists(full_nm.c_str()) == 0) || (tlapse != TIMELAPSE_APPEND)) {
@@ -618,8 +619,17 @@ int cls_movie::set_outputfile()
             }
         }
 
+        /* Set movflags for browser-compatible MP4/MOV files.
+         * faststart moves the moov atom to the beginning of the file,
+         * enabling progressive playback in web browsers.
+         */
+        if ((container == "mp4") || (container == "mov") || (container == "hevc")) {
+            av_dict_set(&fmt_opts, "movflags", "+faststart", 0);
+        }
+
         clock_gettime(CLOCK_MONOTONIC, &cb_st_ts);
-        retcd = avformat_write_header(oc, nullptr);
+        retcd = avformat_write_header(oc, &fmt_opts);
+        av_dict_free(&fmt_opts);
         if (retcd < 0) {
             av_strerror(retcd, errstr, sizeof(errstr));
             MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO

@@ -152,6 +152,8 @@ export interface FolderContentsResponse {
   folders: FolderItem[];
   files: FolderFileItem[];
   total_files: number;
+  total_pictures: number;
+  total_movies: number;
   offset: number;
   limit: number;
 }

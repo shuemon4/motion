@@ -471,6 +471,19 @@ static std::string get_file_extension(const std::string &filename)
     return filename.substr(dot_pos);
 }
 
+/* Determine media file type from extension (case-insensitive) */
+static std::string get_media_type(const std::string &filename)
+{
+    std::string ext = get_file_extension(filename);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" ||
+        ext == ".gif" || ext == ".bmp") {
+        return "picture";
+    }
+    return "movie";
+}
+
 static bool validate_folder_path(const std::string &target_dir, const std::string &rel_path,
                                  std::string &full_path)
 {
@@ -523,7 +536,9 @@ void cls_webu_json::api_media_folders()
     std::string sql, target_dir, full_path;
     int offset = 0, limit = 100;
     const char* path_param = nullptr;
+    const char* type_param = nullptr;
     std::string rel_path;
+    std::string type_filter;  /* "picture", "movie", or empty for all */
 
     if (webua->cam == nullptr) {
         webua->bad_request();
@@ -545,10 +560,15 @@ void cls_webu_json::api_media_folders()
         webua->connection, MHD_GET_ARGUMENT_KIND, "offset");
     const char* limit_str = MHD_lookup_connection_value(
         webua->connection, MHD_GET_ARGUMENT_KIND, "limit");
+    type_param = MHD_lookup_connection_value(
+        webua->connection, MHD_GET_ARGUMENT_KIND, "type");
 
     if (path_param) rel_path = path_param;
     if (offset_str) offset = std::max(0, atoi(offset_str));
     if (limit_str) limit = std::min(std::max(1, atoi(limit_str)), 100);
+    if (type_param && (strcmp(type_param, "picture") == 0 || strcmp(type_param, "movie") == 0)) {
+        type_filter = type_param;
+    }
 
     /* Validate and build full path */
     if (!validate_folder_path(target_dir, rel_path, full_path)) {
@@ -571,7 +591,9 @@ void cls_webu_json::api_media_folders()
     /* Scan directory entries */
     struct dirent *entry;
     std::vector<std::pair<std::string, std::string>> folders; /* name, path */
-    std::vector<std::string> media_files;
+    std::vector<std::pair<std::string, std::string>> media_files; /* filename, type */
+    int total_pictures = 0;
+    int total_movies = 0;
 
     while ((entry = readdir(dir)) != nullptr) {
         std::string name = entry->d_name;
@@ -594,13 +616,25 @@ void cls_webu_json::api_media_folders()
             /* Regular file - check if it's a media file (not thumbnail) */
             std::string ext = get_file_extension(name);
             if (is_media_extension(ext) && !is_thumbnail(name)) {
-                media_files.push_back(name);
+                std::string file_type = get_media_type(name);
+
+                /* Track totals for all types */
+                if (file_type == "picture") {
+                    total_pictures++;
+                } else {
+                    total_movies++;
+                }
+
+                /* Apply type filter if specified */
+                if (type_filter.empty() || type_filter == file_type) {
+                    media_files.push_back({name, file_type});
+                }
             }
         }
     }
     closedir(dir);
 
-    /* Sort folders and files alphabetically */
+    /* Sort folders and files alphabetically (by first element = name) */
     std::sort(folders.begin(), folders.end());
     std::sort(media_files.begin(), media_files.end());
 
@@ -668,18 +702,11 @@ void cls_webu_json::api_media_folders()
     for (int i = start_idx; i < end_idx; i++) {
         if (i > start_idx) webua->resp_page += ",";
 
-        std::string filename = media_files[i];
+        std::string filename = media_files[i].first;
+        std::string file_type = media_files[i].second;
         std::string file_path = full_path + "/" + filename;
         struct stat st;
         stat(file_path.c_str(), &st);
-
-        /* Determine file type */
-        std::string ext = get_file_extension(filename);
-        std::string file_type = "movie";
-        if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" ||
-            ext == ".gif" || ext == ".bmp") {
-            file_type = "picture";
-        }
 
         /* Look up in database for metadata */
         sql = " select * from motion ";
@@ -732,6 +759,8 @@ void cls_webu_json::api_media_folders()
     webua->resp_page += "],";
 
     webua->resp_page += "\"total_files\":" + std::to_string(total_files) + ",";
+    webua->resp_page += "\"total_pictures\":" + std::to_string(total_pictures) + ",";
+    webua->resp_page += "\"total_movies\":" + std::to_string(total_movies) + ",";
     webua->resp_page += "\"offset\":" + std::to_string(offset) + ",";
     webua->resp_page += "\"limit\":" + std::to_string(limit);
     webua->resp_page += "}";
