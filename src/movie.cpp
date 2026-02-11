@@ -42,7 +42,7 @@ int movie_interrupt(void *ctx)
 
     clock_gettime(CLOCK_MONOTONIC, &movie->cb_cr_ts);
     if ((movie->cb_cr_ts.tv_sec - movie->cb_st_ts.tv_sec ) > movie->cb_dur) {
-        MOTION_LOG(INF, TYPE_ENCODER, NO_ERRNO,_("Movie timed out"));
+        MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO,_("Movie I/O timed out after %d seconds"), movie->cb_dur);
         return 1;
     }
     return 0;
@@ -312,6 +312,11 @@ int cls_movie::set_quality()
              */
             char crf[10];
             quality = (int)(( (100-quality) * 51)/100);
+            /* CRF 0 = lossless, which is incompatible with x264 "high" profile.
+             * Clamp to CRF 1 (near-lossless, visually identical) for compatibility. */
+            if (quality < 1) {
+                quality = 1;
+            }
             snprintf(crf, 10, "%d", quality);
             if (ctx_codec->codec_id == MY_CODEC_ID_H264) {
                 av_opt_set(ctx_codec->priv_data, "profile", "high", 0);
@@ -587,6 +592,9 @@ int cls_movie::set_outputfile()
 
     /* Open the output file, if needed. */
     if ((timelapse_exists(full_nm.c_str()) == 0) || (tlapse != TIMELAPSE_APPEND)) {
+        /* Set the URL on the format context so that +faststart can reopen
+         * the file during av_write_trailer() to rewrite with MOOV first. */
+        oc->url = av_strdup(full_nm.c_str());
         clock_gettime(CLOCK_MONOTONIC, &cb_st_ts);
         retcd = avio_open(&oc->pb, full_nm.c_str()
             , AVIO_FLAG_WRITE|AVIO_FLAG_NONBLOCK);
@@ -1261,7 +1269,20 @@ void cls_movie::stop()
         if (oc != nullptr) {
             if (oc->pb != nullptr) {
                 if (tlapse != TIMELAPSE_APPEND) {
-                    av_write_trailer(oc);
+                    /* Reset interrupt timeout before writing trailer.
+                     * With +faststart, av_write_trailer rewrites the entire file
+                     * (moving MOOV atom to front). This can take significant time
+                     * for large files. Use generous timeout to prevent the interrupt
+                     * callback from aborting the rewrite and corrupting the file. */
+                    clock_gettime(CLOCK_MONOTONIC, &cb_st_ts);
+                    cb_dur = 60;
+                    int retcd = av_write_trailer(oc);
+                    if (retcd < 0) {
+                        char errstr[128];
+                        av_strerror(retcd, errstr, sizeof(errstr));
+                        MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                            ,_("Error writing movie trailer: %s"), errstr);
+                    }
                 }
                 if (!(oc->oformat->flags & AVFMT_NOFILE)) {
                     if (tlapse != TIMELAPSE_APPEND) {
