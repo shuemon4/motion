@@ -188,6 +188,6 @@ function groupV4L2Controls(controls: V4L2Control[]): Record<string, V4L2Control[
 
   // Remove empty groups
   return Object.fromEntries(
-    Object.entries(groups).filter(([_, groupControls]) => groupControls.length > 0)
+    Object.entries(groups).filter(([, groupControls]) => groupControls.length > 0)
   );
 }

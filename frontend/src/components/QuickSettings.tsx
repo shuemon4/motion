@@ -246,7 +246,7 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
         )}
 
         {/* Manual color controls - only show when AWB is disabled */}
-        {!Boolean(getValue('libcam_awb_enable', true)) && (
+        {!getValue('libcam_awb_enable', true) && (
           <>
             {/* Color Temperature - only show if camera supports it (NoIR cameras don't) */}
             {capabilities?.ColourTemperature !== false && (

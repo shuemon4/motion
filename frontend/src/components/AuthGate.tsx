@@ -1,4 +1,4 @@
-import { type ReactNode, useRef } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { restoreSession } from '@/api/session';
@@ -16,13 +16,17 @@ export function AuthGate({ children }: AuthGateProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { isAuthenticated, authRequired, isLoading } = useAuthContext();
-  const wasAuthenticated = useRef(false);
+  const [wasAuthenticated, setWasAuthenticated] = useState(false);
 
-  if (isAuthenticated) wasAuthenticated.current = true;
-  const sessionExpired = wasAuthenticated.current && authRequired && !isAuthenticated;
+  // Adjust state during render (React-recommended pattern for derived state)
+  if (isAuthenticated && !wasAuthenticated) {
+    setWasAuthenticated(true);
+  }
+
+  const sessionExpired = wasAuthenticated && authRequired && !isAuthenticated;
 
   const handleLoginSuccess = () => {
-    wasAuthenticated.current = true;
+    setWasAuthenticated(true);
     queryClient.invalidateQueries({ queryKey: ['auth'] });
     navigate('/');
   };

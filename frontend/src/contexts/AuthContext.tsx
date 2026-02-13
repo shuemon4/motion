@@ -55,6 +55,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
  * Hook to access authentication context
  * @throws Error if used outside of AuthProvider
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuthContext(): AuthContextValue {
   const context = useContext(AuthContext)
   if (!context) {

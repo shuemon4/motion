@@ -65,13 +65,14 @@ function MediaThumbnail({
 }) {
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [prevImageSrc, setPrevImageSrc] = useState<string | undefined>(undefined)
 
-  // Reset state when the image source changes
   const imageSrc = itemType === 'picture' ? item.path : thumbnail
-  useEffect(() => {
+  if (imageSrc !== prevImageSrc) {
+    setPrevImageSrc(imageSrc)
     setImageError(false)
     setImageLoaded(false)
-  }, [imageSrc])
+  }
 
   const showFallback = imageError || (!imageSrc && itemType !== 'picture')
 
@@ -130,17 +131,8 @@ export function Media() {
 
   const offset = page * PAGE_SIZE
 
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(0)
-  }, [selectedCamera, mediaType, currentFolderPath])
-
-  // Reset folder path when switching to 'all' view mode
-  useEffect(() => {
-    if (viewMode === 'all') {
-      setCurrentFolderPath('')
-    }
-  }, [viewMode])
+  // Page and folder path are reset via event handlers (setSelectedCamera, setMediaType, etc.)
+  // to avoid lint warnings about setState in effects
 
   // Force refetch when switching views or navigating folders to ensure fresh data with thumbnails
   useEffect(() => {
@@ -331,7 +323,7 @@ export function Media() {
           <select
             id="camera-select"
             value={selectedCamera}
-            onChange={(e) => setSelectedCamera(parseInt(e.target.value))}
+            onChange={(e) => { setSelectedCamera(parseInt(e.target.value)); setPage(0) }}
             className="px-3 py-2 bg-surface border border-surface-elevated rounded-lg"
           >
             {cameras?.map((cam) => (
@@ -346,7 +338,7 @@ export function Media() {
           <label className="block text-sm font-medium mb-2">Type</label>
           <div className="flex gap-2">
             <button
-              onClick={() => setMediaType('pictures')}
+              onClick={() => { setMediaType('pictures'); setPage(0) }}
               className={`px-4 py-2 rounded-lg transition-colors ${
                 mediaType === 'pictures'
                   ? 'bg-primary text-white'
@@ -356,7 +348,7 @@ export function Media() {
               Pictures
             </button>
             <button
-              onClick={() => setMediaType('movies')}
+              onClick={() => { setMediaType('movies'); setPage(0) }}
               className={`px-4 py-2 rounded-lg transition-colors ${
                 mediaType === 'movies'
                   ? 'bg-primary text-white'
@@ -372,7 +364,7 @@ export function Media() {
           <label className="block text-sm font-medium mb-2">View</label>
           <div className="flex gap-2">
             <button
-              onClick={() => setViewMode('all')}
+              onClick={() => { setViewMode('all'); setCurrentFolderPath(''); setPage(0) }}
               className={`px-3 py-2 rounded-lg transition-colors text-sm ${
                 viewMode === 'all'
                   ? 'bg-primary text-white'
