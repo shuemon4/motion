@@ -225,6 +225,16 @@ void cls_webu_json::parms_item(cls_config *conf, int indx_parm)
             ",\"type\":\"" + conf->type_desc(config_parms[indx_parm].parm_type) + "\"" +
             "}";
 
+    } else if (config_parms[indx_parm].parm_type == PARM_TYP_FLOAT) {
+        webua->resp_page +=
+            "\"" + config_parms[indx_parm].parm_name + "\"" +
+            ":{" +
+            " \"value\":" + parm_val +
+            ",\"enabled\":" + parm_enable +
+            ",\"category\":" + std::to_string(config_parms[indx_parm].parm_cat) +
+            ",\"type\":\"" + conf->type_desc(config_parms[indx_parm].parm_type) + "\"" +
+            "}";
+
     } else if (config_parms[indx_parm].parm_type == PARM_TYP_BOOL) {
         if (parm_val == "on") {
             webua->resp_page +=
@@ -566,7 +576,14 @@ void cls_webu_json::api_config_patch()
                 cfg->edit_get(parm_name, old_val, config_parms[parm_index].parm_cat);
 
                 /* Check if value actually changed */
-                if (old_val == parm_val) {
+                bool values_equal;
+                if (config_parms[parm_index].parm_type == PARM_TYP_FLOAT) {
+                    values_equal = (strtof(old_val.c_str(), nullptr) ==
+                                    strtof(parm_val.c_str(), nullptr));
+                } else {
+                    values_equal = (old_val == parm_val);
+                }
+                if (values_equal) {
                     unchanged = true;
                     hot_reload = config_parms[parm_index].hot_reload;
                     success_count++;

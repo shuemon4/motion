@@ -49,7 +49,7 @@ enum PARM_SCOPE {
  */
 struct ctx_parm_ext {
     std::string     parm_name;      /* Parameter name */
-    enum PARM_TYP   parm_type;      /* Type: STRING, INT, LIST, BOOL, ARRAY, PARAMS */
+    enum PARM_TYP   parm_type;      /* Type: STRING, INT, FLOAT, LIST, BOOL, ARRAY, PARAMS */
     enum PARM_CAT   parm_cat;       /* Category for web UI grouping */
     int             webui_level;    /* Web UI display level */
     int             scope;          /* PARM_SCOPE flags for device filtering */

@@ -84,17 +84,17 @@ ctx_parm config_parms[] = {
     {"libcam_device",             PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, false},
     {"libcam_params",             PARM_TYP_PARAMS, PARM_CAT_02, PARM_LEVEL_ADVANCED, false},
     {"libcam_buffer_count",       PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, false},
-    {"libcam_brightness",         PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
-    {"libcam_contrast",           PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
-    {"libcam_gain",               PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_brightness",         PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_contrast",           PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_gain",               PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_awb_enable",         PARM_TYP_BOOL,   PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_awb_mode",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_awb_locked",         PARM_TYP_BOOL,   PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_colour_temp",        PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
-    {"libcam_colour_gain_r",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
-    {"libcam_colour_gain_b",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_colour_gain_r",      PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_colour_gain_b",      PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_af_mode",            PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
-    {"libcam_lens_position",      PARM_TYP_STRING, PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_lens_position",      PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_af_range",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_af_speed",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_af_trigger",         PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
@@ -731,7 +731,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "webcontrol_session_timeout") return edit_generic_int(webcontrol_session_timeout, parm, pact, 86400, 60, INT_MAX);
     if (name == "stream_preview_scale") return edit_generic_int(stream_preview_scale, parm, pact, 25, 1, 100);
     if (name == "stream_quality") return edit_generic_int(stream_quality, parm, pact, 60, 1, 100);
-    if (name == "stream_maxrate") return edit_generic_int(stream_maxrate, parm, pact, 1, 0, 100);
+    if (name == "stream_maxrate") return edit_generic_int(stream_maxrate, parm, pact, 15, 0, 100);
     if (name == "stream_scan_time") return edit_generic_int(stream_scan_time, parm, pact, 5, 0, 3600);
     if (name == "stream_scan_scale") return edit_generic_int(stream_scan_scale, parm, pact, 2, 1, 32);
     if (name == "database_port") return edit_generic_int(database_port, parm, pact, 0, 0, 65535);
@@ -1125,6 +1125,7 @@ std::string cls_config::type_desc(enum PARM_TYP ptype)
 {
     if (ptype == PARM_TYP_BOOL) {           return "bool";
     } else if (ptype == PARM_TYP_INT) {     return "int";
+    } else if (ptype == PARM_TYP_FLOAT) {   return "float";
     } else if (ptype == PARM_TYP_LIST) {    return "list";
     } else if (ptype == PARM_TYP_STRING) {  return "string";
     } else if (ptype == PARM_TYP_ARRAY) {   return "array";

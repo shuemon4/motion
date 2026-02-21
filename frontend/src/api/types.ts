@@ -80,7 +80,7 @@ export interface ConfigParam {
   name: string;
   value: string | number | boolean;
   category?: string;
-  type?: 'string' | 'number' | 'boolean' | 'list';
+  type?: 'string' | 'int' | 'float' | 'bool' | 'list' | 'array' | 'params';
 }
 
 // Media item (snapshot or movie)

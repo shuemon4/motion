@@ -58,6 +58,7 @@
     enum PARM_TYP{
         PARM_TYP_STRING
         , PARM_TYP_INT
+        , PARM_TYP_FLOAT
         , PARM_TYP_LIST
         , PARM_TYP_BOOL
         , PARM_TYP_ARRAY
