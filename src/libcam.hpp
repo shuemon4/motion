@@ -71,6 +71,9 @@
             int af_speed = 0;           // 0=Normal, 1=Fast
             bool af_trigger = false;    // Trigger a scan (Auto mode only)
             bool af_cancel = false;     // Cancel a scan (Auto mode only)
+            // Exposure and processing controls
+            int noise_reduction_mode = 0; // 0=Off
+            int exposure_time = 0;        // 0=auto, otherwise microseconds
             bool dirty = false;         // Protected by mtx
         };
 
@@ -94,6 +97,8 @@
                 void set_af_speed(int value);
                 void trigger_af_scan();  // For AfTrigger in Auto mode
                 void cancel_af_scan();   // For AfTrigger cancel
+                void set_noise_reduction_mode(int value);
+                void set_exposure_time(int value);
 
                 /* Capability discovery API */
                 bool is_control_supported(const libcamera::ControlId *id);

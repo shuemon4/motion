@@ -4,6 +4,7 @@ import {
   AUTOFOCUS_MODES,
   AUTOFOCUS_RANGES,
   AUTOFOCUS_SPEEDS,
+  NOISE_REDUCTION_MODES,
 } from '@/utils/parameterMappings';
 import type { CameraCapabilities } from '@/api/types';
 
@@ -152,6 +153,43 @@ export function LibcameraSettings({ config, onChange, getError, capabilities, or
           )}
         </>
       )}
+
+      {/* Image Processing Section */}
+      {capabilities?.NoiseReductionMode !== false && (
+        <FormSelect
+          label="Noise Reduction"
+          value={String(getValue('libcam_noise_reduction_mode', 0))}
+          onChange={(val) => onChange('libcam_noise_reduction_mode', Number(val))}
+          options={NOISE_REDUCTION_MODES.map((mode) => ({
+            value: String(mode.value),
+            label: mode.label,
+          }))}
+          helpText="Fast recommended for motion detection (avoids temporal smearing)"
+          error={getError?.('libcam_noise_reduction_mode')}
+        />
+      )}
+
+      {capabilities?.ExposureTime !== false && (() => {
+        const currentFramerate = Number(getValue('framerate', 15));
+        const maxExposure = Math.floor(1000000 / Math.max(currentFramerate, 1));
+        const exposureValue = Number(getValue('libcam_exposure_time', 0));
+
+        return (
+          <FormSlider
+            label="Exposure Time"
+            value={exposureValue}
+            onChange={(val) => onChange('libcam_exposure_time', val)}
+            min={0}
+            max={maxExposure}
+            step={exposureValue === 0 ? maxExposure : 500}
+            unit=" μs"
+            helpText={exposureValue === 0
+              ? "Auto exposure (camera decides)"
+              : `Manual: 1/${Math.round(1000000 / exposureValue)}s — longer = brighter but more motion blur`}
+            error={getError?.('libcam_exposure_time')}
+          />
+        );
+      })()}
 
       {/* Autofocus Section - conditional based on capabilities */}
       {capabilities?.AfMode ? (

@@ -64,6 +64,7 @@ export function Settings() {
   const { role } = useAuthContext()
   const { addToast } = useToast()
   const [selectedCamera, setSelectedCamera] = useState('0')
+  const [hasAutoSelected, setHasAutoSelected] = useState(false)
   const [changes, setChanges] = useState<ConfigChanges>({})
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const [isSaving, setIsSaving] = useState(false)
@@ -101,8 +102,40 @@ export function Settings() {
     setValidationErrors({})
   }, [selectedCamera])
 
+  // Default to first camera when config loads (instead of Global Settings)
+  useEffect(() => {
+    if (hasAutoSelected || !config?.cameras) return
+    const cameraEntries = Object.entries(config.cameras)
+      .filter(([key]) => key !== 'count')
+    if (cameraEntries.length > 0) {
+      const [, firstCam] = cameraEntries[0]
+      setSelectedCamera(String((firstCam as CameraInfo).id))
+      setHasAutoSelected(true)
+    }
+  }, [config?.cameras, hasAutoSelected])
+
   const handleChange = useCallback((param: string, value: string | number | boolean) => {
-    setChanges((prev) => ({ ...prev, [param]: value }))
+    setChanges((prev) => {
+      const updated = { ...prev, [param]: value }
+
+      if (param === 'framerate') {
+        // One-shot: sync stream_maxrate to match new framerate
+        // User can adjust stream_maxrate independently afterwards
+        updated['stream_maxrate'] = value
+
+        // Clamp exposure time if it exceeds the new max (Feature 2)
+        const newMax = Math.floor(1000000 / Number(value))
+        const currentExposure = Number(
+          prev['libcam_exposure_time'] ??
+          originalConfig?.['libcam_exposure_time']?.value ?? 0
+        )
+        if (currentExposure > newMax && currentExposure > 0) {
+          updated['libcam_exposure_time'] = newMax
+        }
+      }
+
+      return updated
+    })
 
     // Validate the new value
     const result = validateConfigParam(param, String(value))

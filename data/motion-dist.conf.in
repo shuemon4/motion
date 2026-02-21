@@ -32,6 +32,8 @@ target_dir @localstatedir@/lib/@PACKAGE_NAME@/media
 ;netcam_url
 ;libcam_brightness 0.0
 ;libcam_contrast 1.0
+;libcam_noise_reduction_mode 0
+;libcam_exposure_time 0
 
 ;*************************************************
 ;*****   Image

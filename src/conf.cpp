@@ -98,6 +98,8 @@ ctx_parm config_parms[] = {
     {"libcam_af_range",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_af_speed",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_af_trigger",         PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_noise_reduction_mode", PARM_TYP_INT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_exposure_time",      PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
 
     /* Category 03 - Image parameters - NOT hot reloadable (buffer realloc) */
     {"width",                     PARM_TYP_INT,    PARM_CAT_03, PARM_LEVEL_LIMITED,  false},
@@ -757,6 +759,10 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "libcam_af_speed") return edit_generic_int(parm_cam.libcam_af_speed, parm, pact, 0, 0, 1);
     // AfTrigger: 0=Start scan, 1=Cancel (action parameter)
     if (name == "libcam_af_trigger") return edit_generic_int(parm_cam.libcam_af_trigger, parm, pact, 0, 0, 1);
+    // NoiseReductionMode: 0=Off, 1=Fast, 2=HighQuality, 3=Minimal, 4=ZSL
+    if (name == "libcam_noise_reduction_mode") return edit_generic_int(parm_cam.libcam_noise_reduction_mode, parm, pact, 0, 0, 4);
+    // ExposureTime: 0=auto, otherwise microseconds (max depends on framerate)
+    if (name == "libcam_exposure_time") return edit_generic_int(parm_cam.libcam_exposure_time, parm, pact, 0, 0, 1000000);
 
     // BOOLS - libcam AWB parameters
     if (name == "libcam_awb_enable") return edit_generic_bool(parm_cam.libcam_awb_enable, parm, pact, true);

@@ -307,6 +307,7 @@ export interface CameraCapabilities {
   // Other
   DigitalGain?: boolean;
   ScalerCrop?: boolean;
+  NoiseReductionMode?: boolean;
 }
 
 // PTZ capabilities derived from camera config

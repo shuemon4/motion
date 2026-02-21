@@ -502,6 +502,7 @@ std::map<std::string, bool> cls_libcam::get_capability_map()
     caps["AeMeteringMode"] = is_control_supported(&controls::AeMeteringMode);
     caps["AeConstraintMode"] = is_control_supported(&controls::AeConstraintMode);
     caps["AeExposureMode"] = is_control_supported(&controls::AeExposureMode);
+    caps["NoiseReductionMode"] = is_control_supported(&controls::draft::NoiseReductionMode);
 
     /* White balance controls */
     caps["AwbEnable"] = is_control_supported(&controls::AwbEnable);
@@ -1110,6 +1111,12 @@ int cls_libcam::req_add(Request *request)
             if (is_control_supported(&controls::AfSpeed)) {
                 req_controls.set(controls::AfSpeed, pending_ctrls.af_speed);
             }
+            if (is_control_supported(&controls::draft::NoiseReductionMode)) {
+                req_controls.set(controls::draft::NoiseReductionMode, pending_ctrls.noise_reduction_mode);
+            }
+            if (pending_ctrls.exposure_time > 0 && is_control_supported(&controls::ExposureTime)) {
+                req_controls.set(controls::ExposureTime, pending_ctrls.exposure_time);
+            }
 
             // Apply LensPosition only in manual mode and if supported
             if (pending_ctrls.af_mode == 0 && is_control_supported(&controls::LensPosition)) {
@@ -1606,6 +1613,22 @@ void cls_libcam::cancel_af_scan()
 
 }
 
+void cls_libcam::set_noise_reduction_mode(int value)
+{
+    std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
+    pending_ctrls.noise_reduction_mode = value;
+    pending_ctrls.dirty = true;
+    MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO, "Hot-reload: NoiseReductionMode set to %d", value);
+}
+
+void cls_libcam::set_exposure_time(int value)
+{
+    std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
+    pending_ctrls.exposure_time = value;
+    pending_ctrls.dirty = true;
+    MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO, "Hot-reload: ExposureTime set to %d us", value);
+}
+
 void cls_libcam::apply_pending_controls()
 {
     /* Note: libcamera 0.5.2 doesn't have Camera::setControls().
@@ -1741,6 +1764,8 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
         pending_ctrls.lens_position = cam->cfg->parm_cam.libcam_lens_position;
         pending_ctrls.af_range = cam->cfg->parm_cam.libcam_af_range;
         pending_ctrls.af_speed = cam->cfg->parm_cam.libcam_af_speed;
+        pending_ctrls.noise_reduction_mode = cam->cfg->parm_cam.libcam_noise_reduction_mode;
+        pending_ctrls.exposure_time = cam->cfg->parm_cam.libcam_exposure_time;
         pending_ctrls.af_trigger = false;
         pending_ctrls.af_cancel = false;
         pending_ctrls.dirty = false;

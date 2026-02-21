@@ -2382,6 +2382,20 @@ void cls_camera::cancel_libcam_af_scan()
     }
 }
 
+void cls_camera::set_libcam_noise_reduction_mode(int value)
+{
+    if (libcam != nullptr) {
+        libcam->set_noise_reduction_mode(value);
+    }
+}
+
+void cls_camera::set_libcam_exposure_time(int value)
+{
+    if (libcam != nullptr) {
+        libcam->set_exposure_time(value);
+    }
+}
+
 /* Capability discovery accessors */
 bool cls_camera::has_libcam() const
 {

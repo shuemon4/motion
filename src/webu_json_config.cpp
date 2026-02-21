@@ -111,6 +111,12 @@ namespace {
                 cam->cancel_libcam_af_scan();
             }
         }},
+        {"libcam_noise_reduction_mode", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_noise_reduction_mode(atoi(val.c_str()));
+        }},
+        {"libcam_exposure_time", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_exposure_time(atoi(val.c_str()));
+        }},
     };
 }
 

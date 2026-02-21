@@ -148,6 +148,15 @@ export const AUTOFOCUS_SPEEDS = [
   { value: 1, label: 'Fast' },
 ];
 
+// libcamera noise reduction modes
+export const NOISE_REDUCTION_MODES = [
+  { value: 0, label: 'Off' },
+  { value: 1, label: 'Fast' },
+  { value: 2, label: 'High Quality' },
+  { value: 3, label: 'Minimal' },
+  { value: 4, label: 'ZSL' },
+];
+
 // Picture output modes
 export const PICTURE_OUTPUT_MODES = [
   { value: 'off', label: 'Off' },

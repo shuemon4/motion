@@ -165,6 +165,10 @@ struct ctx_parm_cam {
     int             libcam_af_speed;        // 0=Normal, 1=Fast
     int             libcam_af_trigger;      // 0=Start AF scan, 1=Cancel (action param)
 
+    /* Exposure and processing parameters */
+    int             libcam_noise_reduction_mode; // 0=Off, 1=Fast, 2=HighQuality, 3=Minimal, 4=ZSL
+    int             libcam_exposure_time;        // 0=auto, otherwise microseconds
+
     /* Image parameters (PARM_CAT_03) */
     int             width;
     int             height;
