@@ -296,8 +296,12 @@
             bool&           stream_grey             = parm_cam.stream_grey;
             bool&           stream_motion           = parm_cam.stream_motion;
             int&            stream_maxrate          = parm_cam.stream_maxrate;
+            int&            stream_max_connections  = parm_cam.stream_max_connections;
             int&            stream_scan_time        = parm_cam.stream_scan_time;
             int&            stream_scan_scale       = parm_cam.stream_scan_scale;
+            int&            stream_h264_bitrate     = parm_cam.stream_h264_bitrate;
+            std::string&    stream_h264_preset      = parm_cam.stream_h264_preset;
+            int&            stream_h264_quality     = parm_cam.stream_h264_quality;
 
             /* Database parameters (-> parm_app) */
             std::string&    database_type           = parm_app.database_type;

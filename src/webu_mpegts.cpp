@@ -357,7 +357,7 @@ int cls_webu_mpegts::open_mpegts()
     ctx_codec->gop_size      = 15;
     ctx_codec->codec_id      = MY_CODEC_ID_H264;
     ctx_codec->codec_type    = AVMEDIA_TYPE_VIDEO;
-    ctx_codec->bit_rate      = 400000;
+    ctx_codec->bit_rate      = webua->cam->cfg->stream_h264_bitrate;
     ctx_codec->width         = img_w;
     ctx_codec->height        = img_h;
     ctx_codec->time_base.num = 1;
@@ -368,9 +368,8 @@ int cls_webu_mpegts::open_mpegts()
     ctx_codec->framerate.num  = 1;
     ctx_codec->framerate.den  = 1;
     av_opt_set(ctx_codec->priv_data, "profile", "main", 0);
-    av_opt_set(ctx_codec->priv_data, "crf", "22", 0);
     av_opt_set(ctx_codec->priv_data, "tune", "zerolatency", 0);
-    av_opt_set(ctx_codec->priv_data, "preset", "superfast",0);
+    av_opt_set(ctx_codec->priv_data, "preset", webua->cam->cfg->stream_h264_preset.c_str(), 0);
     av_dict_set(&opts, "movflags", "empty_moov", 0);
 
     retcd = avcodec_open2(ctx_codec, codec, &opts);
@@ -441,7 +440,7 @@ mhdrslt cls_webu_mpegts::main()
 
     clock_gettime(CLOCK_MONOTONIC, &webus->time_last);
 
-    response = MHD_create_response_from_callback (MHD_SIZE_UNKNOWN, 4096
+    response = MHD_create_response_from_callback (MHD_SIZE_UNKNOWN, 16384
         ,&webu_mpegts_response, this, NULL);
     if (!response) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO, _("Invalid response"));
@@ -456,8 +455,11 @@ mhdrslt cls_webu_mpegts::main()
         }
     }
 
-    MHD_add_response_header(response, "Content-Transfer-Encoding", "BINARY");
-    MHD_add_response_header(response, "Content-Type", "application/octet-stream");
+    MHD_add_response_header(response, "Content-Type", "video/mp2t");
+    MHD_add_response_header(response, "Cache-Control",
+        "no-store, no-cache, must-revalidate, max-age=0");
+    MHD_add_response_header(response, "Pragma", "no-cache");
+    MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
 
     retcd = MHD_queue_response (webua->connection, MHD_HTTP_OK, response);
     MHD_destroy_response (response);

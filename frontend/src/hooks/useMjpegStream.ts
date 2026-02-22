@@ -71,15 +71,14 @@ export function useMjpegStream(cameraId: number, streamKey: number) {
     const startStream = async () => {
       try {
         const token = getSessionToken()
-        let url = `/${cameraId}/mjpg/stream`
         const params = new URLSearchParams()
-        if (token) params.set('token', token)
         params.set('_k', String(streamKey))
-        url += '?' + params.toString()
+        const url = `/${cameraId}/mjpg/stream?` + params.toString()
 
         const response = await fetch(url, {
           signal: abortController.signal,
           credentials: 'same-origin',
+          headers: token ? { 'X-Session-Token': token } : undefined,
         })
 
         if (!response.ok) {
@@ -94,7 +93,8 @@ export function useMjpegStream(cameraId: number, streamKey: number) {
 
         // Parse the multipart stream
         const reader = response.body.getReader()
-        let buffer = new Uint8Array(0)
+        let buffer = new Uint8Array(128 * 1024) // 128KB initial capacity
+        let bufferLen = 0
 
         // Parse MJPEG stream looking for JPEG frame boundaries
         // JPEG markers: SOI = 0xFF 0xD8 (start), EOI = 0xFF 0xD9 (end)
@@ -105,18 +105,25 @@ export function useMjpegStream(cameraId: number, streamKey: number) {
             break
           }
 
-          // Append new data to buffer
-          const newBuffer = new Uint8Array(buffer.length + value.length)
-          newBuffer.set(buffer)
-          newBuffer.set(value, buffer.length)
-          buffer = newBuffer
+          // Append new data to buffer with capacity doubling
+          if (bufferLen + value.length > buffer.length) {
+            const newCapacity = Math.max(buffer.length * 2, bufferLen + value.length)
+            const newBuffer = new Uint8Array(newCapacity)
+            newBuffer.set(buffer.subarray(0, bufferLen))
+            buffer = newBuffer
+          }
+          buffer.set(value, bufferLen)
+          bufferLen += value.length
 
           // Look for complete JPEG frames in buffer
           let searchStart = 0
-          while (searchStart < buffer.length - 1) {
+          let lastJpegData: Uint8Array | null = null
+          let compactFrom = 0
+
+          while (searchStart < bufferLen - 1) {
             // Find SOI marker (0xFF 0xD8)
             let soiIndex = -1
-            for (let i = searchStart; i < buffer.length - 1; i++) {
+            for (let i = searchStart; i < bufferLen - 1; i++) {
               if (buffer[i] === 0xff && buffer[i + 1] === 0xd8) {
                 soiIndex = i
                 break
@@ -124,14 +131,14 @@ export function useMjpegStream(cameraId: number, streamKey: number) {
             }
 
             if (soiIndex === -1) {
-              // No SOI found, keep last byte (might be partial marker)
-              buffer = buffer.slice(Math.max(0, buffer.length - 1))
+              // No SOI found — discard all but last byte (might be partial marker)
+              compactFrom = bufferLen - 1
               break
             }
 
             // Find EOI marker (0xFF 0xD9) after SOI
             let eoiIndex = -1
-            for (let i = soiIndex + 2; i < buffer.length - 1; i++) {
+            for (let i = soiIndex + 2; i < bufferLen - 1; i++) {
               if (buffer[i] === 0xff && buffer[i + 1] === 0xd9) {
                 eoiIndex = i
                 break
@@ -139,19 +146,32 @@ export function useMjpegStream(cameraId: number, streamKey: number) {
             }
 
             if (eoiIndex === -1) {
-              // No complete frame yet, keep from SOI onwards
-              buffer = buffer.slice(soiIndex)
+              // Incomplete frame — keep from SOI onwards
+              compactFrom = soiIndex
               break
             }
 
-            // Extract complete JPEG frame (SOI to EOI inclusive)
-            const jpegData = buffer.slice(soiIndex, eoiIndex + 2)
-
-            // Record frame timestamp for FPS calculation
+            // Complete frame — extract independent copy (slice, not subarray)
+            lastJpegData = buffer.slice(soiIndex, eoiIndex + 2)
             frameTimestamps.current.push(Date.now())
 
-            // Create blob URL for the frame
-            const blob = new Blob([jpegData], { type: 'image/jpeg' })
+            searchStart = eoiIndex + 2
+            compactFrom = searchStart
+          }
+
+          // Single compaction point — shift unprocessed data to beginning
+          if (compactFrom > 0) {
+            if (compactFrom >= bufferLen) {
+              bufferLen = 0
+            } else {
+              buffer.copyWithin(0, compactFrom, bufferLen)
+              bufferLen = bufferLen - compactFrom
+            }
+          }
+
+          // Only create Blob URL for the last frame (frame dropping optimization)
+          if (lastJpegData) {
+            const blob = new Blob([new Uint8Array(lastJpegData)], { type: 'image/jpeg' })
             const newUrl = URL.createObjectURL(blob)
 
             // Revoke previous URL to prevent memory leak
@@ -164,11 +184,6 @@ export function useMjpegStream(cameraId: number, streamKey: number) {
               ...prev,
               imageUrl: newUrl,
             }))
-
-            // Continue searching after this frame
-            searchStart = eoiIndex + 2
-            buffer = buffer.slice(searchStart)
-            searchStart = 0
           }
         }
       } catch (err) {

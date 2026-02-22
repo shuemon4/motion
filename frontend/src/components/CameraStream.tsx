@@ -16,6 +16,9 @@ export function CameraStream({ cameraId, className = '', onStreamFpsChange }: Ca
   // Track the last known restart timestamp to detect changes
   const lastKnownRestartRef = useRef<number>(getStoredRestartTimestamp(cameraId))
 
+  // Track retry attempts for exponential backoff
+  const retryCountRef = useRef<number>(0)
+
   // Initialize streamKey from stored restart timestamp
   // This ensures fresh connections after navigation back from Settings
   const [streamKey, setStreamKey] = useState(() => getStoredRestartTimestamp(cameraId))
@@ -39,12 +42,21 @@ export function CameraStream({ cameraId, className = '', onStreamFpsChange }: Ca
     }
   }, [streamFps])  // ← Only streamFps in deps, NOT onStreamFpsChange
 
-  // Force stream reconnection by changing key
+  // Reset retry counter on successful connection
+  useEffect(() => {
+    if (isConnected) {
+      retryCountRef.current = 0
+    }
+  }, [isConnected])
+
+  // Force stream reconnection by changing key with exponential backoff
   const handleReconnect = useCallback(() => {
-    // Add small delay before retry to avoid hammering
+    // Exponential backoff: 2s → 4s → 8s → 16s → 30s (max)
+    const delay = Math.min(2000 * Math.pow(2, retryCountRef.current), 30000)
+    retryCountRef.current++
     setTimeout(() => {
       setStreamKey((k) => k + 1)
-    }, 2000)
+    }, delay)
   }, [])
 
   // Listen for camera restart events to force reconnection (same-page scenario)

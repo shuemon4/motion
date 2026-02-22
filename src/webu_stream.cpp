@@ -192,8 +192,6 @@ void cls_webu_stream::mjpeg_all_img()
 
     all_buffer();
 
-    memset(resp_image, '\0', resp_size);
-
     /* Assign to a local pointer the stream we want */
     if (webua->app == NULL) {
         return;
@@ -244,8 +242,6 @@ void cls_webu_stream::mjpeg_one_img()
     if (check_finish()) {
         return;
     }
-
-    memset(resp_image, '\0', resp_size);
 
     /* Assign to a local pointer the stream we want */
     if (webua->cam == NULL) {
@@ -349,6 +345,15 @@ void cls_webu_stream::all_cnct()
             strm = &app->cam_list[indx_cam]->stream.norm;
         }
         pthread_mutex_lock(&app->cam_list[indx_cam]->stream.mutex);
+            /* Check connection limit (0 = unlimited) */
+            if (app->cam_list[indx_cam]->cfg->stream_max_connections > 0 &&
+                strm->all_cnct >= app->cam_list[indx_cam]->cfg->stream_max_connections) {
+                pthread_mutex_unlock(&app->cam_list[indx_cam]->stream.mutex);
+                MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                    _("Stream connection limit reached (%d), rejecting new connection"),
+                    app->cam_list[indx_cam]->cfg->stream_max_connections);
+                return;
+            }
             strm->all_cnct++;
         pthread_mutex_unlock(&app->cam_list[indx_cam]->stream.mutex);
     }
@@ -364,6 +369,7 @@ void cls_webu_stream::all_cnct()
         strm = &app->allcam->stream.norm;
     }
     pthread_mutex_lock(&app->allcam->stream.mutex);
+        /* Note: allcam is a composite view, no per-camera limit applies */
         strm->all_cnct++;
     pthread_mutex_unlock(&app->allcam->stream.mutex);
 
@@ -385,7 +391,6 @@ void cls_webu_stream::static_all_img()
     all_buffer();
 
     resp_used = 0;
-    memset(resp_image, '\0', resp_size);
 
     /* Assign to a local pointer the stream we want */
     if (webua->cnct_type == WEBUI_CNCT_JPG_FULL) {
@@ -436,15 +441,32 @@ void cls_webu_stream::jpg_cnct()
     }
 
     pthread_mutex_lock(&webua->cam->stream.mutex);
+        /* Check connection limit (0 = unlimited) */
+        if (webua->cam->cfg->stream_max_connections > 0 &&
+            strm->jpg_cnct >= webua->cam->cfg->stream_max_connections) {
+            pthread_mutex_unlock(&webua->cam->stream.mutex);
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Stream connection limit reached (%d), rejecting new connection"),
+                webua->cam->cfg->stream_max_connections);
+            return;
+        }
         strm->jpg_cnct++;
     pthread_mutex_unlock(&webua->cam->stream.mutex);
 
 
     if (strm->jpg_cnct == 1) {
-        /* This is the first connection so we need to wait half a sec
-         * so that the motion loop on the other thread can update image
+        /* Poll for first frame instead of unconditional 500ms sleep
+         * Typical first frame appears in 10-30ms on fast hardware
          */
-        SLEEP(0,500000000L);
+        int retries = 0;
+        while (retries < 50) {
+            pthread_mutex_lock(&webua->cam->stream.mutex);
+            bool ready = (strm->jpg_data != NULL);
+            pthread_mutex_unlock(&webua->cam->stream.mutex);
+            if (ready) break;
+            SLEEP(0, 10000000L);  /* 10ms */
+            retries++;
+        }
     }
 
 }
@@ -457,7 +479,6 @@ void cls_webu_stream::static_one_img()
     one_buffer();
 
     resp_used = 0;
-    memset(resp_image, '\0', resp_size);
 
     /* Assign to a local pointer the stream we want */
     if (webua->cam == NULL) {
@@ -509,14 +530,31 @@ void cls_webu_stream::ts_cnct()
         strm = &webua->cam->stream.norm;
     }
     pthread_mutex_lock(&webua->cam->stream.mutex);
+        /* Check connection limit (0 = unlimited) */
+        if (webua->cam->cfg->stream_max_connections > 0 &&
+            strm->ts_cnct >= webua->cam->cfg->stream_max_connections) {
+            pthread_mutex_unlock(&webua->cam->stream.mutex);
+            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
+                _("Stream connection limit reached (%d), rejecting new connection"),
+                webua->cam->cfg->stream_max_connections);
+            return;
+        }
         strm->ts_cnct++;
     pthread_mutex_unlock(&webua->cam->stream.mutex);
 
     if (strm->ts_cnct == 1) {
-        /* This is the first connection so we need to wait half a sec
-         * so that the motion loop on the other thread can update image
+        /* Poll for first frame instead of unconditional 500ms sleep
+         * Typical first frame appears in 10-30ms on fast hardware
          */
-        SLEEP(0,500000000L);
+        int retries = 0;
+        while (retries < 50) {
+            pthread_mutex_lock(&webua->cam->stream.mutex);
+            bool ready = (strm->img_data != NULL);
+            pthread_mutex_unlock(&webua->cam->stream.mutex);
+            if (ready) break;
+            SLEEP(0, 10000000L);  /* 10ms */
+            retries++;
+        }
     }
 }
 
@@ -582,7 +620,7 @@ mhdrslt cls_webu_stream::stream_mjpeg()
 
     clock_gettime(CLOCK_MONOTONIC, &time_last);
 
-    response = MHD_create_response_from_callback (MHD_SIZE_UNKNOWN, 1024
+    response = MHD_create_response_from_callback (MHD_SIZE_UNKNOWN, 65536
         , &webu_mjpeg_response, (void *)this, NULL);
     if (response == NULL) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO, _("Invalid response"));
@@ -599,6 +637,10 @@ mhdrslt cls_webu_stream::stream_mjpeg()
 
     MHD_add_response_header(response, MHD_HTTP_HEADER_CONTENT_TYPE
         , "multipart/x-mixed-replace; boundary=BoundaryString");
+    MHD_add_response_header(response, "Cache-Control",
+        "no-store, no-cache, must-revalidate, max-age=0");
+    MHD_add_response_header(response, "Pragma", "no-cache");
+    MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
 
     retcd = MHD_queue_response(webua->connection, MHD_HTTP_OK, response);
     MHD_destroy_response (response);
@@ -638,6 +680,8 @@ mhdrslt cls_webu_stream::stream_static()
     MHD_add_response_header (response, MHD_HTTP_HEADER_CONTENT_TYPE, "image/jpeg");
     snprintf(resp_head, 20, "%9ld\r\n\r\n",(long)resp_used);
     MHD_add_response_header (response, MHD_HTTP_HEADER_CONTENT_LENGTH, resp_head);
+    MHD_add_response_header (response, "Cache-Control", "no-cache, max-age=0");
+    MHD_add_response_header (response, "Access-Control-Allow-Origin", "*");
 
     retcd = MHD_queue_response (webua->connection, MHD_HTTP_OK, response);
     MHD_destroy_response (response);
