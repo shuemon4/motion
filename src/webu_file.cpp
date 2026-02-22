@@ -131,8 +131,62 @@ static std::string get_cache_control(const std::string &path)
 static ssize_t webu_file_reader (void *cls, uint64_t pos, char *buf, size_t max)
 {
     cls_webu_ans *webu_ans =(cls_webu_ans *)cls;
-    (void)fseek (webu_ans->req_file, (long)pos, SEEK_SET);
+    (void)fseek (webu_ans->req_file, (long)(webu_ans->req_file_offset + pos), SEEK_SET);
     return (ssize_t)fread (buf, 1, max, webu_ans->req_file);
+}
+
+/* Parse HTTP Range header. Returns true if a valid single byte range was parsed. */
+static bool parse_range_header(const char *range_str, uint64_t file_size,
+    uint64_t &range_start, uint64_t &range_end)
+{
+    if (range_str == nullptr) {
+        return false;
+    }
+
+    /* Must start with "bytes=" */
+    if (strncmp(range_str, "bytes=", 6) != 0) {
+        return false;
+    }
+
+    const char *spec = range_str + 6;
+
+    /* Suffix range: bytes=-500 (last 500 bytes) */
+    if (spec[0] == '-') {
+        uint64_t suffix_len = (uint64_t)strtoull(spec + 1, nullptr, 10);
+        if (suffix_len == 0 || suffix_len > file_size) {
+            return false;
+        }
+        range_start = file_size - suffix_len;
+        range_end = file_size - 1;
+        return true;
+    }
+
+    /* Standard range: bytes=START-END or bytes=START- */
+    char *endptr;
+    range_start = (uint64_t)strtoull(spec, &endptr, 10);
+    if (*endptr != '-') {
+        return false;
+    }
+    if (range_start >= file_size) {
+        return false;
+    }
+
+    endptr++; /* skip the '-' */
+    if (*endptr == '\0' || *endptr == ',') {
+        /* Open-ended: bytes=START- */
+        range_end = file_size - 1;
+    } else {
+        range_end = (uint64_t)strtoull(endptr, nullptr, 10);
+        if (range_end >= file_size) {
+            range_end = file_size - 1;
+        }
+    }
+
+    if (range_start > range_end) {
+        return false;
+    }
+
+    return true;
 }
 
 void cls_webu_file::main() {
@@ -277,10 +331,50 @@ void cls_webu_file::main() {
         webua->mhd_send();
         retcd = MHD_YES;
     } else {
-        response = MHD_create_response_from_callback (
-            (size_t)statbuf.st_size, 32 * 1024
-            , &webu_file_reader
-            , webua, NULL);
+        uint64_t file_size = (uint64_t)statbuf.st_size;
+        uint64_t range_start = 0;
+        uint64_t range_end = 0;
+        unsigned int http_status = MHD_HTTP_OK;
+
+        /* Check for Range request header */
+        const char *range_hdr = MHD_lookup_connection_value(
+            webua->connection, MHD_HEADER_KIND, "Range");
+
+        bool has_range = parse_range_header(range_hdr, file_size,
+            range_start, range_end);
+
+        if (range_hdr != nullptr && !has_range) {
+            /* Invalid or unsatisfiable range */
+            if (webua->req_file != nullptr) {
+                myfclose(webua->req_file);
+                webua->req_file = nullptr;
+            }
+            response = MHD_create_response_from_buffer(0, (void *)"",
+                MHD_RESPMEM_PERSISTENT);
+            std::string cr_hdr = "bytes */" + std::to_string(file_size);
+            MHD_add_response_header(response, "Content-Range", cr_hdr.c_str());
+            retcd = MHD_queue_response(webua->connection,
+                MHD_HTTP_RANGE_NOT_SATISFIABLE, response);
+            MHD_destroy_response(response);
+            if (retcd == MHD_NO) {
+                MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, "Error processing file request");
+            }
+            return;
+        }
+
+        uint64_t resp_size;
+        if (has_range) {
+            resp_size = range_end - range_start + 1;
+            webua->req_file_offset = range_start;
+            http_status = MHD_HTTP_PARTIAL_CONTENT;
+        } else {
+            resp_size = file_size;
+            webua->req_file_offset = 0;
+        }
+
+        response = MHD_create_response_from_callback(
+            (size_t)resp_size, 32 * 1024,
+            &webu_file_reader, webua, NULL);
         if (response == NULL) {
             if (webua->req_file != nullptr) {
                 myfclose(webua->req_file);
@@ -289,6 +383,7 @@ void cls_webu_file::main() {
             webua->bad_request();
             return;
         }
+
         /* Set Content-Type based on file extension */
         std::string ext = full_nm.substr(full_nm.rfind('.') + 1);
         const char *mime = "application/octet-stream";
@@ -300,8 +395,19 @@ void cls_webu_file::main() {
         else if (ext == "avi") mime = "video/x-msvideo";
         else if (ext == "webm") mime = "video/webm";
         MHD_add_response_header(response, "Content-Type", mime);
-        retcd = MHD_queue_response (webua->connection, MHD_HTTP_OK, response);
-        MHD_destroy_response (response);
+
+        /* Always advertise Range support */
+        MHD_add_response_header(response, "Accept-Ranges", "bytes");
+
+        if (has_range) {
+            std::string cr_val = "bytes " + std::to_string(range_start)
+                + "-" + std::to_string(range_end)
+                + "/" + std::to_string(file_size);
+            MHD_add_response_header(response, "Content-Range", cr_val.c_str());
+        }
+
+        retcd = MHD_queue_response(webua->connection, http_status, response);
+        MHD_destroy_response(response);
     }
     if (retcd == MHD_NO) {
         MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, "Error processing file request");

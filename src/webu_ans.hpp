@@ -41,6 +41,7 @@
             struct MHD_Connection   *connection;
 
             FILE            *req_file;      /* requested file*/
+            uint64_t        req_file_offset; /* byte offset for Range request support */
             std::string     lang;           /* Two character abbreviation for locale language*/
             std::string     auth_role;      /* User role: "admin" or "user" (empty if unauthenticated) */
             std::string     session_token;  /* Session token from X-Session-Token header */

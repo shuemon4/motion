@@ -1813,6 +1813,7 @@ cls_webu_ans::cls_webu_ans(cls_motapp *p_app, const char *uri)
     resp_page     = "";                          /* The response being constructed */
     resp_code     = 200;                         /* Default HTTP status code */
     req_file      = nullptr;
+    req_file_offset = 0;
     gzip_resp     = nullptr;
     gzip_size     = 0;
     gzip_encode   = false;
