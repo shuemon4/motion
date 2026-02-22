@@ -121,7 +121,7 @@ export function Media() {
   const queryClient = useQueryClient()
   const isAdmin = role === 'admin'
   const [selectedCamera, setSelectedCamera] = useState(1)
-  const [mediaType, setMediaType] = useState<MediaType>('pictures')
+  const [mediaType, setMediaType] = useState<MediaType>('movies')
   const [viewMode, setViewMode] = useState<ViewMode>('all')
   const [currentFolderPath, setCurrentFolderPath] = useState('')
   const [page, setPage] = useState(0)
