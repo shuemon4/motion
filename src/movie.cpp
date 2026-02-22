@@ -1395,7 +1395,7 @@ int cls_movie::put_image(ctx_image_data *img_data, const struct timespec *ts1)
             gop_cnt = 0;
         } else {
             picture->pict_type = AV_PICTURE_TYPE_P;
-             myframe_interlaced(picture);
+             myframe_nonkey(picture);
         }
 
         /* A return code of -2 is thrown by the put_frame

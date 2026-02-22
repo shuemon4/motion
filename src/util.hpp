@@ -144,7 +144,7 @@ struct ctx_params {
     void myunquote(std::string &parm);
 
     void myframe_key(AVFrame *frame);
-    void myframe_interlaced(AVFrame *frame);
+    void myframe_nonkey(AVFrame *frame);
     AVPacket *mypacket_alloc(AVPacket *pkt);
 
     /* FFmpeg initialization wrapper - Handles av_register_all() for old versions */

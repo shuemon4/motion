@@ -698,12 +698,12 @@ void myframe_key(AVFrame *frame)
     #endif
 }
 /*********************************************/
-void myframe_interlaced(AVFrame *frame)
+void myframe_nonkey(AVFrame *frame)
 {
     #if (MYFFVER < 60016)
         frame->key_frame = 0;
     #else
-        frame->flags |= AV_FRAME_FLAG_INTERLACED;
+        frame->flags &= ~AV_FRAME_FLAG_KEY;
     #endif
 }
 
