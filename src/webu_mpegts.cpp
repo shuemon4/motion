@@ -62,6 +62,107 @@ static ssize_t webu_mpegts_response(void *cls, uint64_t pos, char *buf, size_t m
 
 /********Class Functions ****************************************************/
 
+void cls_webu_mpegts::free_nal()
+{
+    if (nal_info) {
+        free(nal_info);
+        nal_info = nullptr;
+        nal_info_len = 0;
+    }
+}
+
+void cls_webu_mpegts::encode_nal(AVPacket *pkt)
+{
+    // h264_v4l2m2m separates SPS/PPS NAL units from the first frame as a
+    // non-KEY packet. In movie.cpp this packet has pts=0, but in streaming
+    // the first PTS is a real-time value. Use nal_info==nullptr to detect
+    // the first non-KEY packet instead of checking pts==0.
+    if ((nal_info == nullptr) && (!(pkt->flags & AV_PKT_FLAG_KEY))) {
+        nal_info_len = pkt->size;
+        nal_info = (char*)mymalloc((uint)nal_info_len);
+        if (nal_info) {
+            memcpy(nal_info, &pkt->data[0], (uint)nal_info_len);
+        } else {
+            nal_info_len = 0;
+        }
+    } else if (nal_info) {
+        int old_size = pkt->size;
+        av_grow_packet(pkt, nal_info_len);
+        memmove(&pkt->data[nal_info_len], &pkt->data[0], (uint)old_size);
+        memcpy(&pkt->data[0], nal_info, (uint)nal_info_len);
+        free_nal();
+    }
+}
+
+/*Special allocation of video buffer for v4l2m2m codec*/
+int cls_webu_mpegts::alloc_video_buffer(AVFrame *frame, int align)
+{
+    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get((enum AVPixelFormat)frame->format);
+    int ret, i, padded_height;
+    int plane_padding = FFMAX(16 + 16/*STRIDE_ALIGN*/, align);
+
+    if (!desc) {
+        return AVERROR(EINVAL);
+    }
+
+    if ((ret = av_image_check_size(
+            (uint)frame->width, (uint)frame->height
+            , 0, nullptr)) < 0) {
+        return ret;
+    }
+
+    if (!frame->linesize[0]) {
+        if (align <= 0) {
+            align = 32; /* STRIDE_ALIGN. Should be av_cpu_max_align() */
+        }
+
+        for(i=1; i<=align; i+=i) {
+            ret = av_image_fill_linesizes(frame->linesize,(enum AVPixelFormat) frame->format,
+                                          FFALIGN(frame->width, i));
+            if (ret < 0) {
+                return ret;
+            }
+            if (!(frame->linesize[0] & (align-1))) {
+                break;
+            }
+        }
+
+        for (i = 0; i < 4 && frame->linesize[i]; i++)
+            frame->linesize[i] = FFALIGN(frame->linesize[i], align);
+    }
+
+    padded_height = FFALIGN(frame->height, 32);
+    ret = av_image_fill_pointers(frame->data
+            ,(enum AVPixelFormat) frame->format
+            , padded_height
+            , nullptr
+            , frame->linesize);
+    if (ret < 0) {
+        return ret;
+    }
+
+    frame->buf[0] = av_buffer_alloc((uint)(ret + 4*plane_padding));
+    if (!frame->buf[0]) {
+        ret = AVERROR(ENOMEM);
+        av_frame_unref(frame);
+        return ret;
+    }
+    frame->buf[1] = av_buffer_alloc((uint)(ret + 4*plane_padding));
+    if (!frame->buf[1]) {
+        ret = AVERROR(ENOMEM);
+        av_frame_unref(frame);
+        return ret;
+    }
+
+    frame->data[0] = frame->buf[0]->data;
+    frame->data[1] = frame->buf[1]->data;
+    frame->data[2] = frame->data[1] + ((frame->width * padded_height) / 4);
+
+    frame->extended_data = frame->data;
+
+    return 0;
+}
+
 int cls_webu_mpegts::pic_send(unsigned char *img)
 {
     int retcd;
@@ -71,24 +172,53 @@ int cls_webu_mpegts::pic_send(unsigned char *img)
 
     if (picture == NULL) {
         picture = av_frame_alloc();
-        picture->linesize[0] = ctx_codec->width;
-        picture->linesize[1] = ctx_codec->width / 2;
-        picture->linesize[2] = ctx_codec->width / 2;
-
         picture->format = ctx_codec->pix_fmt;
         picture->width  = ctx_codec->width;
         picture->height = ctx_codec->height;
+
+        if (encoder_name == "h264_v4l2m2m") {
+            retcd = alloc_video_buffer(picture, 32);
+            if (retcd < 0) {
+                av_strerror(retcd, errstr, sizeof(errstr));
+                MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO
+                    ,_("Failed to allocate v4l2m2m aligned buffer: %s"), errstr);
+                av_frame_free(&picture);
+                picture = NULL;
+                return -1;
+            }
+        } else {
+            picture->linesize[0] = ctx_codec->width;
+            picture->linesize[1] = ctx_codec->width / 2;
+            picture->linesize[2] = ctx_codec->width / 2;
+        }
 
         picture->pict_type = AV_PICTURE_TYPE_I;
         myframe_key(picture);
         picture->pts = 1;
     }
 
-    picture->data[0] = img;
-    picture->data[1] = picture->data[0] +
-        (ctx_codec->width * ctx_codec->height);
-    picture->data[2] = picture->data[1] +
-        ((ctx_codec->width * ctx_codec->height) / 4);
+    if (encoder_name == "h264_v4l2m2m") {
+        int y;
+        int src_stride = ctx_codec->width;
+        int dst_stride = picture->linesize[0];
+        int src_uv_stride = ctx_codec->width / 2;
+        int dst_uv_stride = picture->linesize[1];
+        unsigned char *src_u = img + (ctx_codec->width * ctx_codec->height);
+        unsigned char *src_v = src_u + (ctx_codec->width * ctx_codec->height / 4);
+
+        for (y = 0; y < ctx_codec->height; y++)
+            memcpy(picture->data[0] + y * dst_stride, img + y * src_stride, src_stride);
+        for (y = 0; y < ctx_codec->height / 2; y++) {
+            memcpy(picture->data[1] + y * dst_uv_stride, src_u + y * src_uv_stride, src_uv_stride);
+            memcpy(picture->data[2] + y * dst_uv_stride, src_v + y * src_uv_stride, src_uv_stride);
+        }
+    } else {
+        picture->data[0] = img;
+        picture->data[1] = picture->data[0] +
+            (ctx_codec->width * ctx_codec->height);
+        picture->data[2] = picture->data[1] +
+            ((ctx_codec->width * ctx_codec->height) / 4);
+    }
 
     clock_gettime(CLOCK_REALTIME, &curr_ts);
     pts_interval = ((1000000L * (curr_ts.tv_sec - start_time.tv_sec)) +
@@ -130,6 +260,10 @@ int cls_webu_mpegts::pic_get()
             ,_("Error receiving encoded packet video:%s"), errstr);
         //Packet is freed upon failure of encoding
         return -1;
+    }
+
+    if (encoder_name == "h264_v4l2m2m") {
+        encode_nal(pkt);
     }
 
     pkt->pts = picture->pts;
@@ -332,7 +466,17 @@ int cls_webu_mpegts::open_mpegts()
     fmtctx->oformat = av_guess_format("mpegts", NULL, NULL);
     fmtctx->video_codec_id = MY_CODEC_ID_H264;
 
-    codec = mycodec_find_encoder(MY_CODEC_ID_H264);
+    codec = avcodec_find_encoder_by_name("h264_v4l2m2m");
+    if (codec != nullptr) {
+        encoder_name = "h264_v4l2m2m";
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+            ,_("Using hardware H.264 encoder (h264_v4l2m2m)"));
+    } else {
+        codec = mycodec_find_encoder(MY_CODEC_ID_H264);
+        encoder_name = codec ? codec->name : "";
+        MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO
+            ,_("Using software H.264 encoder (%s)"), encoder_name.c_str());
+    }
     strm = avformat_new_stream(fmtctx, codec);
 
     if (webua->device_id > 0) {
@@ -357,19 +501,34 @@ int cls_webu_mpegts::open_mpegts()
     ctx_codec->gop_size      = 15;
     ctx_codec->codec_id      = MY_CODEC_ID_H264;
     ctx_codec->codec_type    = AVMEDIA_TYPE_VIDEO;
-    ctx_codec->bit_rate      = webua->cam->cfg->stream_h264_bitrate;
     ctx_codec->width         = img_w;
     ctx_codec->height        = img_h;
     ctx_codec->time_base.num = 1;
     ctx_codec->time_base.den = 90000;
     ctx_codec->pix_fmt       = AV_PIX_FMT_YUV420P;
-    ctx_codec->max_b_frames  = 1;
-    ctx_codec->flags         |= AV_CODEC_FLAG_GLOBAL_HEADER;
     ctx_codec->framerate.num  = 1;
     ctx_codec->framerate.den  = 1;
-    av_opt_set(ctx_codec->priv_data, "profile", "main", 0);
-    av_opt_set(ctx_codec->priv_data, "tune", "zerolatency", 0);
-    av_opt_set(ctx_codec->priv_data, "preset", webua->cam->cfg->stream_h264_preset.c_str(), 0);
+
+    if (encoder_name == "h264_v4l2m2m") {
+        /* v4l2m2m does not properly populate extradata with GLOBAL_HEADER,
+         * so we omit it. SPS/PPS are delivered inline via encode_nal(). */
+        ctx_codec->bit_rate      = webua->cam->cfg->stream_h264_bitrate;
+        ctx_codec->max_b_frames  = 0;
+        ctx_codec->profile       = MY_PROFILE_H264_HIGH;
+        av_dict_set(&opts, "preset", "superfast", 0);
+        av_dict_set(&opts, "tune", "zerolatency", 0);
+    } else {
+        char crf[10];
+        ctx_codec->flags         |= AV_CODEC_FLAG_GLOBAL_HEADER;
+        snprintf(crf, 10, "%d", webua->cam->cfg->stream_h264_quality);
+        ctx_codec->bit_rate      = webua->cam->cfg->stream_h264_bitrate;
+        ctx_codec->max_b_frames  = 0;
+        av_opt_set(ctx_codec->priv_data, "profile", "main", 0);
+        av_opt_set(ctx_codec->priv_data, "crf", crf, 0);
+        av_opt_set(ctx_codec->priv_data, "tune", "zerolatency", 0);
+        av_opt_set(ctx_codec->priv_data, "preset",
+            webua->cam->cfg->stream_h264_preset.c_str(), 0);
+    }
     av_dict_set(&opts, "movflags", "empty_moov", 0);
 
     retcd = avcodec_open2(ctx_codec, codec, &opts);
@@ -475,9 +634,11 @@ cls_webu_mpegts::cls_webu_mpegts(cls_webu_ans *p_webua, cls_webu_stream *p_webus
     webus  = p_webus;
 
     stream_pos    = 0;
-    picture = nullptr;;
+    picture = nullptr;
     ctx_codec = nullptr;
     fmtctx = nullptr;
+    nal_info = nullptr;
+    nal_info_len = 0;
 }
 
 cls_webu_mpegts::~cls_webu_mpegts()
@@ -485,6 +646,7 @@ cls_webu_mpegts::~cls_webu_mpegts()
     app    = nullptr;
     webu   = nullptr;
     webua  = nullptr;
+    free_nal();
     if (picture != nullptr) {
         av_frame_free(&picture);
         picture = nullptr;

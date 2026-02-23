@@ -53,11 +53,18 @@
             struct timespec start_time;     /* Start time of the stream*/
             struct timespec st_mono_time;
 
+            std::string     encoder_name;
+            char            *nal_info;
+            int             nal_info_len;
+
             int pic_send(unsigned char *img);
             int pic_get();
             void resetpos();
             int getimg();
             int open_mpegts();
+            void encode_nal(AVPacket *pkt);
+            void free_nal();
+            int  alloc_video_buffer(AVFrame *frame, int align);
     };
 
 #endif /* _INCLUDE_WEBU_MPEGTS_HPP_ */
