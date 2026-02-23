@@ -284,6 +284,8 @@ struct ctx_parm_cam {
     int             stream_h264_bitrate;
     std::string     stream_h264_preset;
     int             stream_h264_quality;
+    int             substream_quality;
+    int             substream_maxrate;
 
     /* Tracking/PTZ parameters (PARM_CAT_17) */
     bool            ptz_auto_track;

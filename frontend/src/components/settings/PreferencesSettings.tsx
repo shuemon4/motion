@@ -8,6 +8,8 @@ interface Preferences {
   playbackFramerateFactor: number;
   playbackResolutionFactor: number;
   theme: 'dark' | 'light' | 'auto';
+  streamMode: 'mjpeg' | 'mpegts';
+  showStreamStats: boolean;
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -17,6 +19,8 @@ const DEFAULT_PREFERENCES: Preferences = {
   playbackFramerateFactor: 1.0,
   playbackResolutionFactor: 1.0,
   theme: 'dark',
+  streamMode: 'mjpeg',
+  showStreamStats: false,
 };
 
 function loadPreferences(): Preferences {
@@ -115,6 +119,28 @@ export function PreferencesSettings() {
           <div className="text-xs text-gray-400">
             <p>Lower resolution factors reduce bandwidth and improve performance on slow connections.</p>
           </div>
+        </div>
+
+        <div className="border-t border-surface-elevated pt-4">
+          <h4 className="font-medium mb-3">Live Stream</h4>
+
+          <FormSelect
+            label="Stream Mode"
+            value={preferences.streamMode}
+            onChange={(val) => updatePreference('streamMode', val as 'mjpeg' | 'mpegts')}
+            options={[
+              { value: 'mjpeg', label: 'MJPEG (compatible with all browsers)' },
+              { value: 'mpegts', label: 'MPEG-TS / H.264 (lower bandwidth, modern browsers only)' },
+            ]}
+            helpText="MPEG-TS uses H.264 compression for up to 10x lower bandwidth. Falls back to MJPEG automatically on unsupported browsers (iOS < 17.1). Takes effect on next stream load."
+          />
+
+          <FormToggle
+            label="Show Stream Stats"
+            value={preferences.showStreamStats}
+            onChange={(val) => updatePreference('showStreamStats', val)}
+            helpText="Display FPS and client count overlay on live stream. Polls backend every 5 seconds."
+          />
         </div>
 
         <div className="border-t border-surface-elevated pt-4">

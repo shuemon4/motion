@@ -1257,6 +1257,10 @@ void cls_webu_ans::answer_get()
                 webu_json->api_profiles_get();
             }
             mhd_send();
+        } else if (uri_cmd2 == "stream" && uri_cmd3 == "stats") {
+            /* GET /{camId}/api/stream/stats */
+            webu_json->api_stream_stats();
+            mhd_send();
         } else {
             bad_request();
         }

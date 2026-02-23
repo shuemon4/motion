@@ -596,3 +596,123 @@ void cls_webu_json::api_cameras_test_netcam()
         webua->resp_page = "{\"status\":\"error\",\"message\":\"Connection failed\"}";
     }
 }
+
+/* Serialize one ctx_stream_data as a pair of "mjpeg" and "mpegts" JSON objects.
+ * Called under stream.mutex.
+ */
+static std::string stream_stats_one(const ctx_stream_data &sd)
+{
+    char buf[256];
+
+    /* bandwidth = fps * frame_size * 8 / 1000 */
+    double bw = sd.stats.fps_actual * (double)sd.stats.frame_size_bytes * 8.0 / 1000.0;
+
+    snprintf(buf, sizeof(buf),
+        "{\"clients\":%d"
+        ",\"fps_actual\":%.2f"
+        ",\"encode_time_ms\":%.2f"
+        ",\"frame_size_bytes\":%d"
+        ",\"bandwidth_kbps\":%.1f"
+        ",\"frames_served\":%llu"
+        ",\"frames_dropped\":%llu"
+        "}",
+        sd.jpg_cnct,
+        sd.stats.fps_actual,
+        sd.stats.encode_time_ms,
+        sd.stats.frame_size_bytes,
+        bw,
+        (unsigned long long)sd.stats.frames_served.load(std::memory_order_relaxed),
+        (unsigned long long)sd.stats.frames_dropped);
+
+    std::string mjpeg(buf);
+
+    /* MPEG-TS encoding is not yet instrumented; report client count only */
+    snprintf(buf, sizeof(buf),
+        "{\"clients\":%d"
+        ",\"fps_actual\":0,\"encode_time_ms\":0,\"frame_size_bytes\":0"
+        ",\"bandwidth_kbps\":0,\"frames_served\":0,\"frames_dropped\":0}",
+        sd.ts_cnct);
+
+    return "\"mjpeg\":" + mjpeg + ",\"mpegts\":" + std::string(buf);
+}
+
+/* GET /{camId}/api/stream/stats
+ * Returns real-time MJPEG/MPEG-TS streaming metrics for the given camera.
+ */
+void cls_webu_json::api_stream_stats()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    if (webua->cam == NULL) {
+        webua->resp_page = "{\"error\":\"camId 0 not supported; specify a camera ID\"}";
+        return;
+    }
+
+    cls_camera *cam = webua->cam;
+    char buf[256];
+
+    std::string json = "{";
+    snprintf(buf, sizeof(buf), "%d", cam->cfg->device_id);
+    json += "\"camera_id\":";  json += buf;
+    snprintf(buf, sizeof(buf), "%lld", (long long)time(NULL));
+    json += ",\"timestamp\":"; json += buf;
+
+    json += ",\"streams\":{";
+
+    pthread_mutex_lock(&cam->stream.mutex);
+
+    json += "\"norm\":{";   json += stream_stats_one(cam->stream.norm);      json += "}";
+    json += ",\"sub\":{";   json += stream_stats_one(cam->stream.sub);       json += "}";
+    json += ",\"motion\":{"; json += stream_stats_one(cam->stream.motion);   json += "}";
+    json += ",\"source\":{"; json += stream_stats_one(cam->stream.source);   json += "}";
+    json += ",\"secondary\":{"; json += stream_stats_one(cam->stream.secondary); json += "}";
+
+    /* Compute totals while still under mutex */
+    int total_clients =
+        cam->stream.norm.jpg_cnct + cam->stream.norm.ts_cnct +
+        cam->stream.sub.jpg_cnct  + cam->stream.sub.ts_cnct  +
+        cam->stream.motion.jpg_cnct + cam->stream.motion.ts_cnct +
+        cam->stream.source.jpg_cnct + cam->stream.source.ts_cnct +
+        cam->stream.secondary.jpg_cnct + cam->stream.secondary.ts_cnct;
+
+    double total_bw =
+        (cam->stream.norm.stats.fps_actual * (double)cam->stream.norm.stats.frame_size_bytes +
+         cam->stream.sub.stats.fps_actual  * (double)cam->stream.sub.stats.frame_size_bytes  +
+         cam->stream.motion.stats.fps_actual * (double)cam->stream.motion.stats.frame_size_bytes +
+         cam->stream.source.stats.fps_actual * (double)cam->stream.source.stats.frame_size_bytes +
+         cam->stream.secondary.stats.fps_actual * (double)cam->stream.secondary.stats.frame_size_bytes
+        ) * 8.0 / 1000.0;
+
+    uint64_t total_served =
+        cam->stream.norm.stats.frames_served.load(std::memory_order_relaxed) +
+        cam->stream.sub.stats.frames_served.load(std::memory_order_relaxed)  +
+        cam->stream.motion.stats.frames_served.load(std::memory_order_relaxed) +
+        cam->stream.source.stats.frames_served.load(std::memory_order_relaxed) +
+        cam->stream.secondary.stats.frames_served.load(std::memory_order_relaxed);
+
+    uint64_t total_dropped =
+        cam->stream.norm.stats.frames_dropped +
+        cam->stream.sub.stats.frames_dropped  +
+        cam->stream.motion.stats.frames_dropped +
+        cam->stream.source.stats.frames_dropped +
+        cam->stream.secondary.stats.frames_dropped;
+
+    pthread_mutex_unlock(&cam->stream.mutex);
+
+    json += "}";  /* close streams */
+
+    snprintf(buf, sizeof(buf),
+        ",\"totals\":{"
+        "\"total_clients\":%d"
+        ",\"total_bandwidth_kbps\":%.1f"
+        ",\"total_frames_served\":%llu"
+        ",\"total_frames_dropped\":%llu"
+        "}",
+        total_clients, total_bw,
+        (unsigned long long)total_served, (unsigned long long)total_dropped);
+
+    json += buf;
+    json += "}";
+
+    webua->resp_page = json;
+}

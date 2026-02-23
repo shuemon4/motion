@@ -74,6 +74,9 @@
             void api_cameras_delete();       /* DELETE /{camId}/api/cameras */
             void api_cameras_test_netcam();  /* POST /0/api/cameras/test */
 
+            /* Stream statistics API endpoint */
+            void api_stream_stats();         /* GET /{camId}/api/stream/stats */
+
             /* Camera action API endpoints (JSON replacements for legacy POST) */
             void api_config_write();         /* POST /0/api/config/write */
             void api_camera_restart();       /* POST /{camId}/api/camera/restart */

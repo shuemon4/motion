@@ -321,3 +321,39 @@ export interface PtzCapabilities {
   hasZoomOut: boolean;        // ptz_zoom_out non-empty
   hasAnyControl: boolean;     // At least one command is available
 }
+
+// Per-protocol metrics within a stream type
+export interface StreamProtocolStats {
+  clients: number;
+  fps_actual: number;
+  encode_time_ms: number;
+  frame_size_bytes: number;
+  bandwidth_kbps: number;
+  frames_served: number;
+  frames_dropped: number;
+}
+
+// Metrics for one stream type (norm/sub/motion/source/secondary)
+export interface StreamTypeStats {
+  mjpeg: StreamProtocolStats;
+  mpegts: StreamProtocolStats;
+}
+
+// Full response from GET /{camId}/api/stream/stats
+export interface StreamStats {
+  camera_id: number;
+  timestamp: number;
+  streams: {
+    norm: StreamTypeStats;
+    sub: StreamTypeStats;
+    motion: StreamTypeStats;
+    source: StreamTypeStats;
+    secondary: StreamTypeStats;
+  };
+  totals: {
+    total_clients: number;
+    total_bandwidth_kbps: number;
+    total_frames_served: number;
+    total_frames_dropped: number;
+  };
+}

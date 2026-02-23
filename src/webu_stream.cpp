@@ -57,6 +57,9 @@ void cls_webu_stream::set_fps()
     } else if ((webua->cam->detecting_motion == false) &&
         (app->cam_list[webua->camindx]->cfg->stream_motion)) {
         stream_fps = 1;
+    } else if (webua->cnct_type == WEBUI_CNCT_JPG_SUB ||
+               webua->cnct_type == WEBUI_CNCT_TS_SUB) {
+        stream_fps = app->cam_list[webua->camindx]->cfg->substream_maxrate;
     } else {
         stream_fps = app->cam_list[webua->camindx]->cfg->stream_maxrate;
     }
@@ -280,6 +283,7 @@ void cls_webu_stream::mjpeg_one_img()
         memcpy(resp_image + header_len + strm->jpg_sz,"\r\n",2);
         resp_used =(uint)(header_len + strm->jpg_sz + 2);
         strm->consumed = true;
+        strm->stats.frames_served.fetch_add(1, std::memory_order_relaxed);
     pthread_mutex_unlock(&webua->cam->stream.mutex);
 
 }

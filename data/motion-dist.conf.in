@@ -139,6 +139,8 @@ webcontrol_html_path @localstatedir@/lib/@PACKAGE_NAME@/webui
 ;*************************************************
 stream_preview_scale 100
 stream_preview_method combined
+substream_quality 40
+substream_maxrate 10
 
 ;*************************************************
 ;*****   Database
