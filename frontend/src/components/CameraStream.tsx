@@ -1,17 +1,25 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { getStoredRestartTimestamp } from '@/lib/cameraRestart'
 import { PtzControls } from '@/components/PtzControls'
+import { useSnapshotPolling } from '@/hooks/useSnapshotPolling'
 
 interface CameraStreamProps {
   cameraId: number
   className?: string
+  mode?: 'live' | 'snapshot'
+  snapshotInterval?: number
   onStreamFpsChange?: (fps: number) => void
 }
 
 // Custom event name for camera restart notification
 export const CAMERA_RESTARTED_EVENT = 'camera-restarted'
 
-export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
+export function CameraStream({
+  cameraId,
+  className = '',
+  mode = 'live',
+  snapshotInterval = 1000,
+}: CameraStreamProps) {
   // Track the last known restart timestamp to detect changes
   const lastKnownRestartRef = useRef<number>(getStoredRestartTimestamp(cameraId))
 
@@ -24,6 +32,8 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasEverConnected, setHasEverConnected] = useState(false)
+
+  const { snapshotUrl } = useSnapshotPolling(cameraId, snapshotInterval, mode === 'snapshot')
 
   // Force stream reconnection by changing key with exponential backoff
   const handleReconnect = useCallback(() => {
@@ -72,34 +82,61 @@ export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
     return () => clearInterval(intervalId)
   }, [cameraId])
 
-  // Auto-retry on error
+  // Auto-retry on error — live mode only
   useEffect(() => {
-    if (error && !isConnected) {
+    if (mode === 'live' && error && !isConnected) {
       handleReconnect()
     }
-  }, [error, isConnected, handleReconnect])
+  }, [mode, error, isConnected, handleReconnect])
+
+  // Reset connection state when mode changes
+  useEffect(() => {
+    setIsConnected(false)
+    setError(null)
+    // Don't reset hasEverConnected — avoids loading overlay flash on mode switch
+  }, [mode])
 
   const streamUrl = `/${cameraId}/mjpg/stream?k=${streamKey}`
 
   return (
     <div className={`w-full ${className}`}>
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-        <img
-          key={streamKey}
-          src={streamUrl}
-          alt={`Camera ${cameraId} stream`}
-          className="absolute inset-0 w-full h-full object-contain"
-          onLoad={() => {
-            setIsConnected(true)
-            setHasEverConnected(true)
-            setError(null)
-            retryCountRef.current = 0
-          }}
-          onError={() => {
-            setIsConnected(false)
-            setError('Stream unavailable')
-          }}
-        />
+        {mode === 'live' ? (
+          <img
+            key={streamKey}
+            src={streamUrl}
+            alt={`Camera ${cameraId} live`}
+            className="absolute inset-0 w-full h-full object-contain"
+            onLoad={() => {
+              setIsConnected(true)
+              setHasEverConnected(true)
+              setError(null)
+              retryCountRef.current = 0
+            }}
+            onError={() => {
+              setIsConnected(false)
+              setError('Stream unavailable')
+            }}
+          />
+        ) : (
+          <img
+            src={snapshotUrl}
+            alt={`Camera ${cameraId} snapshot`}
+            className="absolute inset-0 w-full h-full object-contain"
+            onLoad={() => {
+              setIsConnected(true)
+              setHasEverConnected(true)
+              setError(null)
+            }}
+            onError={() => {
+              // Don't set error state for transient snapshot failures — next poll will retry.
+              // Only surface error if we've never connected (initial load failure).
+              if (!hasEverConnected) {
+                setError('Camera unavailable')
+              }
+            }}
+          />
+        )}
 
         {/* Error overlay — only shown before first successful connection */}
         {error && !hasEverConnected && (

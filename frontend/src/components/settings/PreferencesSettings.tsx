@@ -5,6 +5,7 @@ interface Preferences {
   gridColumns: number;
   gridRows: number;
   fitFramesVertically: boolean;
+  snapshotInterval: number;
   playbackFramerateFactor: number;
   playbackResolutionFactor: number;
   theme: 'dark' | 'light' | 'auto';
@@ -14,6 +15,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   gridColumns: 2,
   gridRows: 2,
   fitFramesVertically: false,
+  snapshotInterval: 1000,
   playbackFramerateFactor: 1.0,
   playbackResolutionFactor: 1.0,
   theme: 'dark',
@@ -84,6 +86,17 @@ export function PreferencesSettings() {
             value={preferences.fitFramesVertically}
             onChange={(val) => updatePreference('fitFramesVertically', val)}
             helpText="Fit camera frames to viewport height instead of width"
+          />
+
+          <FormSlider
+            label="Grid Snapshot Refresh"
+            value={preferences.snapshotInterval}
+            onChange={(val) => updatePreference('snapshotInterval', val)}
+            min={500}
+            max={5000}
+            step={500}
+            unit="ms"
+            helpText="How often grid cameras refresh their snapshot (500ms–5000ms). Lower values are smoother but use more bandwidth. Takes effect on next dashboard visit."
           />
         </div>
 

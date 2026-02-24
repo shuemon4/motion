@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CameraStream } from '@/components/CameraStream'
 import { BottomSheet } from '@/components/BottomSheet'
@@ -38,6 +38,22 @@ export function Dashboard() {
   const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null)
   // Track streaming FPS per camera (client-side calculated)
   const [streamingFps, setStreamingFps] = useState<Record<number, number>>({})
+  // Track which camera is focused (live MJPEG); null = all snapshots
+  const [focusedCamera, setFocusedCamera] = useState<number | null>(null)
+
+  // Read snapshot interval from stored preferences (default 1000ms)
+  const snapshotInterval = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('motion-ui-preferences')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (typeof parsed.snapshotInterval === 'number') {
+          return parsed.snapshotInterval
+        }
+      }
+    } catch { /* ignore */ }
+    return 1000
+  }, [])
 
   // Get capture FPS from server-provided camera status
   const getCaptureFps = (cameraId: number) => {
@@ -53,6 +69,12 @@ export function Dashboard() {
   const handleStreamingFpsChange = (cameraId: number) => (fps: number) => {
     setStreamingFps((prev) => ({ ...prev, [cameraId]: fps }))
   }
+
+  // Toggle focus on a camera. Ignore clicks on action buttons.
+  const handleCameraClick = useCallback((cameraId: number, e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    setFocusedCamera((prev) => prev === cameraId ? null : cameraId)
+  }, [])
 
   // Fetch config when sheet is open
   const { data: configData } = useQuery({
@@ -156,7 +178,7 @@ export function Dashboard() {
   // Determine layout based on camera count
   const cameraCount = cameras.length
 
-  // Single camera: streamlined layout without extra headers
+  // Single camera: streamlined layout without extra headers — always live
   if (cameraCount === 1) {
     const camera = cameras[0]
     const captureFps = getCaptureFps(camera.id)
@@ -191,7 +213,7 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Camera stream */}
+            {/* Camera stream — always live for single camera */}
             <CameraStream cameraId={camera.id} onStreamFpsChange={handleStreamingFpsChange(camera.id)} />
           </div>
         </div>
@@ -214,7 +236,7 @@ export function Dashboard() {
     )
   }
 
-  // Multiple cameras: responsive grid
+  // Multiple cameras: responsive grid with hybrid snapshot/live mode
   const getGridClasses = () => {
     if (cameraCount === 2) {
       return 'grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6'
@@ -235,17 +257,26 @@ export function Dashboard() {
         {cameras.map((camera) => {
           const captureFps = getCaptureFps(camera.id)
           const streamFps = getStreamingFps(camera.id)
+          const isFocused = focusedCamera === camera.id
           return (
             <div
               key={camera.id}
-              className="bg-surface-elevated rounded-lg overflow-hidden shadow-lg"
+              className={`bg-surface-elevated rounded-lg overflow-hidden shadow-lg cursor-pointer transition-all ${
+                isFocused ? 'ring-2 ring-primary' : ''
+              }`}
               data-camera-id={camera.id}
+              onClick={(e) => handleCameraClick(camera.id, e)}
             >
               {/* Camera header */}
               <div className="px-4 py-3 border-b border-surface flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <div className={`w-2 h-2 rounded-full ${
+                    isFocused ? 'bg-green-500 animate-pulse' : 'bg-blue-400'
+                  }`}></div>
                   <h3 className="font-medium text-sm sm:text-base">{camera.name}</h3>
+                  {!isFocused && (
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider">snapshot</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {camera.width && camera.height && (
@@ -267,8 +298,13 @@ export function Dashboard() {
                 </div>
               </div>
 
-              {/* Camera stream */}
-              <CameraStream cameraId={camera.id} onStreamFpsChange={handleStreamingFpsChange(camera.id)} />
+              {/* Camera stream — live for focused, snapshot for all others */}
+              <CameraStream
+                cameraId={camera.id}
+                mode={isFocused ? 'live' : 'snapshot'}
+                snapshotInterval={snapshotInterval}
+                onStreamFpsChange={handleStreamingFpsChange(camera.id)}
+              />
             </div>
           )
         })}
