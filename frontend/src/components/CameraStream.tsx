@@ -1,125 +1,17 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useMjpegStream } from '@/hooks/useMjpegStream'
-import { useMpegTsStream, isMseSupported } from '@/hooks/useMpegTsStream'
 import { getStoredRestartTimestamp } from '@/lib/cameraRestart'
 import { PtzControls } from '@/components/PtzControls'
-import { useStreamStats } from '@/api/queries'
 
 interface CameraStreamProps {
   cameraId: number
   className?: string
-  onStreamFpsChange?: (fps: number) => void // Callback for streaming FPS updates
+  onStreamFpsChange?: (fps: number) => void
 }
 
 // Custom event name for camera restart notification
 export const CAMERA_RESTARTED_EVENT = 'camera-restarted'
 
-type StreamMode = 'mjpeg' | 'mpegts'
-
-function loadStreamMode(): StreamMode {
-  try {
-    const stored = localStorage.getItem('motion-ui-preferences')
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      if (parsed.streamMode === 'mpegts') return 'mpegts'
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return 'mjpeg'
-}
-
-function loadShowStreamStats(): boolean {
-  try {
-    const stored = localStorage.getItem('motion-ui-preferences')
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      if (typeof parsed.showStreamStats === 'boolean') return parsed.showStreamStats
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return false
-}
-
-// ─── MJPEG sub-component ────────────────────────────────────────────────────
-
-interface MjpegViewProps {
-  cameraId: number
-  streamKey: number
-  onFpsChange: (fps: number) => void
-  onError: (err: string | null) => void
-  onConnected: (connected: boolean) => void
-}
-
-function MjpegView({ cameraId, streamKey, onFpsChange, onError, onConnected }: MjpegViewProps) {
-  const { imageUrl, streamFps, isConnected, error } = useMjpegStream(cameraId, streamKey)
-
-  // Stable callbacks — these must not change identity on each render to
-  // prevent infinite re-render loops from the effects below.
-  const onFpsChangeRef = useRef(onFpsChange)
-  const onErrorRef = useRef(onError)
-  const onConnectedRef = useRef(onConnected)
-  useEffect(() => { onFpsChangeRef.current = onFpsChange })
-  useEffect(() => { onErrorRef.current = onError })
-  useEffect(() => { onConnectedRef.current = onConnected })
-
-  useEffect(() => { onFpsChangeRef.current(streamFps) }, [streamFps])
-  useEffect(() => { onErrorRef.current(error) }, [error])
-  useEffect(() => { onConnectedRef.current(isConnected) }, [isConnected])
-
-  if (!imageUrl) return null
-
-  return (
-    <img
-      src={imageUrl}
-      alt={`Camera ${cameraId} stream`}
-      className="absolute inset-0 w-full h-full object-contain"
-    />
-  )
-}
-
-// ─── MPEG-TS sub-component ──────────────────────────────────────────────────
-
-interface MpegTsViewProps {
-  cameraId: number
-  streamKey: number
-  onFpsChange: (fps: number) => void
-  onError: (err: string | null) => void
-  onConnected: (connected: boolean) => void
-}
-
-function MpegTsView({ cameraId, streamKey, onFpsChange, onError, onConnected }: MpegTsViewProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const { isConnected, error, streamFps } = useMpegTsStream(cameraId, streamKey, videoRef)
-
-  const onFpsChangeRef = useRef(onFpsChange)
-  const onErrorRef = useRef(onError)
-  const onConnectedRef = useRef(onConnected)
-  useEffect(() => { onFpsChangeRef.current = onFpsChange })
-  useEffect(() => { onErrorRef.current = onError })
-  useEffect(() => { onConnectedRef.current = onConnected })
-
-  useEffect(() => { onFpsChangeRef.current(streamFps) }, [streamFps])
-  useEffect(() => { onErrorRef.current(error) }, [error])
-  useEffect(() => { onConnectedRef.current(isConnected) }, [isConnected])
-
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      muted
-      playsInline
-      disableRemotePlayback
-      className="absolute inset-0 w-full h-full object-contain"
-      aria-label={`Camera ${cameraId} stream`}
-    />
-  )
-}
-
-// ─── Main CameraStream component ────────────────────────────────────────────
-
-export function CameraStream({ cameraId, className = '', onStreamFpsChange }: CameraStreamProps) {
+export function CameraStream({ cameraId, className = '' }: CameraStreamProps) {
   // Track the last known restart timestamp to detect changes
   const lastKnownRestartRef = useRef<number>(getStoredRestartTimestamp(cameraId))
 
@@ -127,59 +19,14 @@ export function CameraStream({ cameraId, className = '', onStreamFpsChange }: Ca
   const retryCountRef = useRef<number>(0)
 
   // Initialize streamKey from stored restart timestamp
-  // This ensures fresh connections after navigation back from Settings
   const [streamKey, setStreamKey] = useState(() => getStoredRestartTimestamp(cameraId))
 
-  // Stream connection state (lifted from sub-components via callbacks)
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Track whether we've connected at least once — after that, errors don't
-  // replace the video with a full error screen; they just trigger silent retry.
   const [hasEverConnected, setHasEverConnected] = useState(false)
-
-  // Determine effective stream mode once at mount.
-  // Reads from localStorage, falls back to MJPEG if MSE unavailable.
-  const [effectiveMode] = useState<StreamMode>(() => {
-    const preferred = loadStreamMode()
-    if (preferred === 'mpegts' && !isMseSupported()) return 'mjpeg'
-    return preferred
-  })
-
-  // Was MPEG-TS requested but MSE unavailable? Show a small indicator.
-  const [showFallbackIndicator] = useState<boolean>(() => {
-    return loadStreamMode() === 'mpegts' && !isMseSupported()
-  })
-
-  // Stream stats overlay (user preference)
-  const [showStreamStats] = useState<boolean>(() => loadShowStreamStats())
-  const { data: streamStats } = useStreamStats(cameraId, { enabled: showStreamStats })
-
-  // Store callback in ref to avoid triggering effect when callback reference changes.
-  // Prevents render loops when parent passes inline arrow functions.
-  const onStreamFpsChangeRef = useRef(onStreamFpsChange)
-  useEffect(() => {
-    onStreamFpsChangeRef.current = onStreamFpsChange
-  })
-
-  const handleFpsChange = useCallback((fps: number) => {
-    onStreamFpsChangeRef.current?.(fps)
-  }, [])
-
-  const handleConnected = useCallback((connected: boolean) => {
-    setIsConnected(connected)
-    if (connected) {
-      setHasEverConnected(true)
-      retryCountRef.current = 0
-    }
-  }, [])
-
-  const handleError = useCallback((err: string | null) => {
-    setError(err)
-  }, [])
 
   // Force stream reconnection by changing key with exponential backoff
   const handleReconnect = useCallback(() => {
-    // Exponential backoff: 2s → 4s → 8s → 16s → 30s (max)
     const delay = Math.min(2000 * Math.pow(2, retryCountRef.current), 30000)
     retryCountRef.current++
     setTimeout(() => {
@@ -207,7 +54,6 @@ export function CameraStream({ cameraId, className = '', onStreamFpsChange }: Ca
   }, [cameraId])
 
   // Check for restart timestamp changes on mount and periodically.
-  // Handles cross-navigation restarts, multi-tab scenarios, and edge cases.
   useEffect(() => {
     const checkForRestart = () => {
       const storedTimestamp = getStoredRestartTimestamp(cameraId)
@@ -233,30 +79,27 @@ export function CameraStream({ cameraId, className = '', onStreamFpsChange }: Ca
     }
   }, [error, isConnected, handleReconnect])
 
+  const streamUrl = `/${cameraId}/mjpg/stream?k=${streamKey}`
+
   return (
     <div className={`w-full ${className}`}>
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-        {/*
-         * Sub-components are always rendered so their hooks run and stream
-         * data flows. Loading/error states are z-indexed overlays on top.
-         */}
-        {effectiveMode === 'mjpeg' ? (
-          <MjpegView
-            cameraId={cameraId}
-            streamKey={streamKey}
-            onFpsChange={handleFpsChange}
-            onError={handleError}
-            onConnected={handleConnected}
-          />
-        ) : (
-          <MpegTsView
-            cameraId={cameraId}
-            streamKey={streamKey}
-            onFpsChange={handleFpsChange}
-            onError={handleError}
-            onConnected={handleConnected}
-          />
-        )}
+        <img
+          key={streamKey}
+          src={streamUrl}
+          alt={`Camera ${cameraId} stream`}
+          className="absolute inset-0 w-full h-full object-contain"
+          onLoad={() => {
+            setIsConnected(true)
+            setHasEverConnected(true)
+            setError(null)
+            retryCountRef.current = 0
+          }}
+          onError={() => {
+            setIsConnected(false)
+            setError('Stream unavailable')
+          }}
+        />
 
         {/* Error overlay — only shown before first successful connection */}
         {error && !hasEverConnected && (
@@ -270,8 +113,7 @@ export function CameraStream({ cameraId, className = '', onStreamFpsChange }: Ca
           </div>
         )}
 
-        {/* Loading overlay — shown only during initial connection, not during reconnections.
-         * Once video has played, the <video>/<img> element retains the last frame. */}
+        {/* Loading overlay — shown only during initial connection */}
         {!isConnected && !error && !hasEverConnected && (
           <div className="absolute inset-0 z-10 bg-gray-900">
             <div className="absolute top-4 right-4">
@@ -284,22 +126,6 @@ export function CameraStream({ cameraId, className = '', onStreamFpsChange }: Ca
         )}
 
         <PtzControls cameraId={cameraId} />
-
-        {/* Stream stats overlay: shown when user enables "Show Stream Stats" preference */}
-        {showStreamStats && streamStats && (
-          <div className="absolute top-2 left-2 z-10 text-xs text-white bg-black/60 px-2 py-1 rounded font-mono leading-tight">
-            <span>{streamStats.streams.norm.mjpeg.fps_actual.toFixed(1)} fps</span>
-            <span className="mx-1 text-gray-400">·</span>
-            <span>{streamStats.streams.norm.mjpeg.clients} client{streamStats.streams.norm.mjpeg.clients !== 1 ? 's' : ''}</span>
-          </div>
-        )}
-
-        {/* Fallback indicator: preference was MPEG-TS but MSE unavailable */}
-        {showFallbackIndicator && (
-          <div className="absolute bottom-2 left-2 z-10 text-xs text-gray-400 bg-black/60 px-2 py-1 rounded">
-            MJPEG (H.264 unavailable on this browser)
-          </div>
-        )}
       </div>
     </div>
   )

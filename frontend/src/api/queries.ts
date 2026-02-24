@@ -18,7 +18,6 @@ import type {
   AddCameraRequest,
   TestNetcamRequest,
   PtzCapabilities,
-  StreamStats,
 } from './types';
 
 // Query keys for cache management
@@ -34,7 +33,6 @@ export const queryKeys = {
   cameraStatus: ['cameraStatus'] as const,
   platformInfo: ['platformInfo'] as const,
   detectedCameras: ['detectedCameras'] as const,
-  streamStats: (camId: number) => ['stream-stats', camId] as const,
 };
 
 // Fetch full Motion config (includes cameras list)
@@ -425,19 +423,3 @@ export function useSendPtzCommand() {
   });
 }
 
-// Stream Stats - Poll streaming metrics for a camera
-// enabled prop controls whether polling is active (e.g. tied to a user preference)
-export function useStreamStats(
-  cameraId: number,
-  options?: { enabled?: boolean }
-) {
-  return useQuery({
-    queryKey: queryKeys.streamStats(cameraId),
-    queryFn: () => apiGet<StreamStats>(`/${cameraId}/api/stream/stats`),
-    refetchInterval: 5000,             // Poll every 5 seconds
-    refetchIntervalInBackground: false, // Pause when tab inactive
-    staleTime: 3000,
-    enabled: options?.enabled ?? true,
-    retry: false,
-  });
-}

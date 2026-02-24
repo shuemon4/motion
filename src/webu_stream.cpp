@@ -35,7 +35,6 @@
 #include "webu.hpp"
 #include "webu_ans.hpp"
 #include "webu_stream.hpp"
-#include "webu_mpegts.hpp"
 #include "alg_sec.hpp"
 #include "jpegutils.hpp"
 
@@ -57,8 +56,7 @@ void cls_webu_stream::set_fps()
     } else if ((webua->cam->detecting_motion == false) &&
         (app->cam_list[webua->camindx]->cfg->stream_motion)) {
         stream_fps = 1;
-    } else if (webua->cnct_type == WEBUI_CNCT_JPG_SUB ||
-               webua->cnct_type == WEBUI_CNCT_TS_SUB) {
+    } else if (webua->cnct_type == WEBUI_CNCT_JPG_SUB) {
         stream_fps = app->cam_list[webua->camindx]->cfg->substream_maxrate;
     } else {
         stream_fps = app->cam_list[webua->camindx]->cfg->stream_maxrate;
@@ -283,7 +281,6 @@ void cls_webu_stream::mjpeg_one_img()
         memcpy(resp_image + header_len + strm->jpg_sz,"\r\n",2);
         resp_used =(uint)(header_len + strm->jpg_sz + 2);
         strm->consumed = true;
-        strm->stats.frames_served.fetch_add(1, std::memory_order_relaxed);
     pthread_mutex_unlock(&webua->cam->stream.mutex);
 
 }
@@ -515,104 +512,31 @@ void cls_webu_stream::static_one_img()
 
 }
 
-/* Increment the transport stream counters */
-void cls_webu_stream::ts_cnct()
-{
-    ctx_stream_data *strm;
-
-    if (webua->cam == NULL) {
-        return;
-    } else if (webua->cnct_type == WEBUI_CNCT_TS_SUB) {
-        strm = &webua->cam->stream.sub;
-    } else if (webua->cnct_type == WEBUI_CNCT_TS_MOTION) {
-        strm = &webua->cam->stream.motion;
-    } else if (webua->cnct_type == WEBUI_CNCT_TS_SOURCE) {
-        strm = &webua->cam->stream.source;
-    } else if (webua->cnct_type == WEBUI_CNCT_TS_SECONDARY) {
-        strm = &webua->cam->stream.secondary;
-    } else {
-        strm = &webua->cam->stream.norm;
-    }
-    pthread_mutex_lock(&webua->cam->stream.mutex);
-        /* Check connection limit (0 = unlimited) */
-        if (webua->cam->cfg->stream_max_connections > 0 &&
-            strm->ts_cnct >= webua->cam->cfg->stream_max_connections) {
-            pthread_mutex_unlock(&webua->cam->stream.mutex);
-            MOTION_LOG(NTC, TYPE_STREAM, NO_ERRNO,
-                _("Stream connection limit reached (%d), rejecting new connection"),
-                webua->cam->cfg->stream_max_connections);
-            return;
-        }
-        strm->ts_cnct++;
-    pthread_mutex_unlock(&webua->cam->stream.mutex);
-
-    if (strm->ts_cnct == 1) {
-        /* Poll for first frame instead of unconditional 500ms sleep
-         * Typical first frame appears in 10-30ms on fast hardware
-         */
-        int retries = 0;
-        while (retries < 50) {
-            pthread_mutex_lock(&webua->cam->stream.mutex);
-            bool ready = (strm->img_data != NULL);
-            pthread_mutex_unlock(&webua->cam->stream.mutex);
-            if (ready) break;
-            SLEEP(0, 10000000L);  /* 10ms */
-            retries++;
-        }
-    }
-}
-
 /* Assign the type of stream that is being answered*/
 void cls_webu_stream::set_cnct_type()
 {
-    if (webua->uri_cmd1 == "mpegts") {
-        if (webua->uri_cmd2 == "stream") {
-            webua->cnct_type = WEBUI_CNCT_TS_FULL;
-        } else if (webua->uri_cmd2 == "substream") {
-            webua->cnct_type = WEBUI_CNCT_TS_SUB;
-        } else if (webua->uri_cmd2 == "motion") {
-            webua->cnct_type = WEBUI_CNCT_TS_MOTION;
-        } else if (webua->uri_cmd2 == "source") {
-            webua->cnct_type = WEBUI_CNCT_TS_SOURCE;
-        } else if (webua->uri_cmd2 == "secondary") {
-            if (webua->cam == NULL) {
-                webua->cnct_type = WEBUI_CNCT_UNKNOWN;
-            } else {
-                if (webua->cam->algsec->method != "none") {
-                    webua->cnct_type = WEBUI_CNCT_TS_SECONDARY;
-                } else {
-                    webua->cnct_type = WEBUI_CNCT_UNKNOWN;
-                }
-            }
-        } else if (webua->uri_cmd2 == "") {
-            webua->cnct_type = WEBUI_CNCT_TS_FULL;
-        } else {
+    if (webua->uri_cmd2 == "stream") {
+        webua->cnct_type = WEBUI_CNCT_JPG_FULL;
+    } else if (webua->uri_cmd2 == "substream") {
+        webua->cnct_type = WEBUI_CNCT_JPG_SUB;
+    } else if (webua->uri_cmd2 == "motion") {
+        webua->cnct_type = WEBUI_CNCT_JPG_MOTION;
+    } else if (webua->uri_cmd2 == "source") {
+        webua->cnct_type = WEBUI_CNCT_JPG_SOURCE;
+    } else if (webua->uri_cmd2 == "secondary") {
+        if (webua->cam == NULL) {
             webua->cnct_type = WEBUI_CNCT_UNKNOWN;
+        } else {
+            if (webua->cam->algsec->method != "none") {
+                webua->cnct_type = WEBUI_CNCT_JPG_SECONDARY;
+            } else {
+                webua->cnct_type = WEBUI_CNCT_UNKNOWN;
+            }
         }
+    } else if (webua->uri_cmd2 == "") {
+        webua->cnct_type = WEBUI_CNCT_JPG_FULL;
     } else {
-        if (webua->uri_cmd2 == "stream") {
-            webua->cnct_type = WEBUI_CNCT_JPG_FULL;
-        } else if (webua->uri_cmd2 == "substream") {
-            webua->cnct_type = WEBUI_CNCT_JPG_SUB;
-        } else if (webua->uri_cmd2 == "motion") {
-            webua->cnct_type = WEBUI_CNCT_JPG_MOTION;
-        } else if (webua->uri_cmd2 == "source") {
-            webua->cnct_type = WEBUI_CNCT_JPG_SOURCE;
-        } else if (webua->uri_cmd2 == "secondary") {
-            if (webua->cam == NULL) {
-                webua->cnct_type = WEBUI_CNCT_UNKNOWN;
-            } else {
-                if (webua->cam->algsec->method != "none") {
-                    webua->cnct_type = WEBUI_CNCT_JPG_SECONDARY;
-                } else {
-                    webua->cnct_type = WEBUI_CNCT_UNKNOWN;
-                }
-            }
-        } else if (webua->uri_cmd2 == "") {
-            webua->cnct_type = WEBUI_CNCT_JPG_FULL;
-        } else {
-            webua->cnct_type = WEBUI_CNCT_UNKNOWN;
-        }
+        webua->cnct_type = WEBUI_CNCT_UNKNOWN;
     }
 }
 
@@ -722,19 +646,6 @@ void cls_webu_stream::main()
             all_buffer();
         }
         retcd = stream_mjpeg();
-    } else if (webua->uri_cmd1 == "mpegts") {
-        if (webua->device_id > 0) {
-            ts_cnct();
-        } else {
-            all_cnct();
-        }
-        if (webu_mpegts == nullptr){
-            webu_mpegts = new cls_webu_mpegts(webua, this);
-        }
-        retcd = webu_mpegts->main();
-        if (retcd == MHD_NO) {
-            mydelete(webu_mpegts);
-        }
     }
 
     if (retcd == MHD_NO) {
@@ -748,8 +659,6 @@ cls_webu_stream::cls_webu_stream(cls_webu_ans *p_webua)
     app    = p_webua->app;
     webu   = p_webua->webu;
     webua  = p_webua;
-    webu_mpegts = nullptr;
-
     resp_image    = nullptr;
     resp_size     = 0;
     resp_used     = 0;
@@ -761,8 +670,6 @@ cls_webu_stream::cls_webu_stream(cls_webu_ans *p_webua)
 
 cls_webu_stream::~cls_webu_stream()
 {
-    mydelete(webu_mpegts);
-
     myfree(resp_image);
 
 }

@@ -51,7 +51,6 @@
             cls_motapp      *app;
             cls_webu        *webu;
             cls_webu_ans    *webua;
-            cls_webu_mpegts *webu_mpegts;
 
             size_t          stream_pos;
 
@@ -64,7 +63,6 @@
 
             void all_cnct();
             void jpg_cnct();
-            void ts_cnct();
             void set_cnct_type();
     };
 

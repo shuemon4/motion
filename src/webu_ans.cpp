@@ -34,7 +34,6 @@
 #include "webu.hpp"
 #include "webu_ans.hpp"
 #include "webu_stream.hpp"
-#include "webu_mpegts.hpp"
 #include "webu_json.hpp"
 #include "webu_post.hpp"
 #include "webu_file.hpp"
@@ -844,7 +843,7 @@ mhdrslt cls_webu_ans::mhd_auth()
      * 2. Root page and SPA routes (uri_cmd1 empty): /, /settings, etc.
      * 3. All API endpoints: Use session-based auth, not HTTP Basic/Digest
      *
-     * Only streams (mjpg, mpegts, static) use HTTP auth as fallback for
+     * Only streams (mjpg, static) use HTTP auth as fallback for
      * clients that don't support session tokens.
      */
     if (device_id < 0 || uri_cmd1.empty() || uri_cmd1 == "api" ||
@@ -1148,7 +1147,7 @@ void cls_webu_ans::answer_get()
         return;
     }
 
-    if ((uri_cmd1 == "mjpg") || (uri_cmd1 == "mpegts") ||
+    if ((uri_cmd1 == "mjpg") ||
         (uri_cmd1 == "static")) {
         if (webu_stream == nullptr) {
             webu_stream  = new cls_webu_stream(this);
@@ -1256,10 +1255,6 @@ void cls_webu_ans::answer_get()
                 /* GET /0/api/profiles/{id} */
                 webu_json->api_profiles_get();
             }
-            mhd_send();
-        } else if (uri_cmd2 == "stream" && uri_cmd3 == "stats") {
-            /* GET /{camId}/api/stream/stats */
-            webu_json->api_stream_stats();
             mhd_send();
         } else {
             bad_request();
@@ -1716,20 +1711,15 @@ void cls_webu_ans::deinit_counter()
     for (indx=cam_min; indx<cam_max; indx++) {
         p_cam = app->cam_list[indx];
         pthread_mutex_lock(&p_cam->stream.mutex);
-            if ((cnct_type == WEBUI_CNCT_JPG_FULL) ||
-                (cnct_type == WEBUI_CNCT_TS_FULL)) {
+            if (cnct_type == WEBUI_CNCT_JPG_FULL) {
                 strm = &p_cam->stream.norm;
-            } else if ( (cnct_type == WEBUI_CNCT_JPG_SUB) ||
-                        (cnct_type == WEBUI_CNCT_TS_SUB)) {
+            } else if (cnct_type == WEBUI_CNCT_JPG_SUB) {
                 strm = &p_cam->stream.sub;
-            } else if ( (cnct_type == WEBUI_CNCT_JPG_MOTION) ||
-                        (cnct_type == WEBUI_CNCT_TS_MOTION )) {
+            } else if (cnct_type == WEBUI_CNCT_JPG_MOTION) {
                 strm = &p_cam->stream.motion;
-            } else if ( (cnct_type == WEBUI_CNCT_JPG_SOURCE) ||
-                        (cnct_type == WEBUI_CNCT_TS_SOURCE)) {
+            } else if (cnct_type == WEBUI_CNCT_JPG_SOURCE) {
                 strm = &p_cam->stream.source;
-            } else if ( (cnct_type == WEBUI_CNCT_JPG_SECONDARY) ||
-                        (cnct_type == WEBUI_CNCT_TS_SECONDARY)) {
+            } else if (cnct_type == WEBUI_CNCT_JPG_SECONDARY) {
                 strm = &p_cam->stream.secondary;
             } else {
                 strm = &p_cam->stream.norm;
@@ -1742,17 +1732,9 @@ void cls_webu_ans::deinit_counter()
                 } else if ((device_id > 0) && (strm->jpg_cnct > 0)) {
                     strm->jpg_cnct--;
                 }
-            } else if ((cnct_type > WEBUI_CNCT_TS_MIN) &&
-                (cnct_type < WEBUI_CNCT_TS_MAX)) {
-                if ((device_id == 0) && (strm->all_cnct > 0)) {
-                    strm->all_cnct--;
-                } else if ((device_id > 0) && (strm->ts_cnct > 0)) {
-                    strm->ts_cnct--;
-                }
             }
             if ((strm->all_cnct == 0) &&
                 (strm->jpg_cnct == 0) &&
-                (strm->ts_cnct == 0) &&
                 (p_cam->passflag)) {
                     myfree(strm->img_data);
                     myfree(strm->jpg_data);
@@ -1761,20 +1743,15 @@ void cls_webu_ans::deinit_counter()
     }
     if (device_id == 0) {
         pthread_mutex_lock(&app->allcam->stream.mutex);
-            if ((cnct_type == WEBUI_CNCT_JPG_FULL) ||
-                (cnct_type == WEBUI_CNCT_TS_FULL)) {
+            if (cnct_type == WEBUI_CNCT_JPG_FULL) {
                 strm = &app->allcam->stream.norm;
-            } else if ( (cnct_type == WEBUI_CNCT_JPG_SUB) ||
-                        (cnct_type == WEBUI_CNCT_TS_SUB)) {
+            } else if (cnct_type == WEBUI_CNCT_JPG_SUB) {
                 strm = &app->allcam->stream.sub;
-            } else if ( (cnct_type == WEBUI_CNCT_JPG_MOTION) ||
-                        (cnct_type == WEBUI_CNCT_TS_MOTION )) {
+            } else if (cnct_type == WEBUI_CNCT_JPG_MOTION) {
                 strm = &app->allcam->stream.motion;
-            } else if ( (cnct_type == WEBUI_CNCT_JPG_SOURCE) ||
-                        (cnct_type == WEBUI_CNCT_TS_SOURCE)) {
+            } else if (cnct_type == WEBUI_CNCT_JPG_SOURCE) {
                 strm = &app->allcam->stream.source;
-            } else if ( (cnct_type == WEBUI_CNCT_JPG_SECONDARY) ||
-                        (cnct_type == WEBUI_CNCT_TS_SECONDARY)) {
+            } else if (cnct_type == WEBUI_CNCT_JPG_SECONDARY) {
                 strm = &app->allcam->stream.secondary;
             } else {
                 strm = &app->allcam->stream.norm;

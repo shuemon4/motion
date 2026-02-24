@@ -281,9 +281,6 @@ struct ctx_parm_cam {
     int             stream_max_connections;
     int             stream_scan_time;
     int             stream_scan_scale;
-    int             stream_h264_bitrate;
-    std::string     stream_h264_preset;
-    int             stream_h264_quality;
     int             substream_quality;
     int             substream_maxrate;
 

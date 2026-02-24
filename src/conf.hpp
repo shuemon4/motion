@@ -299,9 +299,6 @@
             int&            stream_max_connections  = parm_cam.stream_max_connections;
             int&            stream_scan_time        = parm_cam.stream_scan_time;
             int&            stream_scan_scale       = parm_cam.stream_scan_scale;
-            int&            stream_h264_bitrate     = parm_cam.stream_h264_bitrate;
-            std::string&    stream_h264_preset      = parm_cam.stream_h264_preset;
-            int&            stream_h264_quality     = parm_cam.stream_h264_quality;
             int&            substream_quality       = parm_cam.substream_quality;
             int&            substream_maxrate       = parm_cam.substream_maxrate;
 

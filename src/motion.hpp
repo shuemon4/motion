@@ -65,7 +65,6 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <thread>
-#include <atomic>
 #include "zlib.h"
 
 #if defined(HAVE_PTHREAD_NP_H)
@@ -126,7 +125,6 @@ class cls_webu;
 class cls_webu_ans;
 class cls_webu_file;
 class cls_webu_json;
-class cls_webu_mpegts;
 class cls_webu_common;
 class cls_webu_stream;
 class cls_thumbnail;
@@ -169,31 +167,13 @@ struct ctx_all_sizes {
     bool    reset;
 };
 
-struct ctx_stream_stats {
-    /* Updated by camera thread under stream.mutex */
-    double      encode_time_ms;         /* Exponential moving average of JPEG encode time */
-    int         frame_size_bytes;       /* Last compressed frame size in bytes */
-    uint64_t    frames_produced;        /* Total frames successfully encoded */
-    uint64_t    frames_dropped;         /* Frames skipped because buffer was not yet consumed */
-
-    /* Updated by web threads (atomic — no mutex needed for this counter) */
-    std::atomic<uint64_t> frames_served; /* Total MJPEG frames sent to clients */
-
-    /* For FPS calculation (camera thread only, under stream.mutex) */
-    struct timespec last_fps_time;
-    uint64_t    last_fps_frame_count;
-    double      fps_actual;
-};
-
 struct ctx_stream_data {
     u_char  *jpg_data;  /* Image compressed as JPG */
     int     jpg_sz;     /* The number of bytes for jpg */
     int     consumed;   /* Bool for whether the jpeg data was consumed*/
     u_char  *img_data;  /* The base data used for image */
     int     jpg_cnct;   /* Counter of the number of jpg connections*/
-    int     ts_cnct;    /* Counter of the number of mpegts connections */
     int     all_cnct;   /* Counter of the number of all camera connections */
-    ctx_stream_stats stats; /* Per-stream-type streaming statistics */
 };
 
 struct ctx_stream {

@@ -737,8 +737,6 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "stream_max_connections") return edit_generic_int(stream_max_connections, parm, pact, 10, 0, 100);
     if (name == "stream_scan_time") return edit_generic_int(stream_scan_time, parm, pact, 5, 0, 3600);
     if (name == "stream_scan_scale") return edit_generic_int(stream_scan_scale, parm, pact, 2, 1, 32);
-    if (name == "stream_h264_bitrate") return edit_generic_int(stream_h264_bitrate, parm, pact, 400000, 10000, 10000000);
-    if (name == "stream_h264_quality") return edit_generic_int(stream_h264_quality, parm, pact, 22, 0, 51);
     if (name == "substream_quality") return edit_generic_int(substream_quality, parm, pact, 40, 1, 100);
     if (name == "substream_maxrate") return edit_generic_int(substream_maxrate, parm, pact, 10, 1, 100);
     if (name == "database_port") return edit_generic_int(database_port, parm, pact, 0, 0, 65535);
@@ -880,9 +878,6 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
 
     static const std::vector<std::string> picture_output_motion_values = {"on","off","roi"};
     if (name == "picture_output_motion") return edit_generic_list(picture_output_motion, parm, pact, "off", picture_output_motion_values);
-
-    static const std::vector<std::string> stream_h264_preset_values = {"ultrafast","superfast","veryfast","faster","fast","medium","slow","slower","veryslow","placebo"};
-    if (name == "stream_h264_preset") return edit_generic_list(stream_h264_preset, parm, pact, "superfast", stream_h264_preset_values);
 
     static const std::vector<std::string> picture_type_values = {"jpg","webp","ppm"};
     if (name == "picture_type") return edit_generic_list(picture_type, parm, pact, "jpg", picture_type_values);

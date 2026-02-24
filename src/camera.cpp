@@ -1615,24 +1615,21 @@ void cls_camera::overlay()
     if ((cfg->smart_mask_speed >0) &&
         ((cfg->picture_output_motion != "off") ||
         cfg->movie_output_motion ||
-        (stream.motion.jpg_cnct > 0) ||
-        (stream.motion.ts_cnct > 0))) {
+        (stream.motion.jpg_cnct > 0))) {
         draw->smartmask();
     }
 
     if (imgs.largest_label &&
         ((cfg->picture_output_motion != "off") ||
         cfg->movie_output_motion ||
-        (stream.motion.jpg_cnct > 0) ||
-        (stream.motion.ts_cnct > 0))) {
+        (stream.motion.jpg_cnct > 0))) {
         draw->largest_label();
     }
 
     if (imgs.mask &&
         ((cfg->picture_output_motion != "off") ||
         cfg->movie_output_motion ||
-        (stream.motion.jpg_cnct > 0) ||
-        (stream.motion.ts_cnct > 0))) {
+        (stream.motion.jpg_cnct > 0))) {
         draw->fixed_mask();
     }
 
@@ -1648,8 +1645,7 @@ void cls_camera::overlay()
                 , tmp, text_scale);
     }
 
-    if ((stream.motion.jpg_cnct > 0) ||
-        (stream.motion.ts_cnct > 0)) {
+    if (stream.motion.jpg_cnct > 0) {
         sprintf(tmp, "D:%5d L:%3d N:%3d", current_image->diffs,
             current_image->total_labels, noise);
         draw->text(imgs.image_motion.image_norm
