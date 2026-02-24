@@ -45,6 +45,7 @@
             std::string     lang;           /* Two character abbreviation for locale language*/
             std::string     auth_role;      /* User role: "admin" or "user" (empty if unauthenticated) */
             std::string     session_token;  /* Session token from X-Session-Token header */
+            std::string     cookie_header;  /* Set-Cookie value, added to response if non-empty */
 
             std::string     url;            /* The URL sent from the client */
             std::string     uri_cmd0;       /* Parsed command from the url eg /cmd0/cmd1/cmd2/cmd3/cmd4 */

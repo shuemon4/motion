@@ -183,6 +183,14 @@ void cls_webu_json::api_auth_login()
     std::string session_token = webu->session_create(role, webua->clientip);
     std::string csrf_token = webu->session_get_csrf(session_token);
 
+    /* Set session cookie for browser stream authentication */
+    webua->cookie_header = "motion_session=" + session_token +
+        "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" +
+        std::to_string(app->cfg->webcontrol_session_timeout);
+    if (app->cfg->webcontrol_tls) {
+        webua->cookie_header += "; Secure";
+    }
+
     /* Return session info */
     webua->resp_page = "{";
     webua->resp_page += "\"session_token\":\"" + session_token + "\",";
@@ -209,6 +217,12 @@ void cls_webu_json::api_auth_logout()
         webu->session_destroy(session_token);
     }
 
+    /* Clear session cookie */
+    webua->cookie_header = "motion_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0";
+    if (app->cfg->webcontrol_tls) {
+        webua->cookie_header += "; Secure";
+    }
+
     webua->resp_page = "{\"success\":true}";
 }
 
@@ -228,6 +242,13 @@ void cls_webu_json::api_auth_status()
         if (webua->session_token.empty()) {
             /* No session yet - create pseudo-session for CSRF */
             std::string new_token = webu->session_create("admin", webua->clientip);
+            /* Set cookie for stream auth even when auth not configured */
+            webua->cookie_header = "motion_session=" + new_token +
+                "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" +
+                std::to_string(app->cfg->webcontrol_session_timeout);
+            if (app->cfg->webcontrol_tls) {
+                webua->cookie_header += "; Secure";
+            }
             webua->resp_page += ",\"authenticated\":true";
             webua->resp_page += ",\"role\":\"admin\"";
             webua->resp_page += ",\"session_token\":\"" + new_token + "\"";
@@ -242,6 +263,13 @@ void cls_webu_json::api_auth_status()
             } else {
                 /* Session expired - create new one */
                 std::string new_token = webu->session_create("admin", webua->clientip);
+                /* Set cookie for stream auth even when auth not configured */
+                webua->cookie_header = "motion_session=" + new_token +
+                    "; HttpOnly; SameSite=Strict; Path=/; Max-Age=" +
+                    std::to_string(app->cfg->webcontrol_session_timeout);
+                if (app->cfg->webcontrol_tls) {
+                    webua->cookie_header += "; Secure";
+                }
                 webua->resp_page += ",\"authenticated\":true";
                 webua->resp_page += ",\"role\":\"admin\"";
                 webua->resp_page += ",\"session_token\":\"" + new_token + "\"";

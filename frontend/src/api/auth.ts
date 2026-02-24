@@ -31,6 +31,7 @@ export async function login(
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
+      credentials: 'same-origin',  // Required for Set-Cookie to be processed
       body: JSON.stringify({ username, password }),
     });
 
@@ -67,6 +68,7 @@ export async function logout(): Promise<void> {
         headers: {
           'X-Session-Token': token,
         },
+        credentials: 'same-origin',  // Required for cookie clearing
       });
     } catch {
       // Ignore errors - clear local session anyway

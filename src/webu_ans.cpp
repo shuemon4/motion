@@ -838,13 +838,13 @@ mhdrslt cls_webu_ans::mhd_auth()
     snprintf(auth_realm, WEBUI_LEN_PARM, "%s","Motion");
 
     /* Allow certain endpoints without HTTP auth so the React SPA can load
-     * and handle authentication itself via session tokens:
+     * and handle authentication itself via session tokens/cookies:
      * 1. Static files (device_id < 0): /assets/* etc.
      * 2. Root page and SPA routes (uri_cmd1 empty): /, /settings, etc.
      * 3. All API endpoints: Use session-based auth, not HTTP Basic/Digest
      *
      * Only streams (mjpg, static) use HTTP auth as fallback for
-     * clients that don't support session tokens.
+     * clients that don't support session tokens or cookies.
      */
     if (device_id < 0 || uri_cmd1.empty() || uri_cmd1 == "api" ||
         uri_cmd1 == "config.json" || uri_cmd1 == "movies.json" ||
@@ -973,6 +973,11 @@ void cls_webu_ans::mhd_send()
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "connect-src 'self'");
+    }
+
+    /* Set session cookie if requested by auth handlers */
+    if (!cookie_header.empty()) {
+        MHD_add_response_header(response, "Set-Cookie", cookie_header.c_str());
     }
 
     /* User-configured headers can override defaults */
@@ -1179,6 +1184,14 @@ void cls_webu_ans::answer_get()
             if (token != nullptr) {
                 session_token = token;
             }
+            /* Fall back to session cookie */
+            if (session_token.empty()) {
+                const char* cookie_token = MHD_lookup_connection_value(
+                    connection, MHD_COOKIE_KIND, "motion_session");
+                if (cookie_token != nullptr) {
+                    session_token = cookie_token;
+                }
+            }
 
             /* Validate session token */
             bool has_valid_session = false;
@@ -1268,6 +1281,13 @@ void cls_webu_ans::answer_get()
             if (token != nullptr) {
                 session_token = token;
             }
+            if (session_token.empty()) {
+                const char* cookie_token = MHD_lookup_connection_value(
+                    connection, MHD_COOKIE_KIND, "motion_session");
+                if (cookie_token != nullptr) {
+                    session_token = cookie_token;
+                }
+            }
             bool has_valid_session = false;
             if (!session_token.empty()) {
                 auth_role = webu->session_validate(session_token, clientip);
@@ -1294,6 +1314,13 @@ void cls_webu_ans::answer_get()
                 connection, MHD_HEADER_KIND, "X-Session-Token");
             if (token != nullptr) {
                 session_token = token;
+            }
+            if (session_token.empty()) {
+                const char* cookie_token = MHD_lookup_connection_value(
+                    connection, MHD_COOKIE_KIND, "motion_session");
+                if (cookie_token != nullptr) {
+                    session_token = cookie_token;
+                }
             }
             bool has_valid_session = false;
             if (!session_token.empty()) {
@@ -1361,36 +1388,49 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
     }
 
     if (authenticated == false) {
-        /* Check for session token in X-Session-Token header */
-        const char* token = MHD_lookup_connection_value(
-            connection, MHD_HEADER_KIND, "X-Session-Token");
-
-        /* Also check query parameter for streams (img/video tags can't send headers) */
-        if (token == nullptr) {
-            token = MHD_lookup_connection_value(
-                connection, MHD_GET_ARGUMENT_KIND, "token");
-        }
-
-        if (token != nullptr) {
-            session_token = token;
-
-            /* Validate and get role from session */
+        /* Priority 1: Check for session cookie (browser streams, <img>/<video> tags) */
+        const char* cookie_token = MHD_lookup_connection_value(
+            connection, MHD_COOKIE_KIND, "motion_session");
+        if (cookie_token != nullptr) {
+            session_token = cookie_token;
             auth_role = webu->session_validate(session_token, clientip);
             if (!auth_role.empty()) {
                 authenticated = true;
                 retcd = MHD_YES;
+            }
+            /* If cookie invalid, fall through to header/param/digest */
+        }
+
+        /* Priority 2: Check X-Session-Token header (React API calls) */
+        if (authenticated == false) {
+            const char* token = MHD_lookup_connection_value(
+                connection, MHD_HEADER_KIND, "X-Session-Token");
+
+            /* Priority 3: Check query parameter (legacy fallback) */
+            if (token == nullptr) {
+                token = MHD_lookup_connection_value(
+                    connection, MHD_GET_ARGUMENT_KIND, "token");
+            }
+
+            if (token != nullptr) {
+                session_token = token;
+                auth_role = webu->session_validate(session_token, clientip);
+                if (!auth_role.empty()) {
+                    authenticated = true;
+                    retcd = MHD_YES;
+                } else {
+                    /* Session invalid/expired - fall through to HTTP auth */
+                    retcd = mhd_auth();
+                    if (authenticated == false) {
+                        return retcd;
+                    }
+                }
             } else {
-                /* Session invalid/expired - fall through to HTTP auth */
+                /* No session token - use HTTP Basic/Digest auth */
                 retcd = mhd_auth();
                 if (authenticated == false) {
                     return retcd;
                 }
-            }
-        } else {
-            /* No session token - use HTTP Basic/Digest auth */
-            retcd = mhd_auth();
-            if (authenticated == false) {
-                return retcd;
             }
         }
     }

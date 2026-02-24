@@ -3,21 +3,17 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCameras, usePictures, useMovies, useMediaFolders, useDeletePicture, useDeleteMovie, useDeleteFolderFiles, useDeleteProgress, queryKeys } from '@/api/queries'
 import { useToast } from '@/components/Toast'
 import { Pagination } from '@/components/Pagination'
-import { getSessionToken } from '@/api/session'
 import { useAuthContext } from '@/contexts/AuthContext'
 import type { MediaItem, FolderFileItem } from '@/api/types'
 
 type MediaType = 'pictures' | 'movies'
 
 /**
- * Append session token to media URL for authentication
- * Required because img/video tags can't send custom headers
+ * Media URL authentication is handled by session cookies.
+ * No query parameter needed — browser sends cookie automatically.
  */
 function getAuthenticatedUrl(url: string): string {
-  const token = getSessionToken()
-  if (!token) return url
-  const separator = url.includes('?') ? '&' : '?'
-  return `${url}${separator}token=${encodeURIComponent(token)}`
+  return url
 }
 type ViewMode = 'all' | 'folders'
 
