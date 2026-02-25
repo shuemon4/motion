@@ -1421,6 +1421,13 @@ void cls_libcam::libcam_stop()
         cam_mgr->stop();
         cam_mgr.reset();
     }
+
+    /* Reset all started flags so repeated libcam_stop() calls are safe */
+    started_aqr = false;
+    started_req = false;
+    started_mgr = false;
+    started_cam = false;
+
     cam->device_status = STATUS_CLOSED;
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "Camera stopped.");
 }
