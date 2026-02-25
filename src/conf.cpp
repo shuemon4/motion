@@ -242,6 +242,7 @@ ctx_parm config_parms[] = {
     {"stream_scan_scale",         PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
     {"substream_quality",         PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  true},
     {"substream_maxrate",         PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  true},
+    {"substream_scale",           PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
 
     /* Category 15 - Database parameters - NOT hot reloadable */
     {"database_type",             PARM_TYP_LIST,   PARM_CAT_15, PARM_LEVEL_ADVANCED, false},
@@ -739,6 +740,7 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "stream_scan_scale") return edit_generic_int(stream_scan_scale, parm, pact, 2, 1, 32);
     if (name == "substream_quality") return edit_generic_int(substream_quality, parm, pact, 40, 1, 100);
     if (name == "substream_maxrate") return edit_generic_int(substream_maxrate, parm, pact, 10, 1, 100);
+    if (name == "substream_scale") return edit_generic_int(substream_scale, parm, pact, 50, 10, 100);
     if (name == "database_port") return edit_generic_int(database_port, parm, pact, 0, 0, 65535);
     if (name == "database_busy_timeout") return edit_generic_int(database_busy_timeout, parm, pact, 0, 0, INT_MAX);
     if (name == "ptz_wait") return edit_generic_int(ptz_wait, parm, pact, 1, 0, INT_MAX);

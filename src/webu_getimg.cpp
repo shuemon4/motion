@@ -40,6 +40,7 @@
 void webu_getimg_init(cls_camera *cam)
 {
     cam->imgs.image_substream = NULL;
+    cam->imgs.image_substream_tmp = NULL;
 
     cam->stream.norm.jpg_sz = 0;
     cam->stream.norm.jpg_data = NULL;
@@ -83,6 +84,7 @@ void webu_getimg_deinit(cls_camera *cam)
 {
     /* NOTE:  This runs on the camera thread. */
     myfree(cam->imgs.image_substream);
+    myfree(cam->imgs.image_substream_tmp);
 
     pthread_mutex_lock(&cam->stream.mutex);
         myfree(cam->stream.norm.jpg_data);
@@ -129,7 +131,7 @@ static void webu_getimg_norm(cls_camera *cam)
 /* Get a substream image from the motion loop and compress it*/
 static void webu_getimg_sub(cls_camera *cam)
 {
-    int subsize;
+    int sub_w, sub_h, subsize, scale;
 
     if ((cam->stream.sub.jpg_cnct == 0) &&
         (cam->stream.sub.all_cnct == 0)) {
@@ -138,40 +140,110 @@ static void webu_getimg_sub(cls_camera *cam)
 
     if (cam->stream.sub.jpg_cnct > 0) {
         if (cam->stream.sub.jpg_data == NULL) {
-            cam->stream.sub.jpg_data =(unsigned char*)
+            cam->stream.sub.jpg_data = (unsigned char*)
                 mymalloc((uint)cam->imgs.size_norm);
         }
         if (cam->current_image->image_norm != NULL && cam->stream.sub.consumed) {
-            /* Resulting substream image must be multiple of 8 */
-            if (((cam->imgs.width  % 16) == 0)  &&
-                ((cam->imgs.height % 16) == 0)) {
+            scale = cam->cfg->substream_scale;
 
-                subsize = ((cam->imgs.width / 2) * (cam->imgs.height / 2) * 3 / 2);
-                if (cam->imgs.image_substream == NULL) {
-                    cam->imgs.image_substream =(unsigned char*)
-                        mymalloc((uint)subsize);
+            /* Calculate target dimensions, rounded down to multiple of 16 */
+            sub_w = ((cam->imgs.width * scale / 100) / 16) * 16;
+            sub_h = ((cam->imgs.height * scale / 100) / 16) * 16;
+
+            /* Validate minimum size; fall back to 50% if too small */
+            if (sub_w < 64 || sub_h < 64) {
+                sub_w = ((cam->imgs.width / 2) / 16) * 16;
+                sub_h = ((cam->imgs.height / 2) / 16) * 16;
+                if (sub_w < 64 || sub_h < 64) {
+                    /* Camera resolution too low — send full resolution */
+                    cam->stream.sub.jpg_sz = cam->picture->put_memory(
+                        cam->stream.sub.jpg_data
+                        , cam->imgs.size_norm
+                        , cam->current_image->image_norm
+                        , cam->cfg->substream_quality
+                        , cam->imgs.width
+                        , cam->imgs.height);
+                    cam->stream.sub.consumed = false;
+                    return;
                 }
-                cam->picture->scale_img(cam->imgs.width
-                    ,cam->imgs.height
-                    ,cam->current_image->image_norm
-                    ,cam->imgs.image_substream);
-                cam->stream.sub.jpg_sz = cam->picture->put_memory(
-                    cam->stream.sub.jpg_data
-                    ,subsize
-                    ,cam->imgs.image_substream
-                    ,cam->cfg->substream_quality
-                    ,(cam->imgs.width / 2)
-                    ,(cam->imgs.height / 2));
-            } else {
-                /* Substream was not multiple of 8 so send full image*/
-                cam->stream.sub.jpg_sz = cam->picture->put_memory(
-                    cam->stream.sub.jpg_data
-                    ,cam->imgs.size_norm
-                    ,cam->current_image->image_norm
-                    ,cam->cfg->substream_quality
-                    ,cam->imgs.width
-                    ,cam->imgs.height);
+                scale = 50;
             }
+
+            subsize = (sub_w * sub_h * 3) / 2;  /* YUV420P */
+
+            /* Allocate substream buffer if needed */
+            if (cam->imgs.image_substream == NULL) {
+                cam->imgs.image_substream = (unsigned char*)
+                    mymalloc((uint)subsize);
+            }
+
+            if (scale == 100) {
+                /* No scaling — JPEG-encode full-resolution image at substream quality */
+                cam->stream.sub.jpg_sz = cam->picture->put_memory(
+                    cam->stream.sub.jpg_data
+                    , cam->imgs.size_norm
+                    , cam->current_image->image_norm
+                    , cam->cfg->substream_quality
+                    , cam->imgs.width
+                    , cam->imgs.height);
+            } else if (scale == 50 &&
+                       (cam->imgs.width % 16 == 0) &&
+                       (cam->imgs.height % 16 == 0)) {
+                /* Fast path: 2x nearest-neighbor downsample */
+                cam->picture->scale_img(cam->imgs.width
+                    , cam->imgs.height
+                    , cam->current_image->image_norm
+                    , cam->imgs.image_substream);
+                cam->stream.sub.jpg_sz = cam->picture->put_memory(
+                    cam->stream.sub.jpg_data
+                    , subsize
+                    , cam->imgs.image_substream
+                    , cam->cfg->substream_quality
+                    , sub_w, sub_h);
+            } else if (scale == 25 &&
+                       (cam->imgs.width % 16 == 0) &&
+                       (cam->imgs.height % 16 == 0)) {
+                /* Fast path: chained 2x downscale (full → half → quarter) */
+                int half_w = ((cam->imgs.width / 2) / 16) * 16;
+                int half_h = ((cam->imgs.height / 2) / 16) * 16;
+                int half_size = (half_w * half_h * 3) / 2;
+
+                if (cam->imgs.image_substream_tmp == NULL) {
+                    cam->imgs.image_substream_tmp = (unsigned char*)
+                        mymalloc((uint)half_size);
+                }
+
+                /* First pass: full → half */
+                cam->picture->scale_img(cam->imgs.width
+                    , cam->imgs.height
+                    , cam->current_image->image_norm
+                    , cam->imgs.image_substream_tmp);
+                /* Second pass: half → quarter */
+                cam->picture->scale_img(half_w, half_h
+                    , cam->imgs.image_substream_tmp
+                    , cam->imgs.image_substream);
+
+                cam->stream.sub.jpg_sz = cam->picture->put_memory(
+                    cam->stream.sub.jpg_data
+                    , subsize
+                    , cam->imgs.image_substream
+                    , cam->cfg->substream_quality
+                    , sub_w, sub_h);
+            } else {
+                /* Arbitrary scale — use FFmpeg sws_scale via util_resize() */
+                util_resize(
+                    cam->current_image->image_norm
+                    , cam->imgs.width, cam->imgs.height
+                    , cam->imgs.image_substream
+                    , sub_w, sub_h);
+                cam->stream.sub.jpg_sz = cam->picture->put_memory(
+                    cam->stream.sub.jpg_data
+                    , subsize
+                    , cam->imgs.image_substream
+                    , cam->cfg->substream_quality
+                    , sub_w, sub_h);
+            }
+
             cam->stream.sub.consumed = false;
         }
     }

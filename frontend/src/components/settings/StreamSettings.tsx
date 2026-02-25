@@ -77,6 +77,45 @@ export function StreamSettings({ config, onChange, getError }: StreamSettingsPro
             helpText="Display motion detection boxes in stream"
           />
 
+          <div className="border-t border-surface-elevated pt-4 mt-4">
+            <h4 className="text-sm font-medium text-gray-300 mb-3">Substream Settings</h4>
+            <div className="text-xs text-gray-400 mb-3">
+              Substream is a lower-resolution version used for grid thumbnails. Lower scale saves bandwidth.
+            </div>
+
+            <FormSelect
+              label="Substream Scale"
+              value={String(getValue('substream_scale', 50))}
+              onChange={(val) => onChange('substream_scale', Number(val))}
+              options={[
+                { value: '25', label: 'Quarter (25%)' },
+                { value: '50', label: 'Half (50%) — Default' },
+                { value: '100', label: 'Full (100%)' },
+              ]}
+              helpText="Resolution scale for substream. Lower = less bandwidth. Requires restart."
+            />
+
+            <FormSlider
+              label="Substream Quality"
+              value={Number(getValue('substream_quality', 40))}
+              onChange={(val) => onChange('substream_quality', val)}
+              min={1}
+              max={100}
+              unit="%"
+              helpText="JPEG quality for substream (1-100). Default: 40."
+            />
+
+            <FormSlider
+              label="Substream Max Framerate"
+              value={Number(getValue('substream_maxrate', 10))}
+              onChange={(val) => onChange('substream_maxrate', val)}
+              min={1}
+              max={30}
+              unit=" fps"
+              helpText="Maximum FPS for substream. Default: 10."
+            />
+          </div>
+
           <FormSelect
             label="Direct Stream Access Security"
             value={String(getValue('webcontrol_auth_method', 0))}

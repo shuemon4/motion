@@ -283,6 +283,7 @@ struct ctx_parm_cam {
     int             stream_scan_scale;
     int             substream_quality;
     int             substream_maxrate;
+    int             substream_scale;      /* Resolution scale percentage (25, 50, 100) */
 
     /* Tracking/PTZ parameters (PARM_CAT_17) */
     bool            ptz_auto_track;

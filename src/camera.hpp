@@ -97,6 +97,7 @@ struct ctx_images {
     u_char *mask;              /* Buffer for the mask file */
     u_char *common_buffer;
     u_char *image_substream;
+    u_char *image_substream_tmp;     /* Intermediate buffer for 25% scale (chained 2x downscale) */
     u_char *image_virgin;            /* Last picture frame with no text or locate overlay */
     u_char *image_vprvcy;            /* Virgin image with the privacy mask applied */
     u_char *mask_privacy;            /* Buffer for the privacy mask values */

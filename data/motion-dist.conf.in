@@ -141,6 +141,13 @@ stream_preview_scale 100
 stream_preview_method combined
 substream_quality 40
 substream_maxrate 10
+; substream_scale 50
+; Percentage to scale substream resolution (10-100, default 50)
+; 50 = half resolution (1920x1080 → 960x540)
+; 25 = quarter resolution (1920x1080 → 480x270)
+; 100 = full resolution (no scaling, just lower quality/framerate)
+; Optimized paths for 25%, 50%, 100%; other values use FFmpeg scaler (higher CPU)
+; Requires restart to take effect (affects buffer allocation)
 
 ;*************************************************
 ;*****   Database

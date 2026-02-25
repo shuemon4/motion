@@ -301,6 +301,7 @@
             int&            stream_scan_scale       = parm_cam.stream_scan_scale;
             int&            substream_quality       = parm_cam.substream_quality;
             int&            substream_maxrate       = parm_cam.substream_maxrate;
+            int&            substream_scale         = parm_cam.substream_scale;
 
             /* Database parameters (-> parm_app) */
             std::string&    database_type           = parm_app.database_type;
