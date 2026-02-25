@@ -174,6 +174,8 @@ struct ctx_stream_data {
     u_char  *img_data;  /* The base data used for image */
     int     jpg_cnct;   /* Counter of the number of jpg connections*/
     int     all_cnct;   /* Counter of the number of all camera connections */
+    struct timespec last_encode_time;  /* Timestamp of last encode */
+    float           encode_fps;        /* Running average FPS */
 };
 
 struct ctx_stream {

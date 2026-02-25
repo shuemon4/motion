@@ -597,3 +597,81 @@ void cls_webu_json::api_cameras_test_netcam()
     }
 }
 
+void cls_webu_json::api_stream_info()
+{
+    cls_camera *p_cam;
+    int indx, cam_min, cam_max;
+
+    webua->resp_page = "{\"stream_info\":{";
+
+    if (webua->device_id == 0) {
+        cam_min = 0;
+        cam_max = app->cam_cnt;
+    } else if (webua->camindx >= 0) {
+        cam_min = webua->camindx;
+        cam_max = cam_min + 1;
+    } else {
+        webua->bad_request();
+        return;
+    }
+
+    for (indx = cam_min; indx < cam_max; indx++) {
+        p_cam = app->cam_list[indx];
+        if (indx > cam_min) webua->resp_page += ",";
+
+        pthread_mutex_lock(&p_cam->stream.mutex);
+
+        webua->resp_page += "\"cam" + std::to_string(p_cam->cfg->device_id) + "\":{";
+
+        /* norm variant */
+        webua->resp_page += "\"norm\":{";
+        webua->resp_page += "\"jpg_cnct\":" + std::to_string(p_cam->stream.norm.jpg_cnct);
+        webua->resp_page += ",\"all_cnct\":" + std::to_string(p_cam->stream.norm.all_cnct);
+        webua->resp_page += ",\"jpg_sz\":" + std::to_string(p_cam->stream.norm.jpg_sz);
+        webua->resp_page += ",\"consumed\":" + std::string(p_cam->stream.norm.consumed ? "true" : "false");
+        webua->resp_page += ",\"fps\":" + std::to_string(
+            p_cam->stream.norm.jpg_cnct > 0 ? p_cam->stream.norm.encode_fps : 0.0f);
+        webua->resp_page += "}";
+
+        /* sub variant */
+        webua->resp_page += ",\"sub\":{";
+        webua->resp_page += "\"jpg_cnct\":" + std::to_string(p_cam->stream.sub.jpg_cnct);
+        webua->resp_page += ",\"all_cnct\":" + std::to_string(p_cam->stream.sub.all_cnct);
+        webua->resp_page += ",\"jpg_sz\":" + std::to_string(p_cam->stream.sub.jpg_sz);
+        webua->resp_page += ",\"consumed\":" + std::string(p_cam->stream.sub.consumed ? "true" : "false");
+        webua->resp_page += ",\"fps\":" + std::to_string(
+            p_cam->stream.sub.jpg_cnct > 0 ? p_cam->stream.sub.encode_fps : 0.0f);
+        webua->resp_page += "}";
+
+        /* motion variant */
+        webua->resp_page += ",\"motion\":{";
+        webua->resp_page += "\"jpg_cnct\":" + std::to_string(p_cam->stream.motion.jpg_cnct);
+        webua->resp_page += ",\"all_cnct\":" + std::to_string(p_cam->stream.motion.all_cnct);
+        webua->resp_page += ",\"jpg_sz\":" + std::to_string(p_cam->stream.motion.jpg_sz);
+        webua->resp_page += ",\"consumed\":" + std::string(p_cam->stream.motion.consumed ? "true" : "false");
+        webua->resp_page += "}";
+
+        /* source variant */
+        webua->resp_page += ",\"source\":{";
+        webua->resp_page += "\"jpg_cnct\":" + std::to_string(p_cam->stream.source.jpg_cnct);
+        webua->resp_page += ",\"all_cnct\":" + std::to_string(p_cam->stream.source.all_cnct);
+        webua->resp_page += ",\"jpg_sz\":" + std::to_string(p_cam->stream.source.jpg_sz);
+        webua->resp_page += ",\"consumed\":" + std::string(p_cam->stream.source.consumed ? "true" : "false");
+        webua->resp_page += "}";
+
+        /* secondary variant */
+        webua->resp_page += ",\"secondary\":{";
+        webua->resp_page += "\"jpg_cnct\":" + std::to_string(p_cam->stream.secondary.jpg_cnct);
+        webua->resp_page += ",\"all_cnct\":" + std::to_string(p_cam->stream.secondary.all_cnct);
+        webua->resp_page += ",\"jpg_sz\":" + std::to_string(p_cam->stream.secondary.jpg_sz);
+        webua->resp_page += ",\"consumed\":" + std::string(p_cam->stream.secondary.consumed ? "true" : "false");
+        webua->resp_page += "}";
+
+        webua->resp_page += "}";
+        pthread_mutex_unlock(&p_cam->stream.mutex);
+    }
+
+    webua->resp_page += "}}";
+    webua->resp_type = WEBUI_RESP_JSON;
+}
+

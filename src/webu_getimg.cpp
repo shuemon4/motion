@@ -124,6 +124,15 @@ static void webu_getimg_norm(cls_camera *cam)
                 ,cam->imgs.width
                 ,cam->imgs.height);
             cam->stream.norm.consumed = false;
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            double elapsed = (double)(now.tv_sec - cam->stream.norm.last_encode_time.tv_sec) +
+                (double)(now.tv_nsec - cam->stream.norm.last_encode_time.tv_nsec) / 1e9;
+            if (elapsed > 0.001 && cam->stream.norm.last_encode_time.tv_sec > 0) {
+                float instant_fps = 1.0f / (float)elapsed;
+                cam->stream.norm.encode_fps = 0.8f * cam->stream.norm.encode_fps + 0.2f * instant_fps;
+            }
+            cam->stream.norm.last_encode_time = now;
         }
     }
 }
@@ -245,6 +254,15 @@ static void webu_getimg_sub(cls_camera *cam)
             }
 
             cam->stream.sub.consumed = false;
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            double elapsed = (double)(now.tv_sec - cam->stream.sub.last_encode_time.tv_sec) +
+                (double)(now.tv_nsec - cam->stream.sub.last_encode_time.tv_nsec) / 1e9;
+            if (elapsed > 0.001 && cam->stream.sub.last_encode_time.tv_sec > 0) {
+                float instant_fps = 1.0f / (float)elapsed;
+                cam->stream.sub.encode_fps = 0.8f * cam->stream.sub.encode_fps + 0.2f * instant_fps;
+            }
+            cam->stream.sub.last_encode_time = now;
         }
     }
 

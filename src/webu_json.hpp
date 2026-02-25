@@ -83,6 +83,7 @@
             void api_camera_event_start();   /* POST /{camId}/api/camera/event/start */
             void api_camera_event_end();     /* POST /{camId}/api/camera/event/end */
             void api_camera_ptz();           /* POST /{camId}/api/camera/ptz */
+            void api_stream_info();          /* GET /{camId}/api/stream/info */
 
         private:
             cls_motapp      *app;
