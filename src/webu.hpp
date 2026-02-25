@@ -28,6 +28,7 @@
 #ifndef _INCLUDE_WEBU_HPP_
 #define _INCLUDE_WEBU_HPP_
 
+    #include <atomic>
     #include <mutex>
     #include <map>
     #include <string>
@@ -137,8 +138,9 @@
             struct MHD_Daemon           *wb_daemon;
             struct MHD_Daemon           *wb_daemon2;
             std::list<ctx_webu_clients> wb_clients;
+            std::mutex                  clients_mtx;    /* Protects wb_clients from concurrent MHD threads */
             std::string                 info_tls;
-            int                         cnct_cnt;
+            std::atomic<int>            cnct_cnt;
             bool                        restart;
             std::string                 csrf_token;     /* CSRF protection token */
 

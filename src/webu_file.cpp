@@ -350,7 +350,7 @@ void cls_webu_file::main() {
                 webua->req_file = nullptr;
             }
             response = MHD_create_response_from_buffer(0, (void *)"",
-                MHD_RESPMEM_PERSISTENT);
+                MHD_RESPMEM_MUST_COPY);
             std::string cr_hdr = "bytes */" + std::to_string(file_size);
             MHD_add_response_header(response, "Content-Range", cr_hdr.c_str());
             retcd = MHD_queue_response(webua->connection,

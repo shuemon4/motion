@@ -124,6 +124,8 @@
 
                 /* Capability discovery storage */
                 const libcamera::ControlInfoMap   *cam_controls;   /* Pointer to camera's supported controls */
+                std::mutex                         capabilities_mtx;  /* Protects cached_capabilities for thread safety */
+                std::map<std::string, bool>        cached_capabilities;  /* Thread-safe cached copy of capability map */
                 std::vector<std::string>           ignored_controls_;  /* Controls that were set but not supported */
 
                 bool    started_cam;

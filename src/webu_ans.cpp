@@ -417,6 +417,8 @@ void cls_webu_ans::failauth_log(bool userid_fail, const std::string &username)
 
     clock_gettime(CLOCK_MONOTONIC, &tm_cnct);
 
+    std::lock_guard<std::mutex> lock(webu->clients_mtx);
+
     /* Track by (IP + username) combination for stronger brute-force protection */
     it = webu->wb_clients.begin();
     while (it != webu->wb_clients.end()) {
@@ -462,6 +464,8 @@ void cls_webu_ans::client_connect()
     }
 
     clock_gettime(CLOCK_MONOTONIC, &tm_cnct);
+
+    std::lock_guard<std::mutex> lock(webu->clients_mtx);
 
     /* SECURITY: Clean out stale entries (TTL-based cleanup)
      * This prevents memory exhaustion from attackers creating many entries
@@ -536,6 +540,8 @@ mhdrslt cls_webu_ans::failauth_check()
     std::list<ctx_webu_clients>::iterator   it;
     std::string                             tmp;
 
+    std::lock_guard<std::mutex> lock(webu->clients_mtx);
+
     if (webu->wb_clients.size() == 0) {
         return MHD_YES;
     }
@@ -582,7 +588,7 @@ mhdrslt cls_webu_ans::mhd_digest_fail(int signal_stale)
         "</head><body>Access denied</body></html>";
 
     response = MHD_create_response_from_buffer(resp_page.length()
-        ,(void *)resp_page.c_str(), MHD_RESPMEM_PERSISTENT);
+        ,(void *)resp_page.c_str(), MHD_RESPMEM_MUST_COPY);
 
     if (response == NULL) {
         return MHD_NO;
@@ -683,7 +689,7 @@ mhdrslt cls_webu_ans::mhd_basic_fail()
         "</head><body>Access denied</body></html>";
 
     response = MHD_create_response_from_buffer(resp_page.length()
-        ,(void *)resp_page.c_str(), MHD_RESPMEM_PERSISTENT);
+        ,(void *)resp_page.c_str(), MHD_RESPMEM_MUST_COPY);
 
     if (response == NULL) {
         return MHD_NO;
@@ -944,15 +950,15 @@ void cls_webu_ans::mhd_send()
             gzip_encode = false;
             resp_page = "Error in gzip response";
             response = MHD_create_response_from_buffer(resp_page.length()
-                ,(void *)resp_page.c_str(), MHD_RESPMEM_PERSISTENT);
+                ,(void *)resp_page.c_str(), MHD_RESPMEM_MUST_COPY);
         } else {
             response = MHD_create_response_from_buffer(
                 gzip_size, (void *)gzip_resp
-                , MHD_RESPMEM_PERSISTENT);
+                , MHD_RESPMEM_MUST_COPY);
         }
     } else {
         response = MHD_create_response_from_buffer(resp_page.length()
-            ,(void *)resp_page.c_str(), MHD_RESPMEM_PERSISTENT);
+            ,(void *)resp_page.c_str(), MHD_RESPMEM_MUST_COPY);
     }
     if (response == NULL) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO, _("Invalid response"));

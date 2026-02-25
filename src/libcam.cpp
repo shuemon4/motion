@@ -434,6 +434,58 @@ void cls_libcam::discover_capabilities()
     if (cam_controls->find(&controls::AwbEnable) != cam_controls->end()) {
         MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO, "  Auto white balance: SUPPORTED");
     }
+
+    /* Build and cache the capability map for thread-safe web API access.
+     * This avoids get_capability_map() having to chase cam_controls,
+     * which becomes dangling when libcam_stop() destroys the camera. */
+    std::map<std::string, bool> caps;
+
+    /* Autofocus controls (Pi Camera v3 / IMX708) */
+    caps["AfMode"] = is_control_supported(&controls::AfMode);
+    caps["LensPosition"] = is_control_supported(&controls::LensPosition);
+    caps["AfTrigger"] = is_control_supported(&controls::AfTrigger);
+    caps["AfRange"] = is_control_supported(&controls::AfRange);
+    caps["AfSpeed"] = is_control_supported(&controls::AfSpeed);
+    caps["AfMetering"] = is_control_supported(&controls::AfMetering);
+
+    /* Exposure controls */
+    caps["ExposureTime"] = is_control_supported(&controls::ExposureTime);
+    caps["ExposureValue"] = is_control_supported(&controls::ExposureValue);
+    caps["AnalogueGain"] = is_control_supported(&controls::AnalogueGain);
+    caps["AeEnable"] = is_control_supported(&controls::AeEnable);
+    caps["AeMeteringMode"] = is_control_supported(&controls::AeMeteringMode);
+    caps["AeConstraintMode"] = is_control_supported(&controls::AeConstraintMode);
+    caps["AeExposureMode"] = is_control_supported(&controls::AeExposureMode);
+    caps["NoiseReductionMode"] = is_control_supported(&controls::draft::NoiseReductionMode);
+
+    /* White balance controls */
+    caps["AwbEnable"] = is_control_supported(&controls::AwbEnable);
+    caps["AwbMode"] = is_control_supported(&controls::AwbMode);
+    caps["AwbLocked"] = is_control_supported(&controls::AwbLocked);
+    caps["ColourGains"] = is_control_supported(&controls::ColourGains);
+    caps["ColourTemperature"] = is_control_supported(&controls::ColourTemperature);
+
+    /* Image quality controls */
+    caps["Brightness"] = is_control_supported(&controls::Brightness);
+    caps["Contrast"] = is_control_supported(&controls::Contrast);
+    caps["Saturation"] = is_control_supported(&controls::Saturation);
+    caps["Sharpness"] = is_control_supported(&controls::Sharpness);
+
+    /* Other controls */
+    caps["DigitalGain"] = is_control_supported(&controls::DigitalGain);
+    caps["ScalerCrop"] = is_control_supported(&controls::ScalerCrop);
+
+    /* NoIR camera overrides */
+    if (is_noir_camera()) {
+        caps["ColourTemperature"] = false;
+        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
+            , "NoIR camera detected - disabling ColourTemperature control");
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(capabilities_mtx);
+        cached_capabilities = std::move(caps);
+    }
 }
 
 /* Check if a specific control is supported by the camera */
@@ -482,56 +534,16 @@ bool cls_libcam::is_noir_camera()
 }
 
 /* Build a map of control names to supported status for JSON API */
+/* Return thread-safe cached copy of capability map.
+ * The map is populated in discover_capabilities() (camera thread)
+ * and may be read concurrently from web server threads via
+ * cls_camera::get_libcam_capabilities() → status_vars().
+ * Using a cached copy avoids dereferencing cam_controls (which
+ * becomes dangling when libcam_stop() destroys the camera). */
 std::map<std::string, bool> cls_libcam::get_capability_map()
 {
-    std::map<std::string, bool> caps;
-
-    /* Autofocus controls (Pi Camera v3 / IMX708) */
-    caps["AfMode"] = is_control_supported(&controls::AfMode);
-    caps["LensPosition"] = is_control_supported(&controls::LensPosition);
-    caps["AfTrigger"] = is_control_supported(&controls::AfTrigger);
-    caps["AfRange"] = is_control_supported(&controls::AfRange);
-    caps["AfSpeed"] = is_control_supported(&controls::AfSpeed);
-    caps["AfMetering"] = is_control_supported(&controls::AfMetering);
-
-    /* Exposure controls */
-    caps["ExposureTime"] = is_control_supported(&controls::ExposureTime);
-    caps["ExposureValue"] = is_control_supported(&controls::ExposureValue);
-    caps["AnalogueGain"] = is_control_supported(&controls::AnalogueGain);
-    caps["AeEnable"] = is_control_supported(&controls::AeEnable);
-    caps["AeMeteringMode"] = is_control_supported(&controls::AeMeteringMode);
-    caps["AeConstraintMode"] = is_control_supported(&controls::AeConstraintMode);
-    caps["AeExposureMode"] = is_control_supported(&controls::AeExposureMode);
-    caps["NoiseReductionMode"] = is_control_supported(&controls::draft::NoiseReductionMode);
-
-    /* White balance controls */
-    caps["AwbEnable"] = is_control_supported(&controls::AwbEnable);
-    caps["AwbMode"] = is_control_supported(&controls::AwbMode);
-    caps["AwbLocked"] = is_control_supported(&controls::AwbLocked);
-    caps["ColourGains"] = is_control_supported(&controls::ColourGains);
-    caps["ColourTemperature"] = is_control_supported(&controls::ColourTemperature);
-
-    /* Image quality controls */
-    caps["Brightness"] = is_control_supported(&controls::Brightness);
-    caps["Contrast"] = is_control_supported(&controls::Contrast);
-    caps["Saturation"] = is_control_supported(&controls::Saturation);
-    caps["Sharpness"] = is_control_supported(&controls::Sharpness);
-
-    /* Other controls */
-    caps["DigitalGain"] = is_control_supported(&controls::DigitalGain);
-    caps["ScalerCrop"] = is_control_supported(&controls::ScalerCrop);
-
-    /* NoIR camera overrides:
-     * NoIR cameras lack an IR filter, so color temperature adjustment
-     * doesn't work properly. Override these capabilities to false.
-     */
-    if (is_noir_camera()) {
-        caps["ColourTemperature"] = false;
-        MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO
-            , "NoIR camera detected - disabling ColourTemperature control");
-    }
-
-    return caps;
+    std::lock_guard<std::mutex> lock(capabilities_mtx);
+    return cached_capabilities;
 }
 
 /* Get list of controls that were ignored because camera doesn't support them */
@@ -1395,6 +1407,17 @@ int cls_libcam::libcam_start()
 void cls_libcam::libcam_stop()
 {
     mydelete(params);
+
+    /* Invalidate cam_controls and cached capabilities BEFORE destroying camera.
+     * cam_controls points into the Camera object's ControlInfoMap.
+     * Web server threads may call get_capability_map() concurrently,
+     * so we must clear the cached copy under lock and nullify the
+     * raw pointer before camera.reset() frees the underlying data. */
+    {
+        std::lock_guard<std::mutex> lock(capabilities_mtx);
+        cam_controls = nullptr;
+        cached_capabilities.clear();
+    }
 
     if (started_aqr) {
         camera->stop();
