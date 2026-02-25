@@ -374,6 +374,10 @@ void cls_webu_stream::all_cnct()
         strm->all_cnct++;
     pthread_mutex_unlock(&app->allcam->stream.mutex);
 
+    MOTION_LOG(INF, TYPE_STREAM, NO_ERRNO,
+        _("Stream opened cam=%d type=%d connections=%d (all-cam)"),
+        webua->device_id, (int)webua->cnct_type, strm->all_cnct);
+
 }
 
 /* Obtain the current image for the camera.*/
@@ -454,6 +458,9 @@ void cls_webu_stream::jpg_cnct()
         strm->jpg_cnct++;
     pthread_mutex_unlock(&webua->cam->stream.mutex);
 
+    MOTION_LOG(INF, TYPE_STREAM, NO_ERRNO,
+        _("Stream opened cam=%d type=%d connections=%d"),
+        webua->cam->cfg->device_id, (int)webua->cnct_type, strm->jpg_cnct);
 
     if (strm->jpg_cnct == 1) {
         /* Poll for first frame instead of unconditional 500ms sleep
@@ -568,7 +575,6 @@ mhdrslt cls_webu_stream::stream_mjpeg()
     MHD_add_response_header(response, "Cache-Control",
         "no-store, no-cache, must-revalidate, max-age=0");
     MHD_add_response_header(response, "Pragma", "no-cache");
-    MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
 
     retcd = MHD_queue_response(webua->connection, MHD_HTTP_OK, response);
     MHD_destroy_response (response);
@@ -609,7 +615,6 @@ mhdrslt cls_webu_stream::stream_static()
     snprintf(resp_head, 20, "%9ld\r\n\r\n",(long)resp_used);
     MHD_add_response_header (response, MHD_HTTP_HEADER_CONTENT_LENGTH, resp_head);
     MHD_add_response_header (response, "Cache-Control", "no-cache, max-age=0");
-    MHD_add_response_header (response, "Access-Control-Allow-Origin", "*");
 
     retcd = MHD_queue_response (webua->connection, MHD_HTTP_OK, response);
     MHD_destroy_response (response);

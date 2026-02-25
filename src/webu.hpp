@@ -180,6 +180,7 @@
             void mhd_opts_localhost();
             void mhd_opts_digest();
             void mhd_opts_tls();
+            void mhd_opts_keepalive();
             void mhd_opts();
             void mhd_flags();
     };

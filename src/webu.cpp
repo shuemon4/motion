@@ -37,6 +37,51 @@
 #include "webu_stream.hpp"
 #include "video_v4l2.hpp"
 #include <cstdio>
+#include <sys/socket.h>
+#include <netinet/tcp.h>
+
+/* Set TCP keepalive options on each accepted connection to detect dead peers in ~40s */
+static void webu_connection_notify(void *cls, struct MHD_Connection *connection,
+    void **socket_context, enum MHD_ConnectionNotificationCode toe)
+{
+    (void)cls;
+    (void)socket_context;
+
+    if (toe == MHD_CONNECTION_NOTIFY_STARTED) {
+        const union MHD_ConnectionInfo *ci;
+        ci = MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CONNECTION_FD);
+        if (ci != NULL) {
+            int fd = (int)ci->connect_fd;
+            int val;
+
+            val = 1;
+            setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
+
+            #ifdef TCP_KEEPIDLE
+                val = 10;   /* Start probing 10s after last data */
+                setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val));
+            #elif defined(TCP_KEEPALIVE)  /* macOS */
+                val = 10;
+                setsockopt(fd, IPPROTO_TCP, TCP_KEEPALIVE, &val, sizeof(val));
+            #endif
+
+            val = 10;   /* Probe every 10s */
+            setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val));
+
+            val = 3;    /* Drop after 3 failed probes */
+            setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val));
+
+            /* Critical: abort connection after 40s of unACKed data.
+             * This works during active retransmission, which keepalive alone cannot detect.
+             * Value = KEEPIDLE + (KEEPINTVL × KEEPCNT) = 10 + (10 × 3) = 40s
+             */
+            #ifdef TCP_USER_TIMEOUT
+                unsigned int timeout_ms = 40000;
+                setsockopt(fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout_ms, sizeof(timeout_ms));
+            #endif
+        }
+    }
+}
 
 /* Initialize the MHD answer */
 static void *webu_mhd_init(void *cls, const char *uri, struct MHD_Connection *connection)
@@ -58,10 +103,34 @@ static void webu_mhd_deinit(void *cls, struct MHD_Connection *connection
 {
     (void)connection;
     (void)cls;
-    (void)toe;
-    cls_webu_ans *webua =(cls_webu_ans *) *con_cls;
+    cls_webu_ans *webua = (cls_webu_ans *) *con_cls;
 
     if (webua != nullptr) {
+        /* Log stream disconnections for diagnostics */
+        if (webua->cnct_type > WEBUI_CNCT_JPG_MIN &&
+            webua->cnct_type < WEBUI_CNCT_JPG_MAX) {
+            const char *reason;
+            switch (toe) {
+                case MHD_REQUEST_TERMINATED_COMPLETED_OK:
+                    reason = "completed"; break;
+                case MHD_REQUEST_TERMINATED_WITH_ERROR:
+                    reason = "error"; break;
+                case MHD_REQUEST_TERMINATED_TIMEOUT_REACHED:
+                    reason = "timeout"; break;
+                case MHD_REQUEST_TERMINATED_DAEMON_SHUTDOWN:
+                    reason = "shutdown"; break;
+                case MHD_REQUEST_TERMINATED_READ_ERROR:
+                    reason = "read_error"; break;
+                case MHD_REQUEST_TERMINATED_CLIENT_ABORT:
+                    reason = "client_abort"; break;
+                default:
+                    reason = "unknown"; break;
+            }
+            MOTION_LOG(INF, TYPE_STREAM, NO_ERRNO,
+                _("Stream closed cam=%d type=%d reason=%s"),
+                webua->device_id, (int)webua->cnct_type, reason);
+        }
+
         if (webua->req_file != nullptr) {
             myfclose(webua->req_file);
             webua->req_file = nullptr;
@@ -340,6 +409,15 @@ void cls_webu::mhd_opts_tls()
 
 }
 
+/* Register TCP keepalive callback to detect stale connections within ~40s */
+void cls_webu::mhd_opts_keepalive()
+{
+    mhdst->mhd_ops[mhdst->mhd_opt_nbr].option = MHD_OPTION_NOTIFY_CONNECTION;
+    mhdst->mhd_ops[mhdst->mhd_opt_nbr].value = (intptr_t)webu_connection_notify;
+    mhdst->mhd_ops[mhdst->mhd_opt_nbr].ptr_value = app;
+    mhdst->mhd_opt_nbr++;
+}
+
 /* Set all the MHD options based upon the configuration parameters*/
 void cls_webu::mhd_opts()
 {
@@ -351,6 +429,7 @@ void cls_webu::mhd_opts()
     mhd_opts_localhost();
     mhd_opts_digest();
     mhd_opts_tls();
+    mhd_opts_keepalive();
 
     mhdst->mhd_ops[mhdst->mhd_opt_nbr].option = MHD_OPTION_END;
     mhdst->mhd_ops[mhdst->mhd_opt_nbr].value = 0;

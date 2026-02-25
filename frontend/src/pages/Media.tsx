@@ -248,7 +248,7 @@ export function Media() {
           movieId: deleteConfirm.id,
         })
       }
-      addToast(`${itemType === 'picture' || itemType === 'pictures' ? 'Picture' : 'Movie'} deleted`, 'success')
+      addToast(`${itemType === 'picture' || itemType === 'pictures' ? 'Picture' : 'Movie'} deleted`, 'success', 1000)
       setDeleteConfirm(null)
       if (selectedItem?.id === deleteConfirm.id) {
         setSelectedItem(null)
