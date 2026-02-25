@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { CameraStream } from '@/components/CameraStream'
 import { BottomSheet } from '@/components/BottomSheet'
 import { QuickSettings } from '@/components/QuickSettings'
@@ -28,6 +29,7 @@ interface DashboardConfig {
 }
 
 export function Dashboard() {
+  const navigate = useNavigate()
   const { data: cameras, isLoading, error } = useCameras()
   const { role, isAuthenticated, authRequired } = useAuthContext()
   // Only poll for camera status when authenticated (or auth not required)
@@ -120,6 +122,14 @@ export function Dashboard() {
     return { ...defaultConfig, ...cameraConfig }
   }, [configData, selectedCameraId])
 
+  // Redirect to Settings when no cameras are configured
+  // This allows users to add cameras (e.g., network cameras) even when hardware is broken
+  useEffect(() => {
+    if (!isLoading && !error && (!cameras || cameras.length === 0)) {
+      navigate('/settings', { replace: true })
+    }
+  }, [cameras, isLoading, error, navigate])
+
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6">
@@ -158,21 +168,9 @@ export function Dashboard() {
     )
   }
 
+  // If no cameras, the useEffect above handles redirect to Settings
   if (!cameras || cameras.length === 0) {
-    return (
-      <div className="p-4 sm:p-6">
-        <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Camera Dashboard</h2>
-        <div className="bg-surface-elevated rounded-lg p-8 text-center max-w-2xl mx-auto">
-          <svg className="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <p className="text-gray-400 text-lg">No cameras configured</p>
-          <p className="text-sm text-gray-500 mt-2">
-            Add cameras in Motion's configuration file
-          </p>
-        </div>
-      </div>
-    )
+    return null
   }
 
   // Determine layout based on camera count

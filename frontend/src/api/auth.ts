@@ -93,9 +93,15 @@ export async function getAuthStatus(): Promise<AuthStatusResponse> {
       }, false);
     }
     return data;
-  } catch {
-    // Auth status endpoint should not 401 (it returns authenticated:false instead)
-    // But if it does (server error), return safe default
+  } catch (err) {
+    // If we still have a session token, the error is a transient server issue
+    // (handleSessionExpired already clears the token on 401 before we get here)
+    // Throw to let TanStack Query keep the previous cached auth state,
+    // so transient errors don't log the user out
+    if (getSessionToken()) {
+      throw err;
+    }
+    // No session token: either 401 cleared it, or user was never logged in
     return { auth_required: true, authenticated: false };
   }
 }

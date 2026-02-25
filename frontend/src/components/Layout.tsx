@@ -2,12 +2,15 @@ import { useState, memo } from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { useCameras } from '@/api/queries'
 import { logout } from '@/api/auth'
 import { SystemStatus, VersionDisplay } from '@/components/SystemStatus'
 
 export const Layout = memo(function Layout() {
   const queryClient = useQueryClient()
   const { isAuthenticated, role, authRequired } = useAuthContext()
+  const { data: cameras } = useCameras()
+  const hasCameras = cameras && cameras.length > 0
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleLogout = async () => {
@@ -30,7 +33,11 @@ export const Layout = memo(function Layout() {
             {/* Desktop navigation */}
             <div className="hidden md:flex items-center gap-6">
               <div className="flex items-center gap-4">
-                <Link to="/" className="hover:text-primary">Dashboard</Link>
+                {hasCameras ? (
+                  <Link to="/" className="hover:text-primary">Dashboard</Link>
+                ) : (
+                  <span className="text-gray-600 cursor-not-allowed" title="No cameras configured">Dashboard</span>
+                )}
                 {role === 'admin' && (
                   <Link to="/settings" className="hover:text-primary">Settings</Link>
                 )}
@@ -84,13 +91,19 @@ export const Layout = memo(function Layout() {
           {mobileMenuOpen && (
             <div className="md:hidden mt-3 pt-3 border-t border-gray-800">
               <div className="flex flex-col gap-2">
-                <Link
-                  to="/"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-3 py-2 rounded-lg hover:bg-surface transition-colors"
-                >
-                  Dashboard
-                </Link>
+                {hasCameras ? (
+                  <Link
+                    to="/"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-3 py-2 rounded-lg hover:bg-surface transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                ) : (
+                  <span className="px-3 py-2 rounded-lg text-gray-600 cursor-not-allowed">
+                    Dashboard
+                  </span>
+                )}
                 {role === 'admin' && (
                   <Link
                     to="/settings"
