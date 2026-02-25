@@ -1088,6 +1088,7 @@ void cls_webu_ans::answer_delete()
         if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", session_token)) {
             MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
                 _("CSRF token validation failed for DELETE from %s"), clientip.c_str());
+            resp_code = 403;
             resp_type = WEBUI_RESP_JSON;
             resp_page = "{\"error\":\"CSRF validation failed\"}";
             mhd_send();

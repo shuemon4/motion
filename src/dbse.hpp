@@ -96,7 +96,7 @@ class cls_dbse {
         void sqlite3db_cb (int arg_nb, char **arg_val, char **col_nm);
         pthread_mutex_t     mutex_dbse;
         void exec(cls_camera *cam, std::string filename, std::string cmd);
-        void exec_sql(std::string sql);
+        bool exec_sql(std::string sql);
         void filelist_add(cls_camera *cam, timespec *ts1, std::string ftyp
             ,std::string filenm, std::string fullnm, std::string dirnm);
         void filelist_get(std::string sql, vec_files &p_flst);
@@ -113,7 +113,7 @@ class cls_dbse {
     private:
         #ifdef HAVE_SQLITE3DB
             sqlite3 *database_sqlite3db;
-            void sqlite3db_exec(std::string sql);
+            bool sqlite3db_exec(std::string sql);
             void sqlite3db_cols_verify();
             void sqlite3db_cols_rename();
             void sqlite3db_init();
@@ -122,7 +122,7 @@ class cls_dbse {
         #endif
         #ifdef HAVE_MARIADB
             MYSQL *database_mariadb;
-            void mariadb_exec(std::string sql);
+            bool mariadb_exec(std::string sql);
             void mariadb_recs(std::string sql);
             void mariadb_cols_verify();
             void mariadb_cols_rename();
@@ -133,7 +133,7 @@ class cls_dbse {
         #endif
         #ifdef HAVE_PGSQLDB
             PGconn *database_pgsqldb;
-            void pgsqldb_exec(std::string sql);
+            bool pgsqldb_exec(std::string sql);
             void pgsqldb_recs(std::string sql);
             void pgsqldb_cols_verify();
             void pgsqldb_cols_rename();

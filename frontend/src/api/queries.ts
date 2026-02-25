@@ -146,10 +146,14 @@ export function useDeleteFolderFiles() {
 
   return useMutation({
     mutationFn: async ({ camId, path }: { camId: number; path: string }) => {
-      return apiDelete<DeleteFolderFilesResponse>(
+      const result = await apiDelete<DeleteFolderFilesResponse & { error?: string }>(
         `/${camId}/api/media/folders/files?path=${encodeURIComponent(path)}`,
         BULK_DELETE_TIMEOUT
       );
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      return result as DeleteFolderFilesResponse;
     },
     onSuccess: (_, { camId, path }) => {
       // Invalidate folder cache for this path and parent
@@ -262,13 +266,18 @@ export function useDeletePicture() {
 
   return useMutation({
     mutationFn: async ({ camId, pictureId }: { camId: number; pictureId: number }) => {
-      return apiDelete<{ success: boolean; deleted_id: number }>(
+      const result = await apiDelete<{ success?: boolean; deleted_id?: number; error?: string }>(
         `/${camId}/api/media/picture/${pictureId}`
       );
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      return result as { success: boolean; deleted_id: number };
     },
     onSuccess: (_, { camId }) => {
-      // Invalidate pictures cache to refetch fresh data
       queryClient.invalidateQueries({ queryKey: queryKeys.pictures(camId) });
+      queryClient.invalidateQueries({ queryKey: ['media-folders', camId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mediaDates(camId, 'pic') });
     },
   });
 }
@@ -279,13 +288,18 @@ export function useDeleteMovie() {
 
   return useMutation({
     mutationFn: async ({ camId, movieId }: { camId: number; movieId: number }) => {
-      return apiDelete<{ success: boolean; deleted_id: number }>(
+      const result = await apiDelete<{ success?: boolean; deleted_id?: number; error?: string }>(
         `/${camId}/api/media/movie/${movieId}`
       );
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      return result as { success: boolean; deleted_id: number };
     },
     onSuccess: (_, { camId }) => {
-      // Invalidate movies cache to refetch fresh data
       queryClient.invalidateQueries({ queryKey: queryKeys.movies(camId) });
+      queryClient.invalidateQueries({ queryKey: ['media-folders', camId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.mediaDates(camId, 'movie') });
     },
   });
 }

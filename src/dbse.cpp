@@ -236,13 +236,16 @@ static int dbse_sqlite3db_cb (void *ptr, int arg_nb, char **arg_val, char **col_
     return 0;
 }
 
-void cls_dbse::sqlite3db_exec(std::string sql)
+bool cls_dbse::sqlite3db_exec(std::string sql)
 {
     int retcd;
     char *errmsg = nullptr;
 
     if ((finish == true) || (database_sqlite3db == nullptr) || (is_open == false)) {
-        return;
+        MOTION_LOG(ERR, TYPE_DB, NO_ERRNO
+            , _("SQLite exec skipped: db not available (finish=%d, ptr=%p, open=%d)")
+            , (int)finish, (void*)database_sqlite3db, (int)is_open);
+        return false;
     }
 
     MOTION_LOG(DBG, TYPE_DB, NO_ERRNO, "Executing query");
@@ -252,8 +255,10 @@ void cls_dbse::sqlite3db_exec(std::string sql)
         MOTION_LOG(ERR, TYPE_DB, NO_ERRNO
             , _("SQLite error was %s"), errmsg);
         sqlite3_free(errmsg);
+        return false;
     }
     MOTION_LOG(DBG, TYPE_DB, NO_ERRNO, "Finished query");
+    return true;
 }
 
 void cls_dbse::sqlite3db_cb (int arg_nb, char **arg_val, char **col_nm)
@@ -470,12 +475,12 @@ void cls_dbse::sqlite3db_close()
 
 #ifdef HAVE_MARIADB
 
-void cls_dbse::mariadb_exec (std::string sql)
+bool cls_dbse::mariadb_exec (std::string sql)
 {
     int retcd;
 
     if ((finish == true) || (database_mariadb == nullptr) || (is_open == false)) {
-        return;
+        return false;
     }
 
     MOTION_LOG(DBG, TYPE_DB, NO_ERRNO, "Executing MariaDB query");
@@ -489,8 +494,8 @@ void cls_dbse::mariadb_exec (std::string sql)
             , retcd);
         if (retcd >= 2000) {
             shutdown();
-            return;
         }
+        return false;
     }
     retcd = mysql_query(database_mariadb, "commit;");
     if (retcd != 0) {
@@ -500,10 +505,10 @@ void cls_dbse::mariadb_exec (std::string sql)
             , mysql_error(database_mariadb), retcd);
         if (retcd >= 2000) {
             shutdown();
-            return;
         }
+        return false;
     }
-
+    return true;
 }
 
 void cls_dbse::mariadb_recs(std::string sql)
@@ -744,12 +749,12 @@ void cls_dbse::mariadb_filelist(std::string sql)
 
 #ifdef HAVE_PGSQLDB
 
-void cls_dbse::pgsqldb_exec(std::string sql)
+bool cls_dbse::pgsqldb_exec(std::string sql)
 {
     PGresult    *res;
 
     if ((database_pgsqldb == nullptr) || (sql == "") || (is_open == false)) {
-        return;
+        return false;
     }
 
     MOTION_LOG(DBG, TYPE_DB, NO_ERRNO, "Executing postgresql query");
@@ -767,7 +772,7 @@ void cls_dbse::pgsqldb_exec(std::string sql)
                 , PQerrorMessage(database_pgsqldb));
             PQclear(res);
             shutdown();
-            return;
+            return false;
         } else {
             MOTION_LOG(INF, TYPE_DB, NO_ERRNO
                 , _("Re-Connection to PostgreSQL database '%s' Succeed")
@@ -779,8 +784,11 @@ void cls_dbse::pgsqldb_exec(std::string sql)
             , sql.c_str()
             , PQresStatus(PQresultStatus(res))
             , PQresultErrorMessage(res));
+        PQclear(res);
+        return false;
     }
     PQclear(res);
+    return true;
 }
 
 void cls_dbse::pgsqldb_close()
@@ -1072,33 +1080,37 @@ void cls_dbse::shutdown()
     #endif
 }
 
-void cls_dbse::exec_sql(std::string sql)
+bool cls_dbse::exec_sql(std::string sql)
 {
+    bool retval = false;
+
     if (dbse_open() == false) {
-        return;
+        return false;
     }
 
     pthread_mutex_lock(&mutex_dbse);
         #ifdef HAVE_MARIADB
             if (app->cfg->database_type == "mariadb") {
-                mariadb_exec(sql);
+                retval = mariadb_exec(sql);
             }
         #endif
         #ifdef HAVE_PGSQLDB
             if (app->cfg->database_type == "postgresql") {
-                pgsqldb_exec(sql);
+                retval = pgsqldb_exec(sql);
             }
         #endif
         #ifdef HAVE_SQLITE3DB
             if (app->cfg->database_type == "sqlite3") {
-                sqlite3db_exec(sql);
+                retval = sqlite3db_exec(sql);
             }
         #endif
         #ifndef HAVE_DBSE
             (void)sql;
+            retval = true;
         #endif
     pthread_mutex_unlock(&mutex_dbse);
 
+    return retval;
 }
 
 void cls_dbse::exec(cls_camera *cam, std::string fname, std::string cmd)

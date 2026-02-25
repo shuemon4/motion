@@ -133,6 +133,7 @@ void cls_webu_json::api_delete_picture()
     vec_files flst;
 
     if (webua->cam == nullptr) {
+        webua->resp_code = 400;
         webua->resp_page = "{\"error\":\"Camera not specified\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -143,6 +144,7 @@ void cls_webu_json::api_delete_picture()
         if (webu->wb_actions->params_array[indx].param_name == "delete") {
             if (webu->wb_actions->params_array[indx].param_value == "off") {
                 MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, "Delete action disabled");
+                webua->resp_code = 403;
                 webua->resp_page = "{\"error\":\"Delete action is disabled\"}";
                 webua->resp_type = WEBUI_RESP_JSON;
                 return;
@@ -153,6 +155,7 @@ void cls_webu_json::api_delete_picture()
 
     /* Get file ID from URI: uri_cmd4 contains the record ID */
     if (webua->uri_cmd4.empty()) {
+        webua->resp_code = 400;
         webua->resp_page = "{\"error\":\"File ID required\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -160,6 +163,7 @@ void cls_webu_json::api_delete_picture()
 
     int file_id = mtoi(webua->uri_cmd4);
     if (file_id <= 0) {
+        webua->resp_code = 400;
         webua->resp_page = "{\"error\":\"Invalid file ID\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -173,6 +177,7 @@ void cls_webu_json::api_delete_picture()
     app->dbse->filelist_get(sql, flst);
 
     if (flst.empty()) {
+        webua->resp_code = 404;
         webua->resp_page = "{\"error\":\"File not found\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -184,15 +189,18 @@ void cls_webu_json::api_delete_picture()
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("Path traversal attempt blocked: %s from %s"),
             full_path.c_str(), webua->clientip.c_str());
+        webua->resp_code = 400;
         webua->resp_page = "{\"error\":\"Invalid file path\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
     }
 
     /* Delete the file from filesystem */
+    errno = 0;
     if (remove(full_path.c_str()) != 0 && errno != ENOENT) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("Failed to delete file: %s"), full_path.c_str());
+        webua->resp_code = 500;
         webua->resp_page = "{\"error\":\"Failed to delete file\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -200,7 +208,14 @@ void cls_webu_json::api_delete_picture()
 
     /* Delete from database */
     sql  = "delete from motion where record_id = " + std::to_string(file_id);
-    app->dbse->exec_sql(sql);
+    if (app->dbse->exec_sql(sql) == false) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO,
+            "Database delete failed for picture id=%d", file_id);
+        webua->resp_code = 500;
+        webua->resp_page = "{\"error\":\"Database delete failed\"}";
+        webua->resp_type = WEBUI_RESP_JSON;
+        return;
+    }
 
     MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
         "Deleted picture: %s (id=%d) by %s",
@@ -217,6 +232,7 @@ void cls_webu_json::api_delete_movie()
     vec_files flst;
 
     if (webua->cam == nullptr) {
+        webua->resp_code = 400;
         webua->resp_page = "{\"error\":\"Camera not specified\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -227,6 +243,7 @@ void cls_webu_json::api_delete_movie()
         if (webu->wb_actions->params_array[indx].param_name == "delete") {
             if (webu->wb_actions->params_array[indx].param_value == "off") {
                 MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, "Delete action disabled");
+                webua->resp_code = 403;
                 webua->resp_page = "{\"error\":\"Delete action is disabled\"}";
                 webua->resp_type = WEBUI_RESP_JSON;
                 return;
@@ -237,6 +254,7 @@ void cls_webu_json::api_delete_movie()
 
     /* Get file ID from URI: uri_cmd4 contains the record ID */
     if (webua->uri_cmd4.empty()) {
+        webua->resp_code = 400;
         webua->resp_page = "{\"error\":\"File ID required\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -244,6 +262,7 @@ void cls_webu_json::api_delete_movie()
 
     int file_id = mtoi(webua->uri_cmd4);
     if (file_id <= 0) {
+        webua->resp_code = 400;
         webua->resp_page = "{\"error\":\"Invalid file ID\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -257,6 +276,7 @@ void cls_webu_json::api_delete_movie()
     app->dbse->filelist_get(sql, flst);
 
     if (flst.empty()) {
+        webua->resp_code = 404;
         webua->resp_page = "{\"error\":\"File not found\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -268,15 +288,18 @@ void cls_webu_json::api_delete_movie()
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("Path traversal attempt blocked: %s from %s"),
             full_path.c_str(), webua->clientip.c_str());
+        webua->resp_code = 400;
         webua->resp_page = "{\"error\":\"Invalid file path\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
     }
 
     /* Delete the file from filesystem */
+    errno = 0;
     if (remove(full_path.c_str()) != 0 && errno != ENOENT) {
         MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
             _("Failed to delete file: %s"), full_path.c_str());
+        webua->resp_code = 500;
         webua->resp_page = "{\"error\":\"Failed to delete file\"}";
         webua->resp_type = WEBUI_RESP_JSON;
         return;
@@ -284,6 +307,7 @@ void cls_webu_json::api_delete_movie()
 
     /* Delete associated thumbnail */
     std::string thumb_path = full_path + ".thumb.jpg";
+    errno = 0;
     if (remove(thumb_path.c_str()) != 0 && errno != ENOENT) {
         MOTION_LOG(NTC, TYPE_STREAM, SHOW_ERRNO,
             _("Could not delete thumbnail: %s"), thumb_path.c_str());
@@ -292,7 +316,14 @@ void cls_webu_json::api_delete_movie()
 
     /* Delete from database */
     sql  = "delete from motion where record_id = " + std::to_string(file_id);
-    app->dbse->exec_sql(sql);
+    if (app->dbse->exec_sql(sql) == false) {
+        MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO,
+            "Database delete failed for movie id=%d", file_id);
+        webua->resp_code = 500;
+        webua->resp_page = "{\"error\":\"Database delete failed\"}";
+        webua->resp_type = WEBUI_RESP_JSON;
+        return;
+    }
 
     MOTION_LOG(INF, TYPE_ALL, NO_ERRNO,
         "Deleted movie: %s (id=%d) by %s",

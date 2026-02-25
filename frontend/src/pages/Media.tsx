@@ -253,8 +253,9 @@ export function Media() {
       if (selectedItem?.id === deleteConfirm.id) {
         setSelectedItem(null)
       }
-    } catch {
-      addToast('Failed to delete file', 'error')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete file'
+      addToast(message, 'error')
     }
   }, [deleteConfirm, mediaType, selectedCamera, deletePictureMutation, deleteMovieMutation, addToast, selectedItem])
 
