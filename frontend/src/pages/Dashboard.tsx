@@ -57,6 +57,18 @@ export function Dashboard() {
     return 1000
   }, [])
 
+  // Read gridMode from stored preferences (default 'snapshot')
+  const gridMode = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('motion-ui-preferences')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed.gridMode === 'substream') return 'substream' as const
+      }
+    } catch { /* ignore */ }
+    return 'snapshot' as const
+  }, [])
+
   // Get capture FPS from server-provided camera status
   const getCaptureFps = (cameraId: number) => {
     return cameraStatuses?.find((c) => c.id === cameraId)?.fps ?? 0
@@ -269,11 +281,14 @@ export function Dashboard() {
               <div className="px-4 py-3 border-b border-surface flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${
-                    isFocused ? 'bg-green-500 animate-pulse' : 'bg-blue-400'
+                    isFocused ? 'bg-green-500 animate-pulse' :
+                    gridMode === 'substream' ? 'bg-cyan-400' : 'bg-blue-400'
                   }`}></div>
                   <h3 className="font-medium text-sm sm:text-base">{camera.name}</h3>
                   {!isFocused && (
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wider">snapshot</span>
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+                      {gridMode === 'substream' ? 'substream' : 'snapshot'}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
@@ -299,7 +314,7 @@ export function Dashboard() {
               {/* Camera stream — live for focused, snapshot for all others */}
               <CameraStream
                 cameraId={camera.id}
-                mode={isFocused ? 'live' : 'snapshot'}
+                mode={isFocused ? 'live' : gridMode}
                 snapshotInterval={snapshotInterval}
                 onStreamFpsChange={handleStreamingFpsChange(camera.id)}
               />

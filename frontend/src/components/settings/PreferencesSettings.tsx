@@ -9,6 +9,7 @@ interface Preferences {
   playbackFramerateFactor: number;
   playbackResolutionFactor: number;
   theme: 'dark' | 'light' | 'auto';
+  gridMode: 'snapshot' | 'substream';
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -19,6 +20,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   playbackFramerateFactor: 1.0,
   playbackResolutionFactor: 1.0,
   theme: 'dark',
+  gridMode: 'snapshot',
 };
 
 function loadPreferences(): Preferences {
@@ -97,6 +99,17 @@ export function PreferencesSettings() {
             step={500}
             unit="ms"
             helpText="How often grid cameras refresh their snapshot (500ms–5000ms). Lower values are smoother but use more bandwidth. Takes effect on next dashboard visit."
+          />
+
+          <FormSelect
+            label="Grid Camera Mode"
+            value={preferences.gridMode}
+            onChange={(val) => updatePreference('gridMode', val as 'snapshot' | 'substream')}
+            options={[
+              { value: 'snapshot', label: 'Snapshot (Low Bandwidth)' },
+              { value: 'substream', label: 'Substream (Smooth Video)' },
+            ]}
+            helpText="Snapshot polls once per second (low bandwidth, choppy). Substream uses continuous MJPEG at reduced resolution (smooth, slightly more bandwidth). Takes effect on next dashboard visit."
           />
         </div>
 

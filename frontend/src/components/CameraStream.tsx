@@ -6,7 +6,7 @@ import { useSnapshotPolling } from '@/hooks/useSnapshotPolling'
 interface CameraStreamProps {
   cameraId: number
   className?: string
-  mode?: 'live' | 'snapshot'
+  mode?: 'live' | 'snapshot' | 'substream'
   snapshotInterval?: number
   onStreamFpsChange?: (fps: number) => void
 }
@@ -82,9 +82,9 @@ export function CameraStream({
     return () => clearInterval(intervalId)
   }, [cameraId])
 
-  // Auto-retry on error — live mode only
+  // Auto-retry on error — live and substream modes
   useEffect(() => {
-    if (mode === 'live' && error && !isConnected) {
+    if ((mode === 'live' || mode === 'substream') && error && !isConnected) {
       handleReconnect()
     }
   }, [mode, error, isConnected, handleReconnect])
@@ -97,11 +97,29 @@ export function CameraStream({
   }, [mode])
 
   const streamUrl = `/${cameraId}/mjpg/stream?k=${streamKey}`
+  const substreamUrl = `/${cameraId}/mjpg/substream?k=${streamKey}`
 
   return (
     <div className={`w-full ${className}`}>
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-        {mode === 'live' ? (
+        {mode === 'substream' ? (
+          <img
+            key={streamKey}
+            src={substreamUrl}
+            alt={`Camera ${cameraId} substream`}
+            className="absolute inset-0 w-full h-full object-contain"
+            onLoad={() => {
+              setIsConnected(true)
+              setHasEverConnected(true)
+              setError(null)
+              retryCountRef.current = 0
+            }}
+            onError={() => {
+              setIsConnected(false)
+              setError('Stream unavailable')
+            }}
+          />
+        ) : mode === 'live' ? (
           <img
             key={streamKey}
             src={streamUrl}
