@@ -292,6 +292,16 @@ void cls_motapp::av_init()
     #if (LIBAVDEVICE_VERSION_MAJOR < 61)
         avdevice_register_all();
     #endif
+
+    /* Probe hardware encoder availability by actually opening each encoder.
+     * avcodec_find_encoder_by_name() alone returns a valid codec on Pi 5
+     * (false positive) because FFmpeg is built with v4l2 support. Only
+     * avcodec_open2() correctly detects whether the hardware is present. */
+    hw_encoders.h264_v4l2m2m = movie_probe_hw_encoder("h264_v4l2m2m");
+    hw_encoders.probed = true;
+    MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+        ,_("Hardware encoder probe: h264_v4l2m2m=%s")
+        , hw_encoders.h264_v4l2m2m ? "available" : "not available");
 }
 
 void cls_motapp::av_deinit()
@@ -547,6 +557,7 @@ void cls_motapp::init(int p_argc, char *p_argv[])
     schedule = nullptr;
     cam_list.clear();
     snd_list.clear();
+    hw_encoders = {false, false};
 
 
     pthread_mutex_init(&mutex_camlst, NULL);

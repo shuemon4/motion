@@ -222,6 +222,7 @@ export interface CameraStatus {
   detecting: boolean;
   pause: boolean;
   user_pause: string;
+  hw_encoder_fallback: boolean;            // true if HW encoder failed and fell back to SW
   // Type-specific fields
   camera_type: CameraType;
   camera_device: string;

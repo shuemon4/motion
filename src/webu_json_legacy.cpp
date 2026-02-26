@@ -285,6 +285,12 @@ void cls_webu_json::status_vars(int indx_cam)
 
     webua->resp_page += ",\"user_pause\":\"" + cam->user_pause +"\"";
 
+    if (cam->hw_encoder_fallback) {
+        webua->resp_page += ",\"hw_encoder_fallback\":true";
+    } else {
+        webua->resp_page += ",\"hw_encoder_fallback\":false";
+    }
+
     /* Add supportedControls for libcamera capability discovery */
     #ifdef HAVE_LIBCAM
     if (cam->has_libcam()) {

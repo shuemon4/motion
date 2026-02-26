@@ -190,6 +190,12 @@ struct ctx_stream {
 /* Forward declaration for delete progress tracking (defined in webu.hpp) */
 struct ctx_delete_progress;
 
+/* Hardware encoder availability (probed at startup, cached) */
+struct ctx_hw_encoders {
+    bool h264_v4l2m2m;  /* true if v4l2m2m H.264 hardware encoder is available */
+    bool probed;        /* true after startup probe completes */
+};
+
 class cls_motapp {
     public:
         cls_motapp();
@@ -224,6 +230,9 @@ class cls_motapp {
         /* Delete progress tracking */
         std::map<std::string, ctx_delete_progress> delete_progress_map;
         pthread_mutex_t     mutex_delete_progress;
+
+        /* Hardware encoder availability (probed once at startup) */
+        ctx_hw_encoders     hw_encoders;
 
         void signal_process();
         void cleanup_delete_progress();

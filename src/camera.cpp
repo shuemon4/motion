@@ -647,6 +647,7 @@ void cls_camera::init_values()
     postcap = 0;
     picture_event_count = 0;
     picture_last_ts = {0, 0};
+    hw_encoder_fallback = false;
     event_stop = false;
     text_scale = cfg->text_scale;
     connectionlosttime.tv_sec = 0;

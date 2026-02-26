@@ -222,6 +222,7 @@ class cls_camera {
 
         int                     picture_event_count;    /* pictures saved in current event */
         struct timespec         picture_last_ts;        /* timestamp of last picture saved */
+        bool                    hw_encoder_fallback;    /* true if HW encoder failed and fell back to software */
 
         enum DEVICE_STATUS      device_status;
         enum CAMERA_TYPE        camera_type;

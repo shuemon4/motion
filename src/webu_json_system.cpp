@@ -178,17 +178,12 @@ void cls_webu_json::api_system_status()
         fclose(file);
     }
 
-    /* Hardware Encoder Availability */
-    {
-        const AVCodec *codec_check;
-        webua->resp_page += "\"hardware_encoders\":{";
-
-        /* Check for V4L2 M2M H.264 encoder (Pi 4 only) */
-        codec_check = avcodec_find_encoder_by_name("h264_v4l2m2m");
-        webua->resp_page += "\"h264_v4l2m2m\":" + std::string(codec_check ? "true" : "false");
-
-        webua->resp_page += "},";
-    }
+    /* Hardware Encoder Availability - use startup probe result (not
+     * avcodec_find_encoder_by_name which gives false positives on Pi 5) */
+    webua->resp_page += "\"hardware_encoders\":{";
+    webua->resp_page += "\"h264_v4l2m2m\":" +
+        std::string(app->hw_encoders.h264_v4l2m2m ? "true" : "false");
+    webua->resp_page += "},";
 
     /* Webcontrol Actions Status */
     webua->resp_page += "\"actions\":{";

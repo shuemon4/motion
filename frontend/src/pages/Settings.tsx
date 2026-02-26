@@ -518,6 +518,7 @@ export function Settings() {
             onChange={handleChange}
             getError={getError}
             showPassthrough={cameraInfo.features.supportsPassthrough}
+            cameraId={Number(selectedCamera)}
           />
 
           {/* 5. Video Streaming */}

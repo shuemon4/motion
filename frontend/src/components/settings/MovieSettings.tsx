@@ -8,16 +8,24 @@ import {
 } from '@/utils/parameterMappings';
 import { recordingModeToMotion, motionToRecordingMode } from '@/utils/translations';
 import { useDeviceInfo, isPi5, isPi4, hasHardwareEncoder, isHighTemperature } from '@/hooks/useDeviceInfo';
+import { useSystemStatus } from '@/api/queries';
 
 export interface MovieSettingsProps {
   config: Record<string, { value: string | number | boolean }>;
   onChange: (param: string, value: string | number | boolean) => void;
   getError?: (param: string) => string | undefined;
   showPassthrough?: boolean;
+  cameraId?: number;
 }
 
-export function MovieSettings({ config, onChange, getError, showPassthrough = true }: MovieSettingsProps) {
+export function MovieSettings({ config, onChange, getError, showPassthrough = true, cameraId }: MovieSettingsProps) {
   const { data: deviceInfo } = useDeviceInfo();
+  const { data: systemStatus } = useSystemStatus();
+
+  // Check if this camera has had an HW encoder fallback during a recent recording
+  const hwEncoderFallback = cameraId !== undefined
+    ? systemStatus?.status?.[`cam${cameraId}` as `cam${number}`]?.hw_encoder_fallback === true
+    : false;
 
   const getValue = (param: string, defaultValue: string | number | boolean = '') => {
     return config[param]?.value ?? defaultValue;
@@ -135,6 +143,15 @@ export function MovieSettings({ config, onChange, getError, showPassthrough = tr
           options={getAvailableContainers()}
           helpText="Video container format. Hardware encoding requires v4l2m2m support."
         />
+
+        {/* Hardware encoder fallback warning - shown when HW encoder failed and fell back to SW */}
+        {hwEncoderFallback && (
+          <div className="text-xs text-amber-400 bg-amber-950/30 p-3 rounded mt-2">
+            <strong>Hardware Encoder Fallback:</strong> The hardware H.264 encoder (h264_v4l2m2m)
+            failed during a recent recording and fell back to software encoding. Check system logs
+            for details. If this persists, consider switching to a software encoder.
+          </div>
+        )}
 
         {/* Hardware encoding info - when hardware codec is selected */}
         {isHardwareCodec(containerValue) && hasHardwareEncoder(deviceInfo) && (

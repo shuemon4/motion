@@ -28,6 +28,11 @@
 #ifndef _INCLUDE_MOVIE_HPP_
 #define _INCLUDE_MOVIE_HPP_
 
+/* Probe whether a hardware encoder is available by actually opening it.
+ * Returns true if the encoder opens successfully, false otherwise.
+ * Called once at startup; ~50ms per probe. */
+bool movie_probe_hw_encoder(const char *name);
+
 enum TIMELAPSE_TYPE {
     TIMELAPSE_NONE,         /* No timelapse, regular processing */
     TIMELAPSE_APPEND,       /* Use append version of timelapse */

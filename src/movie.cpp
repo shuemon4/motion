@@ -36,6 +36,35 @@
 #include "movie.hpp"
 #include "thumbnail.hpp"
 
+/* Probe whether a hardware encoder is available by actually opening it.
+ * avcodec_find_encoder_by_name() alone returns a valid codec on all Linux
+ * systems with v4l2 FFmpeg support — including Pi 5, which has no encode HW.
+ * Opening avcodec_open2() negotiates with the V4L2 driver; it fails on Pi 5
+ * ("no such device") and succeeds on Pi 4. */
+bool movie_probe_hw_encoder(const char *name)
+{
+    const AVCodec *codec = avcodec_find_encoder_by_name(name);
+    if (!codec) {
+        return false;
+    }
+
+    AVCodecContext *ctx = avcodec_alloc_context3(codec);
+    if (!ctx) {
+        return false;
+    }
+
+    ctx->width     = 640;
+    ctx->height    = 480;
+    ctx->time_base = {1, 30};
+    ctx->pix_fmt   = AV_PIX_FMT_YUV420P;
+    ctx->bit_rate  = 1000000;
+
+    int ret = avcodec_open2(ctx, codec, nullptr);
+    avcodec_free_context(&ctx);
+
+    return (ret == 0);
+}
+
 int movie_interrupt(void *ctx)
 {
     cls_movie *movie = (cls_movie *)ctx;
@@ -300,8 +329,14 @@ int cls_movie::set_quality()
             }
             ctx_codec->profile = MY_PROFILE_H264_HIGH;
             ctx_codec->bit_rate = quality;
-            av_dict_set(&opts, "preset", "ultrafast", 0);
+            // superfast instead of ultrafast: ultrafast reverts H.264 profile
+            // to baseline; also matters if HW fails and falls back to libx264.
+            av_dict_set(&opts, "preset", "superfast", 0);
             av_dict_set(&opts, "tune", "zerolatency", 0);
+            // Increase V4L2 buffer counts to prevent dropped frames under
+            // concurrent recording + streaming load.
+            av_dict_set(&opts, "num_output_buffers", "32", 0);
+            av_dict_set(&opts, "num_capture_buffers", "16", 0);
 
         } else {
             /* Control other H264 encoders quality is via CRF.  To get the profiles
@@ -444,10 +479,85 @@ int cls_movie::set_codec()
         }
         if (retcd < 0) {
             av_strerror(retcd, errstr, sizeof(errstr));
-            MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO, _("Could not open codec %s"),errstr);
-            av_dict_free(&opts);
-            free_context();
-            return -1;
+            /* If a hardware encoder failed, attempt software fallback */
+            if (preferred_codec == "h264_v4l2m2m") {
+                MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
+                    ,_("Hardware encoder %s failed (%s), falling back to software encoder")
+                    , preferred_codec.c_str(), errstr);
+                cam->hw_encoder_fallback = true;
+
+                avcodec_free_context(&ctx_codec);
+                ctx_codec = nullptr;
+                av_dict_free(&opts);
+                opts = nullptr;
+
+                preferred_codec = "";
+                codec = mycodec_find_encoder(oc->video_codec_id);
+                if (codec == nullptr) {
+                    MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                        ,_("Software fallback codec not found for container %s")
+                        , container.c_str());
+                    free_context();
+                    return -1;
+                }
+
+                ctx_codec = avcodec_alloc_context3(codec);
+                if (ctx_codec == nullptr) {
+                    MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                        ,_("Failed to allocate software fallback codec context"));
+                    free_context();
+                    return -1;
+                }
+
+                /* Re-apply gop_size for new context */
+                if (tlapse != TIMELAPSE_NONE) {
+                    ctx_codec->gop_size = 1;
+                } else {
+                    if (fps <= 5) {
+                        ctx_codec->gop_size = 1;
+                    } else if (fps > 30) {
+                        ctx_codec->gop_size = 15;
+                    } else {
+                        ctx_codec->gop_size = (fps / 2);
+                    }
+                    gop_cnt = ctx_codec->gop_size - 1;
+                }
+
+                ctx_codec->codec_id      = codec->id;
+                ctx_codec->codec_type    = AVMEDIA_TYPE_VIDEO;
+                ctx_codec->bit_rate      = cam->cfg->movie_bps;
+                ctx_codec->width         = width;
+                ctx_codec->height        = height;
+                ctx_codec->time_base.num = 1;
+                ctx_codec->time_base.den = fps;
+                ctx_codec->pix_fmt       = AV_PIX_FMT_YUV420P;
+                ctx_codec->max_b_frames  = 0;
+                ctx_codec->flags        |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
+                if (set_quality() < 0) {
+                    MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                        ,_("Unable to set quality for software fallback encoder"));
+                    free_context();
+                    return -1;
+                }
+
+                retcd = avcodec_open2(ctx_codec, codec, &opts);
+                if (retcd < 0) {
+                    av_strerror(retcd, errstr, sizeof(errstr));
+                    MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                        ,_("Could not open software fallback codec %s"), errstr);
+                    av_dict_free(&opts);
+                    free_context();
+                    return -1;
+                }
+                MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+                    ,_("Software fallback encoder %s opened successfully"), codec->name);
+            } else {
+                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO, _("Could not open codec %s"),errstr);
+                av_dict_free(&opts);
+                free_context();
+                return -1;
+            }
         } else {
             MOTION_LOG(INF, TYPE_ENCODER, NO_ERRNO
             ,_("Opened codec with %d fps."), chkrate);
