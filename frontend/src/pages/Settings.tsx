@@ -114,6 +114,21 @@ export function Settings() {
     }
   }, [config?.cameras, hasAutoSelected])
 
+  // Get the original config for the selected camera (without pending changes)
+  // Used to detect modified fields and show indicators
+  const originalConfig = useMemo(() => {
+    if (!config) return {}
+    const defaultConfig = config.configuration.default || {}
+
+    if (selectedCamera === '0') {
+      return defaultConfig
+    } else {
+      const cameraConfig = config.configuration[`cam${selectedCamera}`] || {}
+      // Merge: camera-specific values override defaults
+      return { ...defaultConfig, ...cameraConfig }
+    }
+  }, [config, selectedCamera])
+
   const handleChange = useCallback((param: string, value: string | number | boolean) => {
     setChanges((prev) => {
       const updated = { ...prev, [param]: value }
@@ -150,25 +165,10 @@ export function Settings() {
         return { ...prev, [param]: result.error ?? 'Invalid value' }
       }
     })
-  }, [])
+  }, [originalConfig])
 
   const isDirty = Object.keys(changes).length > 0
   const hasValidationErrors = Object.keys(validationErrors).length > 0
-
-  // Get the original config for the selected camera (without pending changes)
-  // Used to detect modified fields and show indicators
-  const originalConfig = useMemo(() => {
-    if (!config) return {}
-    const defaultConfig = config.configuration.default || {}
-
-    if (selectedCamera === '0') {
-      return defaultConfig
-    } else {
-      const cameraConfig = config.configuration[`cam${selectedCamera}`] || {}
-      // Merge: camera-specific values override defaults
-      return { ...defaultConfig, ...cameraConfig }
-    }
-  }, [config, selectedCamera])
 
   // Get the active config for the selected camera
   // Merges camera-specific config with defaults (camera values override defaults)

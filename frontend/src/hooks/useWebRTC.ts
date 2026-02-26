@@ -60,7 +60,9 @@ export function useWebRTC({
 
   // Keep a stable ref to onFallback so we don't re-run the effect when it changes
   const onFallbackRef = useRef(onFallback)
-  onFallbackRef.current = onFallback
+  useEffect(() => {
+    onFallbackRef.current = onFallback
+  }, [onFallback])
 
   /**
    * Tear down the peer connection and release all resources.
@@ -96,13 +98,21 @@ export function useWebRTC({
       videoRef.current.srcObject = null
     }
 
-    setDataChannel(null)
   }, [])
+
+  // Reset state when disabled (render-time adjustment pattern)
+  const [prevEnabled, setPrevEnabled] = useState(enabled)
+  if (prevEnabled !== enabled) {
+    setPrevEnabled(enabled)
+    if (!enabled) {
+      setConnectionState('disconnected')
+      setDataChannel(null)
+    }
+  }
 
   useEffect(() => {
     if (!enabled) {
       cleanup()
-      setConnectionState('disconnected')
       return
     }
 

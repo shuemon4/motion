@@ -11,7 +11,7 @@ export function useSnapshotPolling(
   intervalMs: number = 1000,
   enabled: boolean = true
 ): SnapshotPollingState {
-  const [timestamp, setTimestamp] = useState(Date.now())
+  const [timestamp, setTimestamp] = useState(() => Date.now())
   const [isConnected] = useState(false)
   const [error] = useState<string | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)

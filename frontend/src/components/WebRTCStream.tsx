@@ -19,17 +19,20 @@ function ConnectionBadge({
   const [visible, setVisible] = useState(true)
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Show badge whenever state changes (render-time adjustment pattern)
+  const [prevState, setPrevState] = useState(state)
+  if (prevState !== state) {
+    setPrevState(state)
+    setVisible(true)
+  }
+
+  // Auto-hide after 3 s when connected
   useEffect(() => {
-    // Clear any pending fade timer when state changes
     if (fadeTimerRef.current) {
       clearTimeout(fadeTimerRef.current)
       fadeTimerRef.current = null
     }
 
-    // Always show when state changes
-    setVisible(true)
-
-    // Auto-hide after 3 s when connected
     if (state === 'connected') {
       fadeTimerRef.current = setTimeout(() => setVisible(false), 3000)
     }

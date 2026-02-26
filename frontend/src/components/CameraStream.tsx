@@ -99,13 +99,15 @@ export function CameraStream({
     }
   }, [effectiveMode, error, isConnected, handleReconnect])
 
-  // Reset connection state when mode changes
-  useEffect(() => {
+  // Reset connection state when mode changes (render-time adjustment pattern)
+  const [prevMode, setPrevMode] = useState(mode)
+  if (prevMode !== mode) {
+    setPrevMode(mode)
     setIsConnected(false)
     setError(null)
     setWebrtcFallback(false)
     // Don't reset hasEverConnected — avoids loading overlay flash on mode switch
-  }, [mode])
+  }
 
   const streamUrl = `/${cameraId}/mjpg/stream?k=${streamKey}`
   const substreamUrl = `/${cameraId}/mjpg/substream?k=${streamKey}`
