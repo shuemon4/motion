@@ -1,4 +1,4 @@
-import { FormSection, FormInput, FormSelect, FormToggle, FormSlider } from '@/components/form';
+import { FormSection, FormInput, FormSelect, FormToggle, FormSlider, HelpTooltip } from '@/components/form';
 import {
   AWB_MODES,
   AUTOFOCUS_MODES,
@@ -156,17 +156,33 @@ export function LibcameraSettings({ config, onChange, getError, capabilities, or
 
       {/* Image Processing Section */}
       {capabilities?.NoiseReductionMode !== false && (
-        <FormSelect
-          label="Noise Reduction"
-          value={String(getValue('libcam_noise_reduction_mode', 0))}
-          onChange={(val) => onChange('libcam_noise_reduction_mode', Number(val))}
-          options={NOISE_REDUCTION_MODES.map((mode) => ({
-            value: String(mode.value),
-            label: mode.label,
-          }))}
-          helpText="Fast recommended for motion detection (avoids temporal smearing)"
-          error={getError?.('libcam_noise_reduction_mode')}
-        />
+        <div>
+          <div className="flex items-center mb-1">
+            <span className="text-sm font-medium">Noise Reduction</span>
+            <HelpTooltip
+              content={
+                <div className="space-y-1.5">
+                  <p><strong className="text-gray-200">Off</strong> — No noise reduction. Sharpest image but noisy in low light.</p>
+                  <p><strong className="text-gray-200">Fast</strong> — Spatial-only filtering. Low CPU, no ghosting. Best for motion detection.</p>
+                  <p><strong className="text-gray-200">High Quality</strong> — Temporal + spatial filtering. Cleanest image but moving objects may smear or ghost.</p>
+                  <p><strong className="text-gray-200">Minimal</strong> — Very light filtering. Preserves detail with slight noise reduction.</p>
+                  <p><strong className="text-gray-200">ZSL</strong> — Zero-shutter-lag mode. Optimized for still capture, not video.</p>
+                </div>
+              }
+            />
+          </div>
+          <FormSelect
+            label=""
+            value={String(getValue('libcam_noise_reduction_mode', 0))}
+            onChange={(val) => onChange('libcam_noise_reduction_mode', Number(val))}
+            options={NOISE_REDUCTION_MODES.map((mode) => ({
+              value: String(mode.value),
+              label: mode.label,
+            }))}
+            helpText="Fast recommended for motion detection (avoids temporal smearing)"
+            error={getError?.('libcam_noise_reduction_mode')}
+          />
+        </div>
       )}
 
       {capabilities?.ExposureTime !== false && (() => {

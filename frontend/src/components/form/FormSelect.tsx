@@ -34,10 +34,12 @@ export function FormSelect({
 
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium mb-1">
-        {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
-      </label>
+      {label && (
+        <label className="block text-sm font-medium mb-1">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+      )}
       <select
         value={value}
         onChange={handleChange}
