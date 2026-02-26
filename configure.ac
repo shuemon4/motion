@@ -697,6 +697,47 @@ AS_IF([test "${FFTW3}" = "no"], [
 )
 
 ##############################################################################
+###  Check for libdatachannel - Optional (WebRTC streaming)
+##############################################################################
+AC_ARG_WITH([webrtc],
+  AS_HELP_STRING([--with-webrtc],[Build with WebRTC streaming support via libdatachannel]),
+  [WEBRTC="$withval"],
+  [WEBRTC="auto"]
+)
+WEBRTC_VER=""
+AS_IF([test "${WEBRTC}" != "no"], [
+    AC_MSG_CHECKING(for libdatachannel)
+    AS_IF([pkgconf LibDataChannel 2>/dev/null], [
+        WEBRTC_VER="("`pkgconf --modversion LibDataChannel`")"
+        TEMP_CPPFLAGS="$TEMP_CPPFLAGS "`pkgconf --cflags LibDataChannel`
+        TEMP_LIBS="$TEMP_LIBS "`pkgconf --libs LibDataChannel`
+        AC_DEFINE([HAVE_WEBRTC], [1], [Define to 1 if libdatachannel/WebRTC is available])
+        WEBRTC="yes"
+    ],[
+        AS_IF([test "${WEBRTC}" = "yes"], [
+            AC_MSG_ERROR([libdatachannel requested but not found. Install it or use --without-webrtc])
+        ])
+        WEBRTC="no"
+    ])
+    AC_MSG_RESULT([$WEBRTC])
+
+    dnl If WebRTC is enabled, check for libswresample (needed for audio resampling)
+    AS_IF([test "${WEBRTC}" = "yes"], [
+        AC_MSG_CHECKING(for libswresample)
+        AS_IF([pkgconf libswresample 2>/dev/null], [
+            TEMP_CPPFLAGS="$TEMP_CPPFLAGS "`pkgconf --cflags libswresample`
+            TEMP_LIBS="$TEMP_LIBS "`pkgconf --libs libswresample`
+            AC_DEFINE([HAVE_SWRESAMPLE], [1], [Define to 1 if libswresample is available])
+            AC_MSG_RESULT([yes])
+        ],[
+            AC_MSG_RESULT([no (WebRTC audio resampling disabled)])
+        ])
+    ])
+])
+dnl Note: No AM_CONDITIONAL needed — source files are added unconditionally
+dnl to Makefile.am with #ifdef HAVE_WEBRTC guards in the C++ source.
+
+##############################################################################
 ###  Developer Flags
 ##############################################################################
 AC_ARG_WITH([developer-flags],
@@ -831,6 +872,7 @@ echo "MariaDB               : $MARIADB$MARIADB_VER"
 echo "ALSA                  : $ALSA$ALSA_VER"
 echo "PulseAudio            : $PULSE$PULSE_VER"
 echo "FFTW                  : $FFTW3$FFTW3_VER"
+echo "WebRTC                : $WEBRTC$WEBRTC_VER"
 echo
 echo "Install prefix        : $prefix"
 echo

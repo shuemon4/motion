@@ -85,6 +85,12 @@
             void api_camera_ptz();           /* POST /{camId}/api/camera/ptz */
             void api_stream_info();          /* GET /{camId}/api/stream/info */
 
+            /* WebRTC signaling API endpoints */
+            void api_webrtc_offer();         /* POST /{camId}/api/webrtc/offer */
+            void api_webrtc_candidate();     /* POST /{camId}/api/webrtc/candidate */
+            void api_webrtc_status();        /* GET /{camId}/api/webrtc/status */
+            void api_webrtc_disconnect();    /* DELETE /{camId}/api/webrtc/peer/{peerId} */
+
         private:
             cls_motapp      *app;
             cls_webu        *webu;

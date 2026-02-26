@@ -48,6 +48,20 @@
     }
 #endif
 
+/* Shared ring buffer for PCM audio data (sound thread -> WebRTC consumer).
+ * Written by the sound capture thread, read by the WebRTC audio encoder.
+ * Protected by mutex for concurrent access. */
+struct ctx_audio_ring {
+    int16_t         *buffer;        /* Circular buffer of S16LE samples */
+    int              capacity;      /* Total samples in buffer (~200ms at 48kHz = 9600) */
+    int              write_pos;     /* Next write position */
+    int              read_pos;      /* Consumer read position (WebRTC) */
+    pthread_mutex_t  mutex;         /* Protects read/write positions */
+    bool             active;        /* Audio capture is running and ring is valid */
+    int              sample_rate;   /* Actual sample rate of captured audio */
+    int              channels;      /* Number of channels in the ring buffer */
+};
+
 struct ctx_snd_alert {
     int             alert_id;           /* Id number for the alert*/
     std::string     alert_nm;           /* Name of the alert*/
@@ -138,6 +152,9 @@ class cls_sound {
         void            handler();
         void            handler_startup();
         void            handler_shutdown();
+
+        /* Shared audio ring buffer for WebRTC audio consumers */
+        ctx_audio_ring  audio_ring;
 
     private:
         cls_motapp      *app;

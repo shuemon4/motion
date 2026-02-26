@@ -285,6 +285,18 @@ struct ctx_parm_cam {
     int             substream_maxrate;
     int             substream_scale;      /* Resolution scale percentage (25, 50, 100) */
 
+    /* WebRTC parameters (PARM_CAT_14 - streams) */
+    bool            webrtc_enable;        /* Enable WebRTC streaming for this camera */
+    int             webrtc_port_min;      /* UDP port range start for RTP */
+    int             webrtc_port_max;      /* UDP port range end for RTP */
+    int             webrtc_gop;           /* GOP size for WebRTC (frames) */
+    int             webrtc_quality;       /* H.264 quality for WebRTC (1-100) */
+    int             webrtc_max_peers;     /* Max simultaneous WebRTC viewers */
+    std::string     webrtc_stun_server;   /* STUN server URL (empty = LAN only) */
+    bool            webrtc_audio;         /* Enable audio in WebRTC stream */
+    std::string     webrtc_audio_device;  /* ALSA device for audio (empty = use snd_device) */
+    int             webrtc_audio_opus_bitrate; /* Opus bitrate in bps (default: 48000) */
+
     /* Tracking/PTZ parameters (PARM_CAT_17) */
     bool            ptz_auto_track;
     int             ptz_wait;

@@ -69,6 +69,19 @@ export function Dashboard() {
     return 'snapshot' as const
   }, [])
 
+  // Read liveStreamMode from stored preferences (default 'mjpeg')
+  // Determines whether focused cameras use WebRTC or MJPEG
+  const liveStreamMode = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('motion-ui-preferences')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed.liveStreamMode === 'webrtc') return 'webrtc' as const
+      }
+    } catch { /* ignore */ }
+    return 'mjpeg' as const
+  }, [])
+
   // Get capture FPS from server-provided camera status
   const getCaptureFps = (cameraId: number) => {
     return cameraStatuses?.find((c) => c.id === cameraId)?.fps ?? 0
@@ -223,8 +236,12 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Camera stream — always live for single camera */}
-            <CameraStream cameraId={camera.id} onStreamFpsChange={handleStreamingFpsChange(camera.id)} />
+            {/* Camera stream — use preferred live mode for single camera */}
+            <CameraStream
+              cameraId={camera.id}
+              mode={liveStreamMode === 'webrtc' ? 'webrtc' : 'live'}
+              onStreamFpsChange={handleStreamingFpsChange(camera.id)}
+            />
           </div>
         </div>
 
@@ -311,10 +328,10 @@ export function Dashboard() {
                 </div>
               </div>
 
-              {/* Camera stream — live for focused, snapshot for all others */}
+              {/* Camera stream — preferred live mode for focused, grid mode for others */}
               <CameraStream
                 cameraId={camera.id}
-                mode={isFocused ? 'live' : gridMode}
+                mode={isFocused ? (liveStreamMode === 'webrtc' ? 'webrtc' : 'live') : gridMode}
                 snapshotInterval={snapshotInterval}
                 onStreamFpsChange={handleStreamingFpsChange(camera.id)}
               />

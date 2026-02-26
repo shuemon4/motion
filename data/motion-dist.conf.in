@@ -150,6 +150,49 @@ substream_maxrate 10
 ; Requires restart to take effect (affects buffer allocation)
 
 ;*************************************************
+;*****   WebRTC Streaming (requires --with-webrtc)
+;*************************************************
+; webrtc_enable true
+; Enable WebRTC streaming for this camera (default: true)
+
+; webrtc_port_min 40000
+; UDP port range start for RTP media (default: 40000)
+
+; webrtc_port_max 40100
+; UDP port range end for RTP media (default: 40100)
+
+; webrtc_gop 30
+; GOP size for WebRTC H.264 encoding (frames).
+; At 15fps, 30 = 2 second keyframe interval (default: 30)
+
+; webrtc_quality 50
+; H.264 quality for WebRTC mode (1-100, default: 50)
+; For libx264: maps to CRF. For v4l2m2m: maps to bitrate.
+
+; webrtc_max_peers 3
+; Maximum simultaneous WebRTC viewers per camera (default: 3)
+
+; webrtc_stun_server
+; STUN server URL for NAT traversal (default: empty = LAN only)
+; Example: stun:stun.l.google.com:19302
+
+; webrtc_audio false
+; Enable Opus audio in WebRTC stream (default: false)
+; Requires a sound device configured in a sound config file.
+; The audio is captured from the sound thread's ring buffer,
+; resampled to 48kHz, and encoded as Opus.
+
+; webrtc_audio_device
+; ALSA device override for WebRTC audio capture (default: empty)
+; When empty, uses the snd_device from the sound configuration.
+; Example: hw:1,0
+
+; webrtc_audio_opus_bitrate 48000
+; Opus encoder bitrate in bits per second (default: 48000)
+; Range: 6000-510000. Lower values reduce bandwidth.
+; 48000 is recommended for speech, 128000 for music.
+
+;*************************************************
 ;*****   Database
 ;*************************************************
 database_type sqlite3

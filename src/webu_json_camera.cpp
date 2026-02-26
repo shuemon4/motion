@@ -41,6 +41,10 @@
 #include "netcam.hpp"
 #include "video_v4l2.hpp"
 #include "json_parse.hpp"
+#ifdef HAVE_WEBRTC
+#include "h264_encoder.hpp"
+#include "webu_webrtc.hpp"
+#endif
 #include <map>
 #include <algorithm>
 #include <vector>
@@ -673,5 +677,141 @@ void cls_webu_json::api_stream_info()
 
     webua->resp_page += "}}";
     webua->resp_type = WEBUI_RESP_JSON;
+}
+
+/* WebRTC signaling API endpoints */
+
+void cls_webu_json::api_webrtc_offer()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    #ifdef HAVE_WEBRTC
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+        return;
+    }
+
+    if (webua->cam->webrtc == nullptr) {
+        webua->resp_page = "{\"error\":\"WebRTC not enabled for this camera\"}";
+        return;
+    }
+
+    /* Parse JSON body to extract SDP offer */
+    JsonParser parser;
+    if (!parser.parse(webua->raw_body)) {
+        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO
+            , _("WebRTC offer JSON parse error: %s"), parser.getError().c_str());
+        webua->resp_page = "{\"error\":\"Invalid JSON\"}";
+        return;
+    }
+
+    std::string sdp = parser.getString("sdp", "");
+    if (sdp.empty()) {
+        webua->resp_page = "{\"error\":\"Missing sdp field\"}";
+        return;
+    }
+
+    /* Delegate to cls_webu_webrtc */
+    webua->resp_page = webua->cam->webrtc->handle_offer(sdp);
+
+    #else
+    webua->resp_page = "{\"error\":\"WebRTC not compiled in\"}";
+    #endif
+}
+
+void cls_webu_json::api_webrtc_candidate()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    #ifdef HAVE_WEBRTC
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+        return;
+    }
+
+    if (webua->cam->webrtc == nullptr) {
+        webua->resp_page = "{\"error\":\"WebRTC not enabled for this camera\"}";
+        return;
+    }
+
+    /* Parse JSON body to extract ICE candidate */
+    JsonParser parser;
+    if (!parser.parse(webua->raw_body)) {
+        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO
+            , _("WebRTC candidate JSON parse error: %s"), parser.getError().c_str());
+        webua->resp_page = "{\"error\":\"Invalid JSON\"}";
+        return;
+    }
+
+    std::string candidate = parser.getString("candidate", "");
+    std::string sdp_mid = parser.getString("sdpMid", "");
+    int sdp_mline_index = (int)parser.getNumber("sdpMLineIndex", 0);
+
+    if (candidate.empty()) {
+        /* Empty candidate signals end-of-candidates -- that is valid */
+        webua->resp_page = "{\"status\":\"ok\"}";
+        return;
+    }
+
+    /* Delegate to cls_webu_webrtc */
+    webua->resp_page = webua->cam->webrtc->handle_candidate(
+        candidate, sdp_mid, sdp_mline_index);
+
+    #else
+    webua->resp_page = "{\"error\":\"WebRTC not compiled in\"}";
+    #endif
+}
+
+void cls_webu_json::api_webrtc_status()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    #ifdef HAVE_WEBRTC
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+        return;
+    }
+
+    if (webua->cam->webrtc == nullptr) {
+        webua->resp_page = "{\"peers\":0,\"encoder_state\":\"DISABLED\",\"max_peers\":0}";
+        return;
+    }
+
+    /* Delegate to cls_webu_webrtc */
+    webua->resp_page = webua->cam->webrtc->get_status();
+
+    #else
+    webua->resp_page = "{\"error\":\"WebRTC not compiled in\"}";
+    #endif
+}
+
+void cls_webu_json::api_webrtc_disconnect()
+{
+    webua->resp_type = WEBUI_RESP_JSON;
+
+    #ifdef HAVE_WEBRTC
+    if (webua->cam == nullptr) {
+        webua->resp_page = "{\"error\":\"Invalid camera ID\"}";
+        return;
+    }
+
+    if (webua->cam->webrtc == nullptr) {
+        webua->resp_page = "{\"error\":\"WebRTC not enabled for this camera\"}";
+        return;
+    }
+
+    /* Peer ID comes from uri_cmd4: DELETE /{camId}/api/webrtc/peer/{peerId} */
+    std::string peer_id = webua->uri_cmd4;
+    if (peer_id.empty()) {
+        webua->resp_page = "{\"error\":\"Missing peer ID\"}";
+        return;
+    }
+
+    /* Delegate to cls_webu_webrtc */
+    webua->resp_page = webua->cam->webrtc->disconnect_peer(peer_id);
+
+    #else
+    webua->resp_page = "{\"error\":\"WebRTC not compiled in\"}";
+    #endif
 }
 

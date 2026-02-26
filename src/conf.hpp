@@ -303,6 +303,18 @@
             int&            substream_maxrate       = parm_cam.substream_maxrate;
             int&            substream_scale         = parm_cam.substream_scale;
 
+            /* WebRTC parameters (-> parm_cam) */
+            bool&           webrtc_enable           = parm_cam.webrtc_enable;
+            int&            webrtc_port_min         = parm_cam.webrtc_port_min;
+            int&            webrtc_port_max         = parm_cam.webrtc_port_max;
+            int&            webrtc_gop              = parm_cam.webrtc_gop;
+            int&            webrtc_quality          = parm_cam.webrtc_quality;
+            int&            webrtc_max_peers        = parm_cam.webrtc_max_peers;
+            std::string&    webrtc_stun_server      = parm_cam.webrtc_stun_server;
+            bool&           webrtc_audio            = parm_cam.webrtc_audio;
+            std::string&    webrtc_audio_device     = parm_cam.webrtc_audio_device;
+            int&            webrtc_audio_opus_bitrate = parm_cam.webrtc_audio_opus_bitrate;
+
             /* Database parameters (-> parm_app) */
             std::string&    database_type           = parm_app.database_type;
             std::string&    database_dbname         = parm_app.database_dbname;

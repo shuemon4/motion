@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { getStoredRestartTimestamp } from '@/lib/cameraRestart'
 import { PtzControls } from '@/components/PtzControls'
+import { WebRTCStream } from '@/components/WebRTCStream'
 import { useSnapshotPolling } from '@/hooks/useSnapshotPolling'
 
 interface CameraStreamProps {
   cameraId: number
   className?: string
-  mode?: 'live' | 'snapshot' | 'substream'
+  mode?: 'live' | 'snapshot' | 'substream' | 'webrtc'
   snapshotInterval?: number
   onStreamFpsChange?: (fps: number) => void
 }
@@ -32,6 +33,10 @@ export function CameraStream({
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasEverConnected, setHasEverConnected] = useState(false)
+
+  // When WebRTC fails, fall back to MJPEG live mode
+  const [webrtcFallback, setWebrtcFallback] = useState(false)
+  const effectiveMode = mode === 'webrtc' && webrtcFallback ? 'live' : mode
 
   const { snapshotUrl } = useSnapshotPolling(cameraId, snapshotInterval, mode === 'snapshot')
 
@@ -82,17 +87,23 @@ export function CameraStream({
     return () => clearInterval(intervalId)
   }, [cameraId])
 
+  // Handle WebRTC fallback — switch to MJPEG live
+  const handleWebRTCFallback = useCallback(() => {
+    setWebrtcFallback(true)
+  }, [])
+
   // Auto-retry on error — live and substream modes
   useEffect(() => {
-    if ((mode === 'live' || mode === 'substream') && error && !isConnected) {
+    if ((effectiveMode === 'live' || effectiveMode === 'substream') && error && !isConnected) {
       handleReconnect()
     }
-  }, [mode, error, isConnected, handleReconnect])
+  }, [effectiveMode, error, isConnected, handleReconnect])
 
   // Reset connection state when mode changes
   useEffect(() => {
     setIsConnected(false)
     setError(null)
+    setWebrtcFallback(false)
     // Don't reset hasEverConnected — avoids loading overlay flash on mode switch
   }, [mode])
 
@@ -102,7 +113,13 @@ export function CameraStream({
   return (
     <div className={`w-full ${className}`}>
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-        {mode === 'substream' ? (
+        {effectiveMode === 'webrtc' ? (
+          <WebRTCStream
+            cameraId={cameraId}
+            className="absolute inset-0"
+            onFallback={handleWebRTCFallback}
+          />
+        ) : effectiveMode === 'substream' ? (
           <img
             key={streamKey}
             src={substreamUrl}
@@ -119,7 +136,7 @@ export function CameraStream({
               setError('Stream unavailable')
             }}
           />
-        ) : mode === 'live' ? (
+        ) : effectiveMode === 'live' ? (
           <img
             key={streamKey}
             src={streamUrl}
@@ -180,8 +197,39 @@ export function CameraStream({
           </div>
         )}
 
+        {/* WebRTC fallback indicator — shown when WebRTC failed and we switched to MJPEG */}
+        {mode === 'webrtc' && webrtcFallback && (
+          <FallbackBadge />
+        )}
+
         <PtzControls cameraId={cameraId} />
       </div>
+    </div>
+  )
+}
+
+/**
+ * Small badge indicating that WebRTC fell back to MJPEG.
+ * Fades out after 5 seconds.
+ */
+function FallbackBadge() {
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(false), 5000)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (!visible) return null
+
+  return (
+    <div
+      className="absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/60 text-xs text-white transition-opacity duration-500"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="w-2 h-2 rounded-full bg-blue-400" aria-hidden="true" />
+      <span>MJPEG (fallback)</span>
     </div>
   )
 }

@@ -43,6 +43,10 @@
 #include "dbse.hpp"
 #include "draw.hpp"
 #include "webu_getimg.hpp"
+#ifdef HAVE_WEBRTC
+#include "h264_encoder.hpp"
+#include "webu_webrtc.hpp"
+#endif
 
 static void *camera_handler(void *arg)
 {
@@ -762,6 +766,14 @@ void cls_camera::cleanup()
 
     ring_destroy(); /* Cleanup the precapture ring buffer */
 
+    #ifdef HAVE_WEBRTC
+    /* Delete webrtc first -- peers must be closed before encoder is destroyed */
+    delete webrtc;
+    webrtc = nullptr;
+    delete h264_enc;
+    h264_enc = nullptr;
+    #endif
+
     mydelete(alg);
     mydelete(algsec);
     mydelete(rotate);
@@ -1337,6 +1349,16 @@ void cls_camera::init()
     movie_motion = new cls_movie(this, "motion");
     movie_timelapse = new cls_movie(this, "timelapse");
     movie_extpipe = new cls_movie(this, "extpipe");
+
+    #ifdef HAVE_WEBRTC
+    if (cfg->webrtc_enable) {
+        h264_enc = new cls_h264_encoder(this);
+        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+            , _("WebRTC H.264 shared encoder initialized for camera %d")
+            , cfg->device_id);
+        webrtc = new cls_webu_webrtc(this);
+    }
+    #endif
 
     init_cleandir();
 
@@ -2271,6 +2293,11 @@ cls_camera::cls_camera(cls_motapp *p_app)
     memset(&all_loc, 0, sizeof(ctx_all_loc));
     memset(&all_sizes, 0, sizeof(ctx_all_sizes));
     all_sizes.reset = true;
+
+    #ifdef HAVE_WEBRTC
+    h264_enc = nullptr;
+    webrtc = nullptr;
+    #endif
 }
 
 cls_camera::~cls_camera()

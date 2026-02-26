@@ -35,6 +35,9 @@
 #include "alg_sec.hpp"
 #include "movie.hpp"
 #include "thumbnail.hpp"
+#ifdef HAVE_WEBRTC
+#include "h264_encoder.hpp"
+#endif
 
 /* Probe whether a hardware encoder is available by actually opening it.
  * avcodec_find_encoder_by_name() alone returns a valid codec on all Linux
@@ -1533,6 +1536,77 @@ int cls_movie::put_image(ctx_image_data *img_data, const struct timespec *ts1)
     return retcd;
 }
 
+#ifdef HAVE_WEBRTC
+/* Write a pre-encoded H.264 packet from the shared encoder to the movie file.
+ * This is the "passthrough from shared encoder" mode: cls_movie does not encode
+ * internally; it receives already-encoded packets and just muxes them.
+ * Called from put_image() when shared_enc_active is true. */
+int cls_movie::put_encoded_packet(const struct timespec *ts1)
+{
+    int retcd;
+    char errstr[128];
+
+    if (cam->h264_enc == nullptr) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&cam->h264_enc->h264_mutex);
+
+    if (cam->h264_enc->h264_front.nal_data == nullptr ||
+        cam->h264_enc->h264_front.nal_sz <= 0) {
+        pthread_mutex_unlock(&cam->h264_enc->h264_mutex);
+        return 0;
+    }
+
+    pkt = av_packet_alloc();
+    if (pkt == nullptr) {
+        pthread_mutex_unlock(&cam->h264_enc->h264_mutex);
+        return -1;
+    }
+
+    retcd = av_new_packet(pkt, cam->h264_enc->h264_front.nal_sz);
+    if (retcd < 0) {
+        av_packet_free(&pkt);
+        pkt = nullptr;
+        pthread_mutex_unlock(&cam->h264_enc->h264_mutex);
+        return -1;
+    }
+
+    memcpy(pkt->data, cam->h264_enc->h264_front.nal_data,
+           (uint)cam->h264_enc->h264_front.nal_sz);
+
+    if (cam->h264_enc->h264_front.is_keyframe) {
+        pkt->flags |= AV_PKT_FLAG_KEY;
+    }
+
+    pthread_mutex_unlock(&cam->h264_enc->h264_mutex);
+
+    /* Set PTS/DTS for the container */
+    retcd = set_pts(ts1);
+    if (retcd < 0) {
+        av_packet_free(&pkt);
+        pkt = nullptr;
+        return 0;
+    }
+    pkt->pts = picture->pts;
+    pkt->dts = pkt->pts;
+    pkt->stream_index = 0;
+
+    retcd = av_write_frame(oc, pkt);
+    av_packet_free(&pkt);
+    pkt = nullptr;
+
+    if (retcd < 0) {
+        av_strerror(retcd, errstr, sizeof(errstr));
+        MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+            , _("Error writing encoded packet: %s"), errstr);
+        return -1;
+    }
+
+    return 0;
+}
+#endif
+
 void cls_movie::reset_start_time(const struct timespec *ts1)
 {
     int64_t one_frame_interval = av_rescale_q(1,av_make_q(1, fps), strm_video->time_base);
@@ -1868,6 +1942,10 @@ void cls_movie::init_vars()
     extpipe_stream = nullptr;
     container = "";
     preferred_codec = "";
+
+    #ifdef HAVE_WEBRTC
+    shared_enc_active = false;
+    #endif
 
 }
 

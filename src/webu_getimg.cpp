@@ -33,6 +33,10 @@
 #include "picture.hpp"
 #include "alg_sec.hpp"
 #include "webu_getimg.hpp"
+#ifdef HAVE_WEBRTC
+#include "h264_encoder.hpp"
+#include "webu_webrtc.hpp"
+#endif
 
 /* NOTE:  These run on the camera thread. */
 
@@ -357,4 +361,27 @@ void webu_getimg_main(cls_camera *cam)
         webu_getimg_source(cam);
         webu_getimg_secondary(cam);
     pthread_mutex_unlock(&cam->stream.mutex);
+
+    #ifdef HAVE_WEBRTC
+    /* H.264 encode for shared encoder (WebRTC + movie passthrough).
+     * Placed OUTSIDE the stream mutex since encoding can take several ms
+     * and holding the mutex would block MJPEG clients. */
+    if (cam->h264_enc != nullptr && cam->h264_enc->state != H264_STATE_IDLE) {
+        cam->h264_enc->encode_frame(
+            cam->current_image->image_norm,
+            cam->imgs.width, cam->imgs.height,
+            &cam->current_image->imgts);
+
+        cam->h264_enc->swap_buffers();
+
+        /* Distribute the encoded frame to all connected WebRTC peers.
+         * h264_mutex protects h264_front during the read; distribute_frame()
+         * acquires peers_mutex internally (lock order: h264 -> peers). */
+        pthread_mutex_lock(&cam->h264_enc->h264_mutex);
+        if (cam->webrtc != nullptr && cam->h264_enc->h264_front.nal_sz > 0) {
+            cam->webrtc->distribute_frame(&cam->h264_enc->h264_front);
+        }
+        pthread_mutex_unlock(&cam->h264_enc->h264_mutex);
+    }
+    #endif
 }

@@ -243,6 +243,16 @@ ctx_parm config_parms[] = {
     {"substream_quality",         PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  true},
     {"substream_maxrate",         PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  true},
     {"substream_scale",           PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
+    {"webrtc_enable",             PARM_TYP_BOOL,   PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
+    {"webrtc_port_min",           PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_ADVANCED, false},
+    {"webrtc_port_max",           PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_ADVANCED, false},
+    {"webrtc_gop",                PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
+    {"webrtc_quality",            PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
+    {"webrtc_max_peers",          PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
+    {"webrtc_stun_server",        PARM_TYP_STRING, PARM_CAT_14, PARM_LEVEL_ADVANCED, false},
+    {"webrtc_audio",              PARM_TYP_BOOL,   PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
+    {"webrtc_audio_device",       PARM_TYP_STRING, PARM_CAT_14, PARM_LEVEL_ADVANCED, false},
+    {"webrtc_audio_opus_bitrate", PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_ADVANCED, false},
 
     /* Category 15 - Database parameters - NOT hot reloadable */
     {"database_type",             PARM_TYP_LIST,   PARM_CAT_15, PARM_LEVEL_ADVANCED, false},
@@ -687,6 +697,8 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "stream_preview_newline") return edit_generic_bool(stream_preview_newline, parm, pact, false);
     if (name == "stream_grey") return edit_generic_bool(stream_grey, parm, pact, false);
     if (name == "stream_motion") return edit_generic_bool(stream_motion, parm, pact, false);
+    if (name == "webrtc_enable") return edit_generic_bool(webrtc_enable, parm, pact, true);
+    if (name == "webrtc_audio") return edit_generic_bool(webrtc_audio, parm, pact, false);
     if (name == "ptz_auto_track") return edit_generic_bool(ptz_auto_track, parm, pact, false);
 
     // INTEGERS with ranges
@@ -741,6 +753,12 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "substream_quality") return edit_generic_int(substream_quality, parm, pact, 40, 1, 100);
     if (name == "substream_maxrate") return edit_generic_int(substream_maxrate, parm, pact, 10, 1, 100);
     if (name == "substream_scale") return edit_generic_int(substream_scale, parm, pact, 50, 10, 100);
+    if (name == "webrtc_port_min") return edit_generic_int(webrtc_port_min, parm, pact, 40000, 1024, 65535);
+    if (name == "webrtc_port_max") return edit_generic_int(webrtc_port_max, parm, pact, 40100, 1024, 65535);
+    if (name == "webrtc_gop") return edit_generic_int(webrtc_gop, parm, pact, 30, 1, 300);
+    if (name == "webrtc_quality") return edit_generic_int(webrtc_quality, parm, pact, 50, 1, 100);
+    if (name == "webrtc_max_peers") return edit_generic_int(webrtc_max_peers, parm, pact, 3, 1, 10);
+    if (name == "webrtc_audio_opus_bitrate") return edit_generic_int(webrtc_audio_opus_bitrate, parm, pact, 48000, 6000, 510000);
     if (name == "database_port") return edit_generic_int(database_port, parm, pact, 0, 0, 65535);
     if (name == "database_busy_timeout") return edit_generic_int(database_busy_timeout, parm, pact, 0, 0, INT_MAX);
     if (name == "ptz_wait") return edit_generic_int(ptz_wait, parm, pact, 1, 0, INT_MAX);
@@ -834,6 +852,8 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "webcontrol_lock_script") return edit_generic_string(webcontrol_lock_script, parm, pact, "");
     if (name == "webcontrol_trusted_proxies") return edit_generic_string(webcontrol_trusted_proxies, parm, pact, "");
     if (name == "stream_preview_params") return edit_generic_string(stream_preview_params, parm, pact, "");
+    if (name == "webrtc_stun_server") return edit_generic_string(webrtc_stun_server, parm, pact, "");
+    if (name == "webrtc_audio_device") return edit_generic_string(webrtc_audio_device, parm, pact, "");
     if (name == "database_dbname") return edit_generic_string(database_dbname, parm, pact, "motion");
     if (name == "database_host") return edit_generic_string(database_host, parm, pact, "");
     if (name == "database_user") return edit_generic_string(database_user, parm, pact, "");

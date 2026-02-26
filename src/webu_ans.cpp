@@ -1129,6 +1129,13 @@ void cls_webu_ans::answer_delete()
         }
         webu_json->api_cameras_delete();
         mhd_send();
+    } else if (uri_cmd1 == "api" && uri_cmd2 == "webrtc" && uri_cmd3 == "peer") {
+        /* DELETE /{camId}/api/webrtc/peer/{peerId} */
+        if (webu_json == nullptr) {
+            webu_json = new cls_webu_json(this);
+        }
+        webu_json->api_webrtc_disconnect();
+        mhd_send();
     } else {
         /* DELETE not allowed for other endpoints */
         resp_type = WEBUI_RESP_TEXT;
@@ -1279,6 +1286,10 @@ void cls_webu_ans::answer_get()
         } else if (uri_cmd2 == "stream" && uri_cmd3 == "info") {
             /* GET /{camId}/api/stream/info */
             webu_json->api_stream_info();
+            mhd_send();
+        } else if (uri_cmd2 == "webrtc" && uri_cmd3 == "status") {
+            /* GET /{camId}/api/webrtc/status */
+            webu_json->api_webrtc_status();
             mhd_send();
         } else {
             bad_request();
@@ -1471,6 +1482,10 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
                 retcd = MHD_YES;
             } else if (uri_cmd1 == "api" && uri_cmd2 == "cameras") {
                 /* Camera detection/test endpoints handled via JSON POST */
+                raw_body.clear();
+                retcd = MHD_YES;
+            } else if (uri_cmd1 == "api" && uri_cmd2 == "webrtc") {
+                /* WebRTC signaling endpoints handled via JSON POST */
                 raw_body.clear();
                 retcd = MHD_YES;
             } else if (is_form_urlencoded() && (uri_cmd1.empty() || device_id >= 0)) {
@@ -1676,6 +1691,28 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
                 webu_json = new cls_webu_json(this);
             }
             webu_json->api_cameras_add();
+            mhd_send();
+            retcd = MHD_YES;
+        } else if (uri_cmd1 == "api" && uri_cmd2 == "webrtc") {
+            /* WebRTC signaling endpoints - accumulate body for JSON POST */
+            if (*upload_data_size > 0) {
+                raw_body.append(upload_data, *upload_data_size);
+                *upload_data_size = 0;
+                return MHD_YES;
+            }
+            /* Body complete, route to appropriate handler */
+            if (webu_json == nullptr) {
+                webu_json = new cls_webu_json(this);
+            }
+            if (uri_cmd3 == "offer") {
+                /* POST /{camId}/api/webrtc/offer */
+                webu_json->api_webrtc_offer();
+            } else if (uri_cmd3 == "candidate") {
+                /* POST /{camId}/api/webrtc/candidate */
+                webu_json->api_webrtc_candidate();
+            } else {
+                bad_request();
+            }
             mhd_send();
             retcd = MHD_YES;
         } else if (is_form_urlencoded() && webu_post != nullptr) {

@@ -759,10 +759,40 @@ void cls_sound::capture()
     #ifdef HAVE_PULSE
         pulse_capture();
     #endif
+
+    /* Write captured PCM samples to the shared ring buffer.
+     * The ring buffer is read by the WebRTC Opus encoder thread.
+     * On overflow, oldest samples are silently overwritten (acceptable
+     * for real-time audio -- we always want the latest data). */
+    if (device_status != STATUS_CLOSED && audio_ring.active &&
+        snd_info->buffer != NULL && snd_info->frames > 0) {
+        pthread_mutex_lock(&audio_ring.mutex);
+        if (audio_ring.buffer != NULL) {
+            int frames = snd_info->frames;
+            int16_t *src = snd_info->buffer;
+            for (int i = 0; i < frames; i++) {
+                audio_ring.buffer[audio_ring.write_pos] = src[i];
+                audio_ring.write_pos = (audio_ring.write_pos + 1) % audio_ring.capacity;
+            }
+        }
+        pthread_mutex_unlock(&audio_ring.mutex);
+    }
 }
 
 void cls_sound::cleanup()
 {
+    /* Deactivate audio ring buffer before cleaning up device */
+    pthread_mutex_lock(&audio_ring.mutex);
+    audio_ring.active = false;
+    if (audio_ring.buffer != NULL) {
+        free(audio_ring.buffer);
+        audio_ring.buffer = NULL;
+    }
+    audio_ring.capacity = 0;
+    audio_ring.write_pos = 0;
+    audio_ring.read_pos = 0;
+    pthread_mutex_unlock(&audio_ring.mutex);
+
     #ifdef HAVE_ALSA
         alsa_cleanup();
     #endif
@@ -834,6 +864,36 @@ void cls_sound::init()
     #ifdef HAVE_FFTW3
         fftw_open();
     #endif
+
+    /* Initialize shared audio ring buffer for WebRTC consumers.
+     * Size: ~200ms of audio at the configured sample rate.
+     * This allows the WebRTC Opus encoder to read without underrun. */
+    if (device_status == STATUS_OPENED) {
+        int ring_ms = 200;
+        int ring_samples = (snd_info->sample_rate * ring_ms) / 1000;
+        if (ring_samples < 960) {
+            ring_samples = 960;  /* Minimum: one Opus frame at 48kHz */
+        }
+
+        pthread_mutex_lock(&audio_ring.mutex);
+        if (audio_ring.buffer != NULL) {
+            free(audio_ring.buffer);
+        }
+        audio_ring.capacity = ring_samples;
+        audio_ring.buffer = (int16_t *)mymalloc(
+            (uint)ring_samples * sizeof(int16_t));
+        memset(audio_ring.buffer, 0, (uint)ring_samples * sizeof(int16_t));
+        audio_ring.write_pos = 0;
+        audio_ring.read_pos = 0;
+        audio_ring.sample_rate = snd_info->sample_rate;
+        audio_ring.channels = snd_info->channels;
+        audio_ring.active = true;
+        pthread_mutex_unlock(&audio_ring.mutex);
+
+        MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
+            , _("Audio ring buffer: %d samples at %dHz (%dms)")
+            , ring_samples, snd_info->sample_rate, ring_ms);
+    }
 
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Detecting"));
 
@@ -960,10 +1020,30 @@ cls_sound::cls_sound(cls_motapp *p_app)
     handler_stop = true;
     restart = false;
     watchdog = 30;
+
+    /* Initialize audio ring buffer for WebRTC consumers */
+    audio_ring.buffer = NULL;
+    audio_ring.capacity = 0;
+    audio_ring.write_pos = 0;
+    audio_ring.read_pos = 0;
+    audio_ring.active = false;
+    audio_ring.sample_rate = 0;
+    audio_ring.channels = 0;
+    pthread_mutex_init(&audio_ring.mutex, NULL);
 }
 
 cls_sound::~cls_sound()
 {
+    /* Clean up audio ring buffer */
+    pthread_mutex_lock(&audio_ring.mutex);
+    audio_ring.active = false;
+    if (audio_ring.buffer != NULL) {
+        free(audio_ring.buffer);
+        audio_ring.buffer = NULL;
+    }
+    pthread_mutex_unlock(&audio_ring.mutex);
+    pthread_mutex_destroy(&audio_ring.mutex);
+
     mydelete(conf_src);
     mydelete(cfg);
 }

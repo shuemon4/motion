@@ -57,6 +57,11 @@ class cls_movie {
         std::string         file_dir;
         bool                is_running;
 
+    #ifdef HAVE_WEBRTC
+        int put_encoded_packet(const struct timespec *ts1);
+        bool shared_enc_active;  /* true when using shared H.264 encoder */
+    #endif
+
     private:
         cls_camera *cam;
 

@@ -70,7 +70,9 @@ motion_SOURCES = \
 	webu_json_legacy.cpp \
 	webu_post.hpp      webu_post.cpp \
 	webu_stream.hpp    webu_stream.cpp \
-	webu_getimg.hpp    webu_getimg.cpp
+	webu_getimg.hpp    webu_getimg.cpp \
+	webu_webrtc.hpp    webu_webrtc.cpp \
+	h264_encoder.hpp   h264_encoder.cpp
 
 motion_setup_SOURCES = \
 	motion_setup.cpp \

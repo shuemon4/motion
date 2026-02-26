@@ -38,6 +38,11 @@
     typedef std::vector<ctx_v4l2ctrl_item> vec_v4l2ctrl;
 #endif
 
+#ifdef HAVE_WEBRTC
+    class cls_h264_encoder;
+    class cls_webu_webrtc;
+#endif
+
 enum CAMERA_TYPE {
     CAMERA_TYPE_UNKNOWN,
     CAMERA_TYPE_V4L2,
@@ -261,6 +266,11 @@ class cls_camera {
         /* NETCAM accessors for web API */
         bool has_netcam() const;
         bool has_netcam_high() const;
+
+        #ifdef HAVE_WEBRTC
+        cls_h264_encoder *h264_enc;
+        cls_webu_webrtc  *webrtc;
+        #endif
 
     private:
         cls_movie       *movie_norm;

@@ -10,6 +10,7 @@ interface Preferences {
   playbackResolutionFactor: number;
   theme: 'dark' | 'light' | 'auto';
   gridMode: 'snapshot' | 'substream';
+  liveStreamMode: 'webrtc' | 'mjpeg';
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -21,6 +22,7 @@ const DEFAULT_PREFERENCES: Preferences = {
   playbackResolutionFactor: 1.0,
   theme: 'dark',
   gridMode: 'snapshot',
+  liveStreamMode: 'mjpeg',
 };
 
 function loadPreferences(): Preferences {
@@ -110,6 +112,17 @@ export function PreferencesSettings() {
               { value: 'substream', label: 'Substream (Smooth Video)' },
             ]}
             helpText="Snapshot polls once per second (low bandwidth, choppy). Substream uses continuous MJPEG at reduced resolution (smooth, slightly more bandwidth). Takes effect on next dashboard visit."
+          />
+
+          <FormSelect
+            label="Live Stream Mode"
+            value={preferences.liveStreamMode}
+            onChange={(val) => updatePreference('liveStreamMode', val as 'webrtc' | 'mjpeg')}
+            options={[
+              { value: 'mjpeg', label: 'MJPEG (Compatible)' },
+              { value: 'webrtc', label: 'WebRTC (Lower Latency)' },
+            ]}
+            helpText="MJPEG works everywhere but has higher latency. WebRTC uses H.264 for lower latency and bandwidth, with automatic MJPEG fallback if connection fails. Takes effect on next dashboard visit."
           />
         </div>
 
