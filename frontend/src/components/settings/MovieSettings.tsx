@@ -33,9 +33,8 @@ export function MovieSettings({ config, onChange, getError, showPassthrough = tr
 
   // Determine current recording mode
   const movieOutput = getValue('movie_output', false) as boolean;
-  const movieOutputMotion = getValue('movie_output_motion', false) as boolean;
   const emulateMotion = getValue('emulate_motion', false) as boolean;
-  const currentMode = motionToRecordingMode(movieOutput, movieOutputMotion, emulateMotion);
+  const currentMode = motionToRecordingMode(movieOutput, emulateMotion);
 
   const [selectedMode, setSelectedMode] = useState(currentMode);
 
@@ -45,9 +44,6 @@ export function MovieSettings({ config, onChange, getError, showPassthrough = tr
 
     // Apply the mode's parameter changes
     onChange('movie_output', motionParams.movie_output);
-    if (motionParams.movie_output_motion !== undefined) {
-      onChange('movie_output_motion', motionParams.movie_output_motion);
-    }
     // Set emulate_motion for continuous recording
     if (motionParams.emulate_motion !== undefined) {
       onChange('emulate_motion', motionParams.emulate_motion);
@@ -115,6 +111,13 @@ export function MovieSettings({ config, onChange, getError, showPassthrough = tr
           onChange={handleRecordingModeChange}
           options={recordingModeOptions}
           helpText="When to record video. Motion Triggered = only during events, Continuous = always record."
+        />
+
+        <FormToggle
+          label="Debug Motion Videos"
+          value={getValue('movie_output_motion', false) as boolean}
+          onChange={(val) => onChange('movie_output_motion', val)}
+          helpText="Record separate debug videos showing detected motion areas. Useful for troubleshooting detection sensitivity. Doubles disk usage and CPU when enabled."
         />
 
         <FormSlider

@@ -131,13 +131,12 @@ export function captureModeToMotion(mode: string): CaptureMode {
  */
 export interface RecordingMode {
   movie_output: boolean;
-  movie_output_motion?: boolean;
   emulate_motion?: boolean;
 }
 
 export const RECORDING_MODE_MAP: Record<string, RecordingMode> = {
-  'motion-triggered': { movie_output: true, movie_output_motion: true, emulate_motion: false },
-  continuous: { movie_output: true, movie_output_motion: false, emulate_motion: true },
+  'motion-triggered': { movie_output: true, emulate_motion: false },
+  continuous: { movie_output: true, emulate_motion: true },
   off: { movie_output: false, emulate_motion: false },
 };
 
@@ -147,12 +146,11 @@ export const RECORDING_MODE_MAP: Record<string, RecordingMode> = {
  */
 export function motionToRecordingMode(
   movieOutput: boolean,
-  movieOutputMotion: boolean,
   emulateMotion: boolean = false
 ): string {
   if (!movieOutput) return 'off';
   if (emulateMotion) return 'continuous';
-  return movieOutputMotion ? 'motion-triggered' : 'motion-triggered';
+  return 'motion-triggered';
 }
 
 /**
