@@ -193,6 +193,9 @@ struct ctx_delete_progress;
 /* Hardware encoder availability (probed at startup, cached) */
 struct ctx_hw_encoders {
     bool h264_v4l2m2m;  /* true if v4l2m2m H.264 hardware encoder is available */
+    bool h264_nvenc;    /* true if NVIDIA NVENC H.264 encoder is available */
+    bool h264_vaapi;    /* true if VAAPI H.264 encoder is available (Intel/AMD) */
+    bool h264_qsv;      /* true if Intel Quick Sync H.264 encoder is available */
     bool probed;        /* true after startup probe completes */
 };
 

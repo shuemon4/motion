@@ -68,6 +68,90 @@ bool movie_probe_hw_encoder(const char *name)
     return (ret == 0);
 }
 
+/* VAAPI-specific probe: requires hardware device + frames context.
+ * Cannot use the simple movie_probe_hw_encoder() because VAAPI needs
+ * a full HW context pipeline to open successfully. */
+bool movie_probe_vaapi_encoder()
+{
+    const AVCodec *codec = avcodec_find_encoder_by_name("h264_vaapi");
+    if (!codec) {
+        return false;
+    }
+
+    AVBufferRef *hw_dev = nullptr;
+    int ret = av_hwdevice_ctx_create(&hw_dev, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0);
+    if (ret < 0 || !hw_dev) {
+        return false;
+    }
+
+    AVBufferRef *hw_frames_ref = av_hwframe_ctx_alloc(hw_dev);
+    if (!hw_frames_ref) {
+        av_buffer_unref(&hw_dev);
+        return false;
+    }
+
+    AVHWFramesContext *frames_ctx = (AVHWFramesContext *)(hw_frames_ref->data);
+    frames_ctx->format    = AV_PIX_FMT_VAAPI;
+    frames_ctx->sw_format = AV_PIX_FMT_NV12;
+    frames_ctx->width     = 640;
+    frames_ctx->height    = 480;
+    frames_ctx->initial_pool_size = 4;
+
+    ret = av_hwframe_ctx_init(hw_frames_ref);
+    if (ret < 0) {
+        av_buffer_unref(&hw_frames_ref);
+        av_buffer_unref(&hw_dev);
+        return false;
+    }
+
+    AVCodecContext *ctx = avcodec_alloc_context3(codec);
+    if (!ctx) {
+        av_buffer_unref(&hw_frames_ref);
+        av_buffer_unref(&hw_dev);
+        return false;
+    }
+
+    ctx->width     = 640;
+    ctx->height    = 480;
+    ctx->time_base = {1, 30};
+    ctx->pix_fmt   = AV_PIX_FMT_VAAPI;
+    ctx->bit_rate  = 1000000;
+    ctx->hw_frames_ctx = av_buffer_ref(hw_frames_ref);
+
+    ret = avcodec_open2(ctx, codec, nullptr);
+    avcodec_free_context(&ctx);
+    av_buffer_unref(&hw_frames_ref);
+    av_buffer_unref(&hw_dev);
+
+    return (ret == 0);
+}
+
+/* QSV-specific probe: requires NV12 pixel format instead of YUV420P.
+ * QSV system memory mode auto-creates an internal MFX session. */
+bool movie_probe_qsv_encoder()
+{
+    const AVCodec *codec = avcodec_find_encoder_by_name("h264_qsv");
+    if (!codec) {
+        return false;
+    }
+
+    AVCodecContext *ctx = avcodec_alloc_context3(codec);
+    if (!ctx) {
+        return false;
+    }
+
+    ctx->width     = 640;
+    ctx->height    = 480;
+    ctx->time_base = {1, 30};
+    ctx->pix_fmt   = AV_PIX_FMT_NV12;
+    ctx->bit_rate  = 1000000;
+
+    int ret = avcodec_open2(ctx, codec, nullptr);
+    avcodec_free_context(&ctx);
+
+    return (ret == 0);
+}
+
 int movie_interrupt(void *ctx)
 {
     cls_movie *movie = (cls_movie *)ctx;
@@ -306,6 +390,15 @@ int cls_movie::set_pts(const struct timespec *ts1)
     return 0;
 }
 
+/* Check if the preferred codec is a hardware encoder */
+static bool is_hardware_encoder(const std::string &codec_name)
+{
+    return codec_name == "h264_v4l2m2m" ||
+           codec_name == "h264_nvenc" ||
+           codec_name == "h264_vaapi" ||
+           codec_name == "h264_qsv";
+}
+
 int cls_movie::set_quality()
 {
     int quality;
@@ -322,32 +415,51 @@ int cls_movie::set_quality()
         }
 
         if (preferred_codec == "h264_v4l2m2m") {
-
-            // bit_rate = width * height * fps * quality_factor
+            // v4l2m2m: bitrate mode
             quality = (int)(((int64_t)width * height * fps * quality) >> 7);
-            // Clip bit rate to min
             if (quality < 4000) {
-                // magic number
                 quality = 4000;
             }
             ctx_codec->profile = MY_PROFILE_H264_HIGH;
             ctx_codec->bit_rate = quality;
-            // superfast instead of ultrafast: ultrafast reverts H.264 profile
-            // to baseline; also matters if HW fails and falls back to libx264.
             av_dict_set(&opts, "preset", "superfast", 0);
             av_dict_set(&opts, "tune", "zerolatency", 0);
-            // Increase V4L2 buffer counts to prevent dropped frames under
-            // concurrent recording + streaming load.
             av_dict_set(&opts, "num_output_buffers", "32", 0);
             av_dict_set(&opts, "num_capture_buffers", "16", 0);
 
+        } else if (preferred_codec == "h264_nvenc") {
+            // NVENC: Constant Quality mode (CQ)
+            int cq = (int)(((100 - quality) * 51) / 100);
+            if (cq < 1) cq = 1;
+            char cq_str[10];
+            snprintf(cq_str, sizeof(cq_str), "%d", cq);
+
+            av_opt_set(ctx_codec->priv_data, "rc", "vbr", 0);
+            av_opt_set(ctx_codec->priv_data, "cq", cq_str, 0);
+            av_opt_set(ctx_codec->priv_data, "preset", "p4", 0);
+            av_opt_set(ctx_codec->priv_data, "tune", "ll", 0);
+            av_opt_set(ctx_codec->priv_data, "profile", "high", 0);
+            quality = cq;
+
+        } else if (preferred_codec == "h264_vaapi") {
+            // VAAPI: CQP mode (QP value)
+            int qp = (int)(((100 - quality) * 51) / 100);
+            if (qp < 1) qp = 1;
+            ctx_codec->global_quality = qp;
+            ctx_codec->profile = MY_PROFILE_H264_HIGH;
+            quality = qp;
+
+        } else if (preferred_codec == "h264_qsv") {
+            // QSV: ICQ mode (Intelligent Constant Quality)
+            int icq = (int)(((100 - quality) * 51) / 100);
+            if (icq < 1) icq = 1;
+            ctx_codec->global_quality = icq;
+            av_opt_set(ctx_codec->priv_data, "preset", "medium", 0);
+            av_opt_set(ctx_codec->priv_data, "profile", "high", 0);
+            quality = icq;
+
         } else {
-            /* Control other H264 encoders quality is via CRF.  To get the profiles
-             * to work (main), (high), we are setting this via the opt instead of
-             * dictionary.  The ultrafast is not used because at that level, the
-             * profile reverts to (baseline) and a bit more efficiency is in
-             * (main) or (high) so we choose next fastest option (superfast)
-             */
+            /* libx264 / libx265: CRF mode */
             char crf[10];
             quality = (int)(( (100-quality) * 51)/100);
             /* CRF 0 = lossless, which is incompatible with x264 "high" profile.
@@ -483,7 +595,7 @@ int cls_movie::set_codec()
         if (retcd < 0) {
             av_strerror(retcd, errstr, sizeof(errstr));
             /* If a hardware encoder failed, attempt software fallback */
-            if (preferred_codec == "h264_v4l2m2m") {
+            if (is_hardware_encoder(preferred_codec)) {
                 MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
                     ,_("Hardware encoder %s failed (%s), falling back to software encoder")
                     , preferred_codec.c_str(), errstr);

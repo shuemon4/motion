@@ -183,6 +183,12 @@ void cls_webu_json::api_system_status()
     webua->resp_page += "\"hardware_encoders\":{";
     webua->resp_page += "\"h264_v4l2m2m\":" +
         std::string(app->hw_encoders.h264_v4l2m2m ? "true" : "false");
+    webua->resp_page += ",\"h264_nvenc\":" +
+        std::string(app->hw_encoders.h264_nvenc ? "true" : "false");
+    webua->resp_page += ",\"h264_vaapi\":" +
+        std::string(app->hw_encoders.h264_vaapi ? "true" : "false");
+    webua->resp_page += ",\"h264_qsv\":" +
+        std::string(app->hw_encoders.h264_qsv ? "true" : "false");
     webua->resp_page += "},";
 
     /* Webcontrol Actions Status */

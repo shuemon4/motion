@@ -6,6 +6,9 @@ export interface DeviceInfo {
   pi_generation?: number;
   hardware_encoders?: {
     h264_v4l2m2m: boolean;
+    h264_nvenc: boolean;
+    h264_vaapi: boolean;
+    h264_qsv: boolean;
   };
   temperature?: {
     celsius: number;
@@ -61,7 +64,9 @@ export function isRaspberryPi(deviceInfo?: DeviceInfo): boolean {
 }
 
 export function hasHardwareEncoder(deviceInfo?: DeviceInfo): boolean {
-  return deviceInfo?.hardware_encoders?.h264_v4l2m2m === true;
+  const enc = deviceInfo?.hardware_encoders;
+  if (!enc) return false;
+  return enc.h264_v4l2m2m || enc.h264_nvenc || enc.h264_vaapi || enc.h264_qsv;
 }
 
 export function isHighTemperature(deviceInfo?: DeviceInfo, threshold = 70): boolean {

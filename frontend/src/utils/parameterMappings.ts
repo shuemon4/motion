@@ -176,9 +176,15 @@ export const MOVIE_CONTAINERS = [
   { value: 'mov', label: 'MOV (QuickTime)', group: 'basic' },
   { value: '3gp', label: '3GP (Mobile)', group: 'basic' },
 
-  // === Hardware Encoding (requires v4l2m2m support, ~10% CPU) ===
-  { value: 'mkv:h264_v4l2m2m', label: 'MKV - H.264 Hardware', group: 'hardware' },
-  { value: 'mp4:h264_v4l2m2m', label: 'MP4 - H.264 Hardware', group: 'hardware' },
+  // === Hardware Encoding (platform-specific) ===
+  { value: 'mkv:h264_v4l2m2m', label: 'MKV - H.264 Hardware (V4L2)', group: 'hardware' },
+  { value: 'mp4:h264_v4l2m2m', label: 'MP4 - H.264 Hardware (V4L2)', group: 'hardware' },
+  { value: 'mkv:h264_nvenc', label: 'MKV - H.264 Hardware (NVIDIA)', group: 'hardware' },
+  { value: 'mp4:h264_nvenc', label: 'MP4 - H.264 Hardware (NVIDIA)', group: 'hardware' },
+  { value: 'mkv:h264_vaapi', label: 'MKV - H.264 Hardware (VAAPI)', group: 'hardware' },
+  { value: 'mp4:h264_vaapi', label: 'MP4 - H.264 Hardware (VAAPI)', group: 'hardware' },
+  { value: 'mkv:h264_qsv', label: 'MKV - H.264 Hardware (Intel QSV)', group: 'hardware' },
+  { value: 'mp4:h264_qsv', label: 'MP4 - H.264 Hardware (Intel QSV)', group: 'hardware' },
 
   // === Software H.264 (explicit) ===
   { value: 'mkv:libx264', label: 'MKV - H.264 Software', group: 'software' },
@@ -194,7 +200,10 @@ export const MOVIE_CONTAINERS = [
 
 // Check if container uses hardware encoding
 export function isHardwareCodec(container: string): boolean {
-  return container.includes('v4l2m2m');
+  return container.includes('v4l2m2m') ||
+         container.includes('nvenc') ||
+         container.includes('vaapi') ||
+         container.includes('qsv');
 }
 
 // Check if container uses high-CPU codec

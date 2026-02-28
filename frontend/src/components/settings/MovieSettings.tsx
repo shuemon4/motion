@@ -74,18 +74,21 @@ export function MovieSettings({ config, onChange, getError, showPassthrough = tr
 
   // Filter container options based on hardware encoder availability
   const getAvailableContainers = () => {
-    // If device info not loaded or hardware encoder available, show all options
-    if (!deviceInfo || hasHardwareEncoder(deviceInfo)) {
-      return MOVIE_CONTAINERS;
-    }
+    if (!deviceInfo) return MOVIE_CONTAINERS;
+    const enc = deviceInfo.hardware_encoders;
 
-    // Filter out hardware encoding options when no hardware encoder
-    return MOVIE_CONTAINERS.filter(container => !isHardwareCodec(container.value));
+    return MOVIE_CONTAINERS.filter(c => {
+      if (c.value.includes('v4l2m2m') && !enc?.h264_v4l2m2m) return false;
+      if (c.value.includes('nvenc') && !enc?.h264_nvenc) return false;
+      if (c.value.includes('vaapi') && !enc?.h264_vaapi) return false;
+      if (c.value.includes('qsv') && !enc?.h264_qsv) return false;
+      return true;
+    });
   };
 
   // Encoder preset only applies to software encoding, not:
   // - Passthrough mode
-  // - Hardware encoding (h264_v4l2m2m)
+  // - Hardware encoding (v4l2m2m, nvenc, vaapi, qsv)
   // - VP8/VP9 (webm)
   const showEncoderPreset = () => {
     const passthrough = getValue('movie_passthrough', false);

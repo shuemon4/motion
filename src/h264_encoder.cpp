@@ -22,6 +22,13 @@
  * Camera-level shared H.264 encoder serving both movie recording and
  * WebRTC viewers from a single encoder instance per camera.
  *
+ * Supports multiple hardware encoders:
+ *   - h264_v4l2m2m (Pi 4 hardware)
+ *   - h264_nvenc   (NVIDIA GPU)
+ *   - h264_vaapi   (Intel/AMD VAAPI)
+ *   - h264_qsv     (Intel Quick Sync)
+ *   - libx264      (software fallback)
+ *
  * State machine transitions are driven by recording_started/stopped
  * and webrtc_peer_connected/disconnected calls from the camera thread.
  */
@@ -52,10 +59,17 @@ cls_h264_encoder::cls_h264_encoder(cls_camera *p_cam)
     base_pts = 0;
     start_time.tv_sec = 0;
     start_time.tv_nsec = 0;
-    is_hw_codec = false;
+    codec_type = H264_CODEC_LIBX264;
 
     nal_info = nullptr;
     nal_info_len = 0;
+
+    hw_device_ctx = nullptr;
+    hw_frames_ref = nullptr;
+    hw_frame = nullptr;
+
+    sws_ctx = nullptr;
+    nv12_frame = nullptr;
 
     keyframe_requested = false;
     hysteresis_countdown = 0;
@@ -105,21 +119,55 @@ cls_h264_encoder::~cls_h264_encoder()
 }
 
 /* Select the best available H.264 codec.
- * Pi 4: h264_v4l2m2m (hardware, ~5-10% CPU)
- * Pi 5: libx264 (software, ~15-25% CPU at 1080p/15fps)
- * Fallback: libx264 if hardware encoder fails */
+ * Priority: v4l2m2m -> nvenc -> vaapi -> qsv -> libx264
+ * Each encoder is only tried if it was successfully probed at startup. */
 int cls_h264_encoder::select_codec()
 {
-    is_hw_codec = false;
+    codec_type = H264_CODEC_LIBX264;
 
-    /* Check if hardware encoder was detected at startup */
-    if (cam->app->hw_encoders.probed && cam->app->hw_encoders.h264_v4l2m2m) {
-        codec = avcodec_find_encoder_by_name("h264_v4l2m2m");
-        if (codec != nullptr) {
-            is_hw_codec = true;
-            MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
-                , _("H264 shared encoder: using h264_v4l2m2m (hardware)"));
-            return 0;
+    if (cam->app->hw_encoders.probed) {
+        /* Pi 4 hardware encoder */
+        if (cam->app->hw_encoders.h264_v4l2m2m) {
+            codec = avcodec_find_encoder_by_name("h264_v4l2m2m");
+            if (codec != nullptr) {
+                codec_type = H264_CODEC_V4L2M2M;
+                MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+                    , _("H264 shared encoder: using h264_v4l2m2m (hardware)"));
+                return 0;
+            }
+        }
+
+        /* NVIDIA GPU encoder */
+        if (cam->app->hw_encoders.h264_nvenc) {
+            codec = avcodec_find_encoder_by_name("h264_nvenc");
+            if (codec != nullptr) {
+                codec_type = H264_CODEC_NVENC;
+                MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+                    , _("H264 shared encoder: using h264_nvenc (NVIDIA hardware)"));
+                return 0;
+            }
+        }
+
+        /* Intel/AMD VAAPI encoder */
+        if (cam->app->hw_encoders.h264_vaapi) {
+            codec = avcodec_find_encoder_by_name("h264_vaapi");
+            if (codec != nullptr) {
+                codec_type = H264_CODEC_VAAPI;
+                MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+                    , _("H264 shared encoder: using h264_vaapi (VAAPI hardware)"));
+                return 0;
+            }
+        }
+
+        /* Intel Quick Sync encoder */
+        if (cam->app->hw_encoders.h264_qsv) {
+            codec = avcodec_find_encoder_by_name("h264_qsv");
+            if (codec != nullptr) {
+                codec_type = H264_CODEC_QSV;
+                MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+                    , _("H264 shared encoder: using h264_qsv (Intel QSV hardware)"));
+                return 0;
+            }
         }
     }
 
@@ -151,39 +199,86 @@ void cls_h264_encoder::set_quality_params(int profile)
 
     opts = nullptr;
 
-    if (is_hw_codec) {
+    quality = cam->cfg->webrtc_quality;
+    if (quality <= 0) {
+        quality = 50;
+    }
+    if (quality > 100) {
+        quality = 100;
+    }
+
+    switch (codec_type) {
+    case H264_CODEC_V4L2M2M: {
         /* v4l2m2m: bitrate mode */
-        quality = cam->cfg->webrtc_quality;
-        if (quality <= 0) {
-            quality = 50;
-        }
-        if (quality > 100) {
-            quality = 100;
-        }
         int fps = cam->lastrate;
         if (fps < 2) fps = 2;
 
-        /* bit_rate = width * height * fps * quality_factor */
         int bitrate = (int)(((int64_t)cam->imgs.width * cam->imgs.height * fps * quality) >> 7);
         if (bitrate < 4000) {
             bitrate = 4000;
         }
         ctx_codec->bit_rate = bitrate;
-        /* v4l2m2m profile control may be limited; set it but do not fail if ignored */
         ctx_codec->profile = profile;
         av_dict_set(&opts, "preset", "superfast", 0);
         av_dict_set(&opts, "tune", "zerolatency", 0);
         av_dict_set(&opts, "num_output_buffers", "32", 0);
         av_dict_set(&opts, "num_capture_buffers", "16", 0);
-    } else {
+        break;
+    }
+
+    case H264_CODEC_NVENC: {
+        /* NVENC: Constant Quality mode (CQ) — closest to CRF */
+        int cq = (int)(((100 - quality) * 51) / 100);
+        if (cq < 1) cq = 1;
+        char cq_str[10];
+        snprintf(cq_str, sizeof(cq_str), "%d", cq);
+
+        av_opt_set(ctx_codec->priv_data, "rc", "vbr", 0);
+        av_opt_set(ctx_codec->priv_data, "cq", cq_str, 0);
+        av_opt_set(ctx_codec->priv_data, "preset", "p4", 0);
+        av_opt_set(ctx_codec->priv_data, "tune", "ll", 0);
+        /* NVENC has no constrained_baseline; use baseline for WebRTC */
+        if (profile == MY_PROFILE_H264_CONSTRAINED_BASELINE) {
+            av_opt_set(ctx_codec->priv_data, "profile", "baseline", 0);
+        } else {
+            av_opt_set(ctx_codec->priv_data, "profile", "high", 0);
+        }
+        break;
+    }
+
+    case H264_CODEC_VAAPI: {
+        /* VAAPI: CQP mode — uses QP value */
+        int qp = (int)(((100 - quality) * 51) / 100);
+        if (qp < 1) qp = 1;
+        ctx_codec->global_quality = qp;
+        /* VAAPI: must use MY_PROFILE_H264_CONSTRAINED_BASELINE (578),
+         * NOT FF_PROFILE_H264_BASELINE (66) which fails on VAAPI */
+        if (profile == MY_PROFILE_H264_CONSTRAINED_BASELINE) {
+            ctx_codec->profile = MY_PROFILE_H264_CONSTRAINED_BASELINE;
+        } else {
+            ctx_codec->profile = MY_PROFILE_H264_HIGH;
+        }
+        break;
+    }
+
+    case H264_CODEC_QSV: {
+        /* QSV: ICQ mode — Intelligent Constant Quality */
+        int icq = (int)(((100 - quality) * 51) / 100);
+        if (icq < 1) icq = 1;
+        ctx_codec->global_quality = icq;
+
+        av_opt_set(ctx_codec->priv_data, "preset", "medium", 0);
+        if (profile == MY_PROFILE_H264_CONSTRAINED_BASELINE) {
+            av_opt_set(ctx_codec->priv_data, "profile", "baseline", 0);
+        } else {
+            av_opt_set(ctx_codec->priv_data, "profile", "high", 0);
+        }
+        break;
+    }
+
+    case H264_CODEC_LIBX264:
+    default: {
         /* libx264: CRF mode */
-        quality = cam->cfg->webrtc_quality;
-        if (quality <= 0) {
-            quality = 50;
-        }
-        if (quality > 100) {
-            quality = 100;
-        }
         int crf = (int)(((100 - quality) * 51) / 100);
         if (crf < 1) {
             crf = 1;
@@ -191,7 +286,7 @@ void cls_h264_encoder::set_quality_params(int profile)
         char crf_str[10];
         snprintf(crf_str, sizeof(crf_str), "%d", crf);
 
-        if (profile == FF_PROFILE_H264_CONSTRAINED_BASELINE) {
+        if (profile == MY_PROFILE_H264_CONSTRAINED_BASELINE) {
             av_opt_set(ctx_codec->priv_data, "profile", "baseline", 0);
         } else {
             av_opt_set(ctx_codec->priv_data, "profile", "high", 0);
@@ -199,6 +294,8 @@ void cls_h264_encoder::set_quality_params(int profile)
         av_opt_set(ctx_codec->priv_data, "crf", crf_str, 0);
         av_opt_set(ctx_codec->priv_data, "tune", "zerolatency", 0);
         av_opt_set(ctx_codec->priv_data, "preset", "superfast", 0);
+        break;
+    }
     }
 }
 
@@ -228,12 +325,77 @@ int cls_h264_encoder::open_encoder(int profile, int gop)
     ctx_codec->height = cam->imgs.height;
     ctx_codec->time_base.num = 1;
     ctx_codec->time_base.den = fps;
-    ctx_codec->pix_fmt = AV_PIX_FMT_YUV420P;
     ctx_codec->max_b_frames = 0;
     ctx_codec->gop_size = gop;
     ctx_codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
     gop_size = gop;
+
+    /* Set pixel format based on encoder type */
+    if (codec_type == H264_CODEC_VAAPI) {
+        ctx_codec->pix_fmt = AV_PIX_FMT_VAAPI;
+    } else if (codec_type == H264_CODEC_QSV) {
+        ctx_codec->pix_fmt = AV_PIX_FMT_NV12;
+    } else {
+        ctx_codec->pix_fmt = AV_PIX_FMT_YUV420P;
+    }
+
+    /* VAAPI: set up hardware device and frames context */
+    if (codec_type == H264_CODEC_VAAPI) {
+        retcd = av_hwdevice_ctx_create(&hw_device_ctx,
+            AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0);
+        if (retcd < 0) {
+            av_strerror(retcd, errstr, sizeof(errstr));
+            MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: VAAPI device context creation failed: %s"), errstr);
+            avcodec_free_context(&ctx_codec);
+            ctx_codec = nullptr;
+            goto fallback_libx264;
+        }
+
+        hw_frames_ref = av_hwframe_ctx_alloc(hw_device_ctx);
+        if (hw_frames_ref == nullptr) {
+            MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: VAAPI frames context allocation failed"));
+            av_buffer_unref(&hw_device_ctx);
+            avcodec_free_context(&ctx_codec);
+            ctx_codec = nullptr;
+            goto fallback_libx264;
+        }
+
+        AVHWFramesContext *frames_ctx = (AVHWFramesContext *)(hw_frames_ref->data);
+        frames_ctx->format    = AV_PIX_FMT_VAAPI;
+        frames_ctx->sw_format = AV_PIX_FMT_NV12;
+        frames_ctx->width     = cam->imgs.width;
+        frames_ctx->height    = cam->imgs.height;
+        frames_ctx->initial_pool_size = 20;
+
+        retcd = av_hwframe_ctx_init(hw_frames_ref);
+        if (retcd < 0) {
+            av_strerror(retcd, errstr, sizeof(errstr));
+            MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: VAAPI frames context init failed: %s"), errstr);
+            av_buffer_unref(&hw_frames_ref);
+            av_buffer_unref(&hw_device_ctx);
+            avcodec_free_context(&ctx_codec);
+            ctx_codec = nullptr;
+            goto fallback_libx264;
+        }
+
+        ctx_codec->hw_frames_ctx = av_buffer_ref(hw_frames_ref);
+
+        /* Allocate reusable HW frame for uploads */
+        hw_frame = av_frame_alloc();
+        if (hw_frame == nullptr) {
+            MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: failed to allocate VAAPI hw_frame"));
+            av_buffer_unref(&hw_frames_ref);
+            av_buffer_unref(&hw_device_ctx);
+            avcodec_free_context(&ctx_codec);
+            ctx_codec = nullptr;
+            goto fallback_libx264;
+        }
+    }
 
     set_quality_params(profile);
 
@@ -241,56 +403,20 @@ int cls_h264_encoder::open_encoder(int profile, int gop)
     if (retcd < 0) {
         av_strerror(retcd, errstr, sizeof(errstr));
         MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
-            , _("H264 shared encoder: could not open codec: %s"), errstr);
+            , _("H264 shared encoder: could not open codec %s: %s"), codec->name, errstr);
 
         /* If hardware encoder failed, try libx264 fallback */
-        if (is_hw_codec) {
-            MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
-                , _("H264 shared encoder: falling back to libx264"));
+        if (codec_type != H264_CODEC_LIBX264) {
+            /* Clean up any HW resources from failed encoder */
+            if (hw_frame) { av_frame_free(&hw_frame); hw_frame = nullptr; }
+            if (hw_frames_ref) { av_buffer_unref(&hw_frames_ref); hw_frames_ref = nullptr; }
+            if (hw_device_ctx) { av_buffer_unref(&hw_device_ctx); hw_device_ctx = nullptr; }
             avcodec_free_context(&ctx_codec);
             ctx_codec = nullptr;
             av_dict_free(&opts);
             opts = nullptr;
 
-            is_hw_codec = false;
-            codec = avcodec_find_encoder_by_name("libx264");
-            if (codec == nullptr) {
-                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
-                    , _("H264 shared encoder: libx264 not found for fallback"));
-                return -1;
-            }
-
-            ctx_codec = avcodec_alloc_context3(codec);
-            if (ctx_codec == nullptr) {
-                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
-                    , _("H264 shared encoder: failed to allocate fallback codec context"));
-                return -1;
-            }
-
-            ctx_codec->codec_id = codec->id;
-            ctx_codec->codec_type = AVMEDIA_TYPE_VIDEO;
-            ctx_codec->width = cam->imgs.width;
-            ctx_codec->height = cam->imgs.height;
-            ctx_codec->time_base.num = 1;
-            ctx_codec->time_base.den = fps;
-            ctx_codec->pix_fmt = AV_PIX_FMT_YUV420P;
-            ctx_codec->max_b_frames = 0;
-            ctx_codec->gop_size = gop;
-            ctx_codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-
-            set_quality_params(profile);
-
-            retcd = avcodec_open2(ctx_codec, codec, &opts);
-            if (retcd < 0) {
-                av_strerror(retcd, errstr, sizeof(errstr));
-                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
-                    , _("H264 shared encoder: fallback also failed: %s"), errstr);
-                avcodec_free_context(&ctx_codec);
-                ctx_codec = nullptr;
-                av_dict_free(&opts);
-                opts = nullptr;
-                return -1;
-            }
+            goto fallback_libx264;
         } else {
             avcodec_free_context(&ctx_codec);
             ctx_codec = nullptr;
@@ -300,6 +426,55 @@ int cls_h264_encoder::open_encoder(int profile, int gop)
         }
     }
 
+    goto encoder_opened;
+
+fallback_libx264:
+    MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+        , _("H264 shared encoder: falling back to libx264"));
+    av_dict_free(&opts);
+    opts = nullptr;
+
+    codec_type = H264_CODEC_LIBX264;
+    codec = avcodec_find_encoder_by_name("libx264");
+    if (codec == nullptr) {
+        MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+            , _("H264 shared encoder: libx264 not found for fallback"));
+        return -1;
+    }
+
+    ctx_codec = avcodec_alloc_context3(codec);
+    if (ctx_codec == nullptr) {
+        MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+            , _("H264 shared encoder: failed to allocate fallback codec context"));
+        return -1;
+    }
+
+    ctx_codec->codec_id = codec->id;
+    ctx_codec->codec_type = AVMEDIA_TYPE_VIDEO;
+    ctx_codec->width = cam->imgs.width;
+    ctx_codec->height = cam->imgs.height;
+    ctx_codec->time_base.num = 1;
+    ctx_codec->time_base.den = fps;
+    ctx_codec->pix_fmt = AV_PIX_FMT_YUV420P;
+    ctx_codec->max_b_frames = 0;
+    ctx_codec->gop_size = gop;
+    ctx_codec->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
+    set_quality_params(profile);
+
+    retcd = avcodec_open2(ctx_codec, codec, &opts);
+    if (retcd < 0) {
+        av_strerror(retcd, errstr, sizeof(errstr));
+        MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+            , _("H264 shared encoder: fallback also failed: %s"), errstr);
+        avcodec_free_context(&ctx_codec);
+        ctx_codec = nullptr;
+        av_dict_free(&opts);
+        opts = nullptr;
+        return -1;
+    }
+
+encoder_opened:
     av_dict_free(&opts);
     opts = nullptr;
 
@@ -315,6 +490,27 @@ int cls_h264_encoder::open_encoder(int profile, int gop)
     picture->format = ctx_codec->pix_fmt;
     picture->width = ctx_codec->width;
     picture->height = ctx_codec->height;
+
+    /* QSV: allocate NV12 frame for format conversion */
+    if (codec_type == H264_CODEC_QSV) {
+        nv12_frame = av_frame_alloc();
+        if (nv12_frame == nullptr) {
+            MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: could not allocate NV12 frame"));
+            close_encoder();
+            return -1;
+        }
+        nv12_frame->format = AV_PIX_FMT_NV12;
+        nv12_frame->width = cam->imgs.width;
+        nv12_frame->height = cam->imgs.height;
+        retcd = av_frame_get_buffer(nv12_frame, 0);
+        if (retcd < 0) {
+            MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: could not allocate NV12 frame buffer"));
+            close_encoder();
+            return -1;
+        }
+    }
 
     frame_cnt = 0;
 
@@ -360,6 +556,30 @@ void cls_h264_encoder::close_encoder()
         free(nal_info);
         nal_info = nullptr;
         nal_info_len = 0;
+    }
+
+    /* VAAPI cleanup */
+    if (hw_frame != nullptr) {
+        av_frame_free(&hw_frame);
+        hw_frame = nullptr;
+    }
+    if (hw_frames_ref != nullptr) {
+        av_buffer_unref(&hw_frames_ref);
+        hw_frames_ref = nullptr;
+    }
+    if (hw_device_ctx != nullptr) {
+        av_buffer_unref(&hw_device_ctx);
+        hw_device_ctx = nullptr;
+    }
+
+    /* QSV cleanup */
+    if (nv12_frame != nullptr) {
+        av_frame_free(&nv12_frame);
+        nv12_frame = nullptr;
+    }
+    if (sws_ctx != nullptr) {
+        sws_freeContext(sws_ctx);
+        sws_ctx = nullptr;
     }
 
     codec = nullptr;
@@ -446,7 +666,7 @@ int cls_h264_encoder::encode_frame(u_char *yuv_data, int width, int height,
         return -1;
     }
 
-    /* Set up frame data */
+    /* Set up frame data (YUV420P source for all encoder types) */
     put_yuv420(yuv_data, width, height);
 
     /* Calculate PTS from timestamp */
@@ -468,9 +688,7 @@ int cls_h264_encoder::encode_frame(u_char *yuv_data, int width, int height,
     }
     base_pts = picture->pts;
 
-    /* Handle keyframe requests.
-     * Setting pict_type to I-frame is sufficient for the encoder;
-     * the deprecated key_frame field is not needed. */
+    /* Handle keyframe requests */
     if (keyframe_requested || (frame_cnt % gop_size == 0)) {
         picture->pict_type = AV_PICTURE_TYPE_I;
         keyframe_requested = false;
@@ -484,8 +702,76 @@ int cls_h264_encoder::encode_frame(u_char *yuv_data, int width, int height,
         return -1;
     }
 
+    /* Determine which frame to send based on encoder type */
+    AVFrame *send_frame = picture;
+
+    if (codec_type == H264_CODEC_VAAPI) {
+        /* VAAPI: upload YUV420P data to GPU surface */
+        retcd = av_hwframe_get_buffer(ctx_codec->hw_frames_ctx, hw_frame, 0);
+        if (retcd < 0) {
+            av_strerror(retcd, errstr, sizeof(errstr));
+            MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: VAAPI get_buffer failed: %s"), errstr);
+            av_packet_free(&pkt);
+            pkt = nullptr;
+            return -1;
+        }
+        /* Transfer YUV420P CPU frame → VAAPI GPU surface
+         * (handles YUV420P → NV12 conversion automatically) */
+        retcd = av_hwframe_transfer_data(hw_frame, picture, 0);
+        if (retcd < 0) {
+            av_strerror(retcd, errstr, sizeof(errstr));
+            MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: VAAPI transfer failed: %s"), errstr);
+            av_frame_unref(hw_frame);
+            av_packet_free(&pkt);
+            pkt = nullptr;
+            return -1;
+        }
+        hw_frame->pts = picture->pts;
+        hw_frame->pict_type = picture->pict_type;
+        send_frame = hw_frame;
+
+    } else if (codec_type == H264_CODEC_QSV) {
+        /* QSV: convert YUV420P → NV12 via swscale */
+        if (sws_ctx == nullptr) {
+            sws_ctx = sws_getContext(
+                width, height, AV_PIX_FMT_YUV420P,
+                width, height, AV_PIX_FMT_NV12,
+                SWS_FAST_BILINEAR, NULL, NULL, NULL);
+            if (sws_ctx == nullptr) {
+                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                    , _("H264 shared encoder: QSV sws_getContext failed"));
+                av_packet_free(&pkt);
+                pkt = nullptr;
+                return -1;
+            }
+        }
+        retcd = av_frame_make_writable(nv12_frame);
+        if (retcd < 0) {
+            MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                , _("H264 shared encoder: QSV frame not writable"));
+            av_packet_free(&pkt);
+            pkt = nullptr;
+            return -1;
+        }
+        sws_scale(sws_ctx,
+            (const uint8_t * const *)picture->data, picture->linesize,
+            0, height,
+            nv12_frame->data, nv12_frame->linesize);
+        nv12_frame->pts = picture->pts;
+        nv12_frame->pict_type = picture->pict_type;
+        send_frame = nv12_frame;
+    }
+
     /* Encode */
-    retcd = avcodec_send_frame(ctx_codec, picture);
+    retcd = avcodec_send_frame(ctx_codec, send_frame);
+
+    /* Release VAAPI surface back to pool */
+    if (codec_type == H264_CODEC_VAAPI) {
+        av_frame_unref(hw_frame);
+    }
+
     if (retcd < 0) {
         av_strerror(retcd, errstr, sizeof(errstr));
         MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
@@ -512,8 +798,8 @@ int cls_h264_encoder::encode_frame(u_char *yuv_data, int width, int height,
         return -1;
     }
 
-    /* Apply v4l2m2m NAL fixup if needed */
-    if (is_hw_codec) {
+    /* Apply v4l2m2m NAL fixup if needed (only v4l2m2m has this quirk) */
+    if (codec_type == H264_CODEC_V4L2M2M) {
         encode_nal();
     }
 
@@ -571,7 +857,7 @@ int cls_h264_encoder::start(h264_encoder_state new_state)
     }
 
     if (new_state == H264_STATE_RECORD_ONLY) {
-        profile = FF_PROFILE_H264_HIGH;
+        profile = MY_PROFILE_H264_HIGH;
         /* Use movie_quality GOP: fps/2, capped similar to cls_movie */
         int fps = cam->lastrate;
         if (fps < 2) fps = 2;
@@ -584,7 +870,7 @@ int cls_h264_encoder::start(h264_encoder_state new_state)
         }
     } else {
         /* WEBRTC_ONLY or BOTH: use WebRTC-compatible settings */
-        profile = FF_PROFILE_H264_CONSTRAINED_BASELINE;
+        profile = MY_PROFILE_H264_CONSTRAINED_BASELINE;
         gop = cam->cfg->webrtc_gop;
         if (gop <= 0) gop = 30;
     }

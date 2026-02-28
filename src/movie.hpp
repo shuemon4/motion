@@ -33,6 +33,14 @@
  * Called once at startup; ~50ms per probe. */
 bool movie_probe_hw_encoder(const char *name);
 
+/* VAAPI-specific probe: requires HW device + frames context setup.
+ * Returns true if h264_vaapi encoder opens successfully. */
+bool movie_probe_vaapi_encoder();
+
+/* QSV-specific probe: requires NV12 pixel format.
+ * Returns true if h264_qsv encoder opens successfully. */
+bool movie_probe_qsv_encoder();
+
 enum TIMELAPSE_TYPE {
     TIMELAPSE_NONE,         /* No timelapse, regular processing */
     TIMELAPSE_APPEND,       /* Use append version of timelapse */

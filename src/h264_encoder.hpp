@@ -65,6 +65,14 @@ enum h264_encoder_state {
     H264_STATE_BOTH
 };
 
+enum h264_codec_type {
+    H264_CODEC_LIBX264,     /* Software fallback */
+    H264_CODEC_V4L2M2M,     /* Pi 4 hardware (V4L2 M2M) */
+    H264_CODEC_NVENC,        /* NVIDIA hardware */
+    H264_CODEC_VAAPI,        /* Intel/AMD VAAPI */
+    H264_CODEC_QSV           /* Intel Quick Sync */
+};
+
 class cls_h264_encoder {
 public:
     cls_h264_encoder(cls_camera *p_cam);
@@ -110,7 +118,7 @@ private:
     int64_t          frame_cnt;
     int64_t          base_pts;
     struct timespec  start_time;
-    bool             is_hw_codec;   /* true if using h264_v4l2m2m */
+    h264_codec_type  codec_type;
 
     int  open_encoder(int profile, int gop);
     void close_encoder();
@@ -123,6 +131,15 @@ private:
     /* NAL fixup data for v4l2m2m (same logic as cls_movie::encode_nal) */
     char            *nal_info;
     int              nal_info_len;
+
+    /* VAAPI hardware context (only used when codec_type == H264_CODEC_VAAPI) */
+    AVBufferRef     *hw_device_ctx;
+    AVBufferRef     *hw_frames_ref;
+    AVFrame         *hw_frame;
+
+    /* QSV NV12 conversion (only used when codec_type == H264_CODEC_QSV) */
+    struct SwsContext *sws_ctx;
+    AVFrame         *nv12_frame;
 
     bool         keyframe_requested;
     int          hysteresis_countdown;

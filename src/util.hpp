@@ -34,11 +34,14 @@
 typedef const AVCodec myAVCodec;
 typedef const uint8_t myuint;
 
-/* Profile constants - handle FFmpeg rename from AV_PROFILE_* to FF_PROFILE_* */
+/* Profile constants - handle FFmpeg rename from FF_PROFILE_* to AV_PROFILE_*
+ * (FFmpeg 7+ uses AV_PROFILE_*, older versions use FF_PROFILE_*) */
 #ifdef FF_PROFILE_H264_HIGH
-    #define MY_PROFILE_H264_HIGH   FF_PROFILE_H264_HIGH
+    #define MY_PROFILE_H264_HIGH                   FF_PROFILE_H264_HIGH
+    #define MY_PROFILE_H264_CONSTRAINED_BASELINE   FF_PROFILE_H264_CONSTRAINED_BASELINE
 #else
-    #define MY_PROFILE_H264_HIGH   AV_PROFILE_H264_HIGH
+    #define MY_PROFILE_H264_HIGH                   AV_PROFILE_H264_HIGH
+    #define MY_PROFILE_H264_CONSTRAINED_BASELINE   AV_PROFILE_H264_CONSTRAINED_BASELINE
 #endif
 
 /* FFmpeg 5.0+ Compatibility Macros - Support FFmpeg 5.0 through 7.x */

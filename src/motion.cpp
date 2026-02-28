@@ -296,12 +296,19 @@ void cls_motapp::av_init()
     /* Probe hardware encoder availability by actually opening each encoder.
      * avcodec_find_encoder_by_name() alone returns a valid codec on Pi 5
      * (false positive) because FFmpeg is built with v4l2 support. Only
-     * avcodec_open2() correctly detects whether the hardware is present. */
+     * avcodec_open2() correctly detects whether the hardware is present.
+     * Each probe takes ~50ms; run sequentially (they share GPU resources). */
     hw_encoders.h264_v4l2m2m = movie_probe_hw_encoder("h264_v4l2m2m");
+    hw_encoders.h264_nvenc   = movie_probe_hw_encoder("h264_nvenc");
+    hw_encoders.h264_vaapi   = movie_probe_vaapi_encoder();
+    hw_encoders.h264_qsv     = movie_probe_qsv_encoder();
     hw_encoders.probed = true;
     MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
-        ,_("Hardware encoder probe: h264_v4l2m2m=%s")
-        , hw_encoders.h264_v4l2m2m ? "available" : "not available");
+        ,_("Hardware encoder probe: v4l2m2m=%s nvenc=%s vaapi=%s qsv=%s")
+        , hw_encoders.h264_v4l2m2m ? "available" : "not available"
+        , hw_encoders.h264_nvenc   ? "available" : "not available"
+        , hw_encoders.h264_vaapi   ? "available" : "not available"
+        , hw_encoders.h264_qsv     ? "available" : "not available");
 }
 
 void cls_motapp::av_deinit()
