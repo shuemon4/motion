@@ -315,7 +315,10 @@ export function Settings() {
       }
     } catch (err) {
       console.error('Failed to save settings:', err)
-      addToast('Failed to save settings. Check browser console for details.', 'error')
+      const message = err instanceof Error && 'status' in err && (err as { status: number }).status === 401
+        ? 'Session expired. Please log in again.'
+        : 'Failed to save settings. Check browser console for details.'
+      addToast(message, 'error')
     } finally {
       setIsSaving(false)
     }

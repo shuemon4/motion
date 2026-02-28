@@ -224,6 +224,12 @@ export async function apiPost<T>(
           signal: controller.signal,
         });
 
+        if (configResponse.status === 401) {
+          // Session expired on backend - config endpoint rejected our token
+          handleSessionExpired(401);
+          throw new ApiClientError('Session expired', 401);
+        }
+
         if (configResponse.ok) {
           const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
           if (config.csrf_token) {
@@ -339,6 +345,12 @@ export async function apiPatch<T>(
           signal: controller.signal,
         });
 
+        if (configResponse.status === 401) {
+          // Session expired on backend - config endpoint rejected our token
+          handleSessionExpired(401);
+          throw new ApiClientError('Session expired', 401);
+        }
+
         if (configResponse.ok) {
           const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
           if (config.csrf_token) {
@@ -448,6 +460,12 @@ export async function apiDelete<T>(endpoint: string, timeout: number = API_TIMEO
           },
           signal: controller.signal,
         });
+
+        if (configResponse.status === 401) {
+          // Session expired on backend - config endpoint rejected our token
+          handleSessionExpired(401);
+          throw new ApiClientError('Session expired', 401);
+        }
 
         if (configResponse.ok) {
           const config = await safeJsonParse<{ csrf_token?: string }>(configResponse);
