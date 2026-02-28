@@ -212,6 +212,7 @@ export function Settings() {
         changes,
       }) as {
         status?: string
+        message?: string
         applied?: Array<{ param: string; error?: string; hot_reload?: boolean }>
         summary?: { total: number; success: number; errors: number }
       } | undefined
@@ -225,8 +226,11 @@ export function Settings() {
       const summary = response?.summary
       const applied = response?.applied || []
 
-      if (!summary) {
-        // No summary in response - assume success
+      if (response?.status === 'error') {
+        // Server returned an error (e.g., CSRF failure, permission denied)
+        addToast(`Failed to save: ${response.message || 'Unknown error'}`, 'error')
+      } else if (!summary) {
+        // No summary in response but no error - assume success
         addToast(`Saved ${Object.keys(changes).length} setting(s)`, 'success')
         setChanges({})
       } else {

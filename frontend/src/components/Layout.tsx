@@ -13,8 +13,8 @@ export const Layout = memo(function Layout() {
   const hasCameras = cameras && cameras.length > 0
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const handleLogout = async () => {
-    await logout()
+  const handleLogout = () => {
+    logout()
     // Invalidate auth queries - this triggers AuthContext and AuthGate to update
     queryClient.invalidateQueries({ queryKey: ['auth'] })
   }
@@ -123,8 +123,8 @@ export const Layout = memo(function Layout() {
                 {authRequired && isAuthenticated && (
                   <button
                     onClick={() => {
-                      handleLogout()
                       setMobileMenuOpen(false)
+                      handleLogout()
                     }}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface transition-colors text-left"
                   >

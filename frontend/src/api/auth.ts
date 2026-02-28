@@ -57,25 +57,33 @@ export async function login(
 
 /**
  * Logout - destroy session
+ *
+ * Clears local session immediately (instant logout), then notifies
+ * the server as best-effort with a timeout.  This ensures logout
+ * is never blocked by a hanging fetch (common on mobile networks).
  */
-export async function logout(): Promise<void> {
+export function logout(): void {
   const token = getSessionToken();
 
-  if (token) {
-    try {
-      await fetch('/0/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'X-Session-Token': token,
-        },
-        credentials: 'same-origin',  // Required for cookie clearing
-      });
-    } catch {
-      // Ignore errors - clear local session anyway
-    }
-  }
-
+  // Clear local session first - user is logged out immediately
   clearSession();
+
+  // Notify server (best-effort, fire-and-forget with timeout)
+  if (token) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    fetch('/0/api/auth/logout', {
+      method: 'POST',
+      headers: {
+        'X-Session-Token': token,
+      },
+      credentials: 'same-origin',
+      signal: controller.signal,
+    })
+      .catch(() => { /* ignore - session already cleared locally */ })
+      .finally(() => clearTimeout(timeoutId));
+  }
 }
 
 /**

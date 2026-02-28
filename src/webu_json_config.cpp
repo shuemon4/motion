@@ -438,13 +438,8 @@ void cls_webu_json::api_config_patch()
 {
     webua->resp_type = WEBUI_RESP_JSON;
 
-    /* Validate CSRF token (supports both session and global tokens) */
-    const char* csrf_token = MHD_lookup_connection_value(
-        webua->connection, MHD_HEADER_KIND, "X-CSRF-Token");
-    if (!webu->csrf_validate_request(csrf_token ? std::string(csrf_token) : "", webua->session_token)) {
-        MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO,
-            _("CSRF token validation failed for PATCH from %s"), webua->clientip.c_str());
-        webua->resp_page = "{\"status\":\"error\",\"message\":\"CSRF validation failed\"}";
+    /* Validate CSRF token - returns 403 so frontend can auto-retry with fresh token */
+    if (!validate_csrf()) {
         return;
     }
 
