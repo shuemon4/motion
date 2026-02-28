@@ -1836,6 +1836,8 @@ void cls_libcam::set_af_range(int value) { (void)value; }
 void cls_libcam::set_af_speed(int value) { (void)value; }
 void cls_libcam::trigger_af_scan() {}
 void cls_libcam::cancel_af_scan() {}
+void cls_libcam::set_noise_reduction_mode(int value) { (void)value; }
+void cls_libcam::set_exposure_time(int value) { (void)value; }
 std::map<std::string, bool> cls_libcam::get_capability_map() { return std::map<std::string, bool>(); }
 std::vector<std::string> cls_libcam::get_ignored_controls() { return std::vector<std::string>(); }
 void cls_libcam::clear_ignored_controls() {}

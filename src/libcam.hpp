@@ -183,6 +183,8 @@
                 void set_af_speed(int value);
                 void trigger_af_scan();
                 void cancel_af_scan();
+                void set_noise_reduction_mode(int value);
+                void set_exposure_time(int value);
                 std::map<std::string, bool> get_capability_map();
                 std::vector<std::string> get_ignored_controls();
                 void clear_ignored_controls();
