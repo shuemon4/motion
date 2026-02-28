@@ -401,7 +401,8 @@ export function Settings() {
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          {/* Desktop: inline save controls */}
+          <div className="hidden sm:flex items-center gap-3">
             {isDirty && !hasValidationErrors && (
               <span className="text-yellow-200 text-sm">Unsaved changes</span>
             )}
@@ -426,6 +427,32 @@ export function Settings() {
             </button>
           </div>
         </div>
+        {/* Mobile: action row below title when dirty */}
+        {isDirty && (
+          <div className="flex sm:hidden items-center gap-3 mt-3 pt-3 border-t border-gray-700/50">
+            {!hasValidationErrors ? (
+              <span className="text-yellow-200 text-sm">Unsaved changes</span>
+            ) : (
+              <span className="text-red-200 text-sm">Fix errors</span>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={handleReset}
+                disabled={isSaving}
+                className="px-3 py-1.5 text-sm bg-surface-elevated hover:bg-surface rounded-lg transition-colors disabled:opacity-50"
+              >
+                Discard
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving || hasValidationErrors}
+                className="px-4 py-1.5 text-sm bg-primary hover:bg-primary-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Global-only sections - show when selectedCamera === '0' */}
