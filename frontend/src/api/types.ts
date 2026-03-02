@@ -230,6 +230,9 @@ export interface CameraStatus {
   v4l2_controls?: V4L2Control[];           // v4l2 only
   netcam_status?: NetcamConnectionStatus;  // netcam only
   has_high_stream?: boolean;               // netcam only
+  webrtc_encoder?: string;
+  webrtc_encoder_state?: string;
+  webrtc_peers?: number;
 }
 
 // Status section with dynamic camera keys

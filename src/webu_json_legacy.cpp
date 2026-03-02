@@ -48,6 +48,9 @@
 #include <functional>
 #include <unordered_map>
 #include <sys/statvfs.h>
+#ifdef HAVE_WEBRTC
+#include "h264_encoder.hpp"
+#endif
 #include <dirent.h>
 #include <set>
 
@@ -382,6 +385,24 @@ void cls_webu_json::status_vars(int indx_cam)
             webua->resp_page += ",\"has_high_stream\":false";
         }
     }
+
+    #ifdef HAVE_WEBRTC
+    if (cam->h264_enc != nullptr) {
+        webua->resp_page += ",\"webrtc_encoder\":\"" +
+            std::string(cam->h264_enc->get_codec_name()) + "\"";
+        const char *state_str;
+        switch (cam->h264_enc->state) {
+        case H264_STATE_IDLE:        state_str = "idle"; break;
+        case H264_STATE_RECORD_ONLY: state_str = "record_only"; break;
+        case H264_STATE_WEBRTC_ONLY: state_str = "webrtc_only"; break;
+        case H264_STATE_BOTH:        state_str = "both"; break;
+        default:                     state_str = "unknown"; break;
+        }
+        webua->resp_page += ",\"webrtc_encoder_state\":\"" + std::string(state_str) + "\"";
+        webua->resp_page += ",\"webrtc_peers\":" +
+            std::to_string(cam->h264_enc->webrtc_cnct.load());
+    }
+    #endif
 
     webua->resp_page += "}";
 }

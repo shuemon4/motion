@@ -1431,6 +1431,68 @@ int cls_movie::movie_open()
         return 0;
     }
 
+#ifdef HAVE_WEBRTC
+    if (shared_enc_active && cam->h264_enc != nullptr) {
+        AVCodecContext *enc_ctx = cam->h264_enc->get_ctx_codec();
+        if (enc_ctx == nullptr) {
+            MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
+                , _("Shared encoder not ready, falling back to own encoder"));
+            shared_enc_active = false;
+        } else {
+            oc = avformat_alloc_context();
+            if (oc == nullptr) {
+                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                    , _("Could not allocate output context for shared encoder"));
+                shared_enc_active = false;
+            }
+        }
+        if (shared_enc_active) {
+            clock_gettime(CLOCK_MONOTONIC, &cb_st_ts);
+            cb_dur = 3;
+            oc->interrupt_callback.callback = movie_interrupt;
+            oc->interrupt_callback.opaque = this;
+
+            if (get_oformat() < 0) {
+                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                    , _("Could not get output format for shared encoder"));
+                free_context();
+                shared_enc_active = false;
+            }
+        }
+        if (shared_enc_active) {
+            strm_video = avformat_new_stream(oc, nullptr);
+            if (strm_video == nullptr) {
+                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                    , _("Could not create stream for shared encoder"));
+                free_context();
+                shared_enc_active = false;
+            }
+        }
+        if (shared_enc_active) {
+            AVCodecContext *enc = cam->h264_enc->get_ctx_codec();
+            if (avcodec_parameters_from_context(strm_video->codecpar, enc) < 0) {
+                MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                    , _("Could not copy codec params from shared encoder"));
+                free_context();
+                shared_enc_active = false;
+            } else {
+                strm_video->time_base = enc->time_base;
+                strm_video->avg_frame_rate = av_make_q(fps, 1);
+                ctx_codec = nullptr;
+                if (set_outputfile() < 0) {
+                    MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                        , _("Could not open output file for shared encoder"));
+                    free_context();
+                    shared_enc_active = false;
+                } else {
+                    return 0;
+                }
+            }
+        }
+        /* If we fell through, shared_enc_active is false — continue to normal path */
+    }
+#endif
+
     oc = avformat_alloc_context();
     if (oc == nullptr) {
         MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO, _("Could not allocate output context"));
@@ -1481,6 +1543,16 @@ void cls_movie::stop()
 
     clock_gettime(CLOCK_MONOTONIC, &cb_st_ts);
 
+#ifdef HAVE_WEBRTC
+    bool was_shared = shared_enc_active;
+    if (shared_enc_active) {
+        shared_enc_active = false;
+        if (cam->h264_enc != nullptr) {
+            cam->h264_enc->recording_stopped();
+        }
+    }
+#endif
+
     if (movie_type == "extpipe") {
         if (extpipe_stream != nullptr) {
             fflush(extpipe_stream);
@@ -1488,7 +1560,11 @@ void cls_movie::stop()
             extpipe_stream = nullptr;
         }
     } else {
+#ifdef HAVE_WEBRTC
+        if (!was_shared && flush_codec() < 0) {
+#else
         if (flush_codec() < 0) {
+#endif
             MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO, _("Error flushing codec"));
         }
         if (oc != nullptr) {
@@ -1609,6 +1685,12 @@ int cls_movie::put_image(ctx_image_data *img_data, const struct timespec *ts1)
         retcd = passthru_put(img_data);
         return retcd;
     }
+
+#ifdef HAVE_WEBRTC
+    if (shared_enc_active) {
+        return put_encoded_packet(ts1);
+    }
+#endif
 
     if (picture) {
         put_pix_yuv420(img_data);
@@ -1817,9 +1899,25 @@ void cls_movie::start_norm()
     motion_images = false;
     passthrough = cam->movie_passthrough;
 
+#ifdef HAVE_WEBRTC
+    if (cam->h264_enc != nullptr && cam->cfg->webrtc_enable
+        && !passthrough && container != "webm") {
+        shared_enc_active = true;
+        cam->h264_enc->recording_started();
+    }
+#endif
+
     if (movie_open() < 0) {
         MOTION_LOG(ERR, TYPE_EVENTS, NO_ERRNO
             ,_("Error initializing movie."));
+#ifdef HAVE_WEBRTC
+        if (shared_enc_active) {
+            shared_enc_active = false;
+            if (cam->h264_enc != nullptr) {
+                cam->h264_enc->recording_stopped();
+            }
+        }
+#endif
         return;
     }
 

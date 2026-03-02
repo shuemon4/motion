@@ -560,6 +560,7 @@ export function Settings() {
             config={activeConfig}
             onChange={handleChange}
             getError={getError}
+            cameraId={Number(selectedCamera)}
           />
 
           {/* 5a. PTZ Controls - netcam only */}

@@ -106,6 +106,17 @@ public:
     /* Codec context accessor for movie passthrough mode */
     AVCodecContext *get_ctx_codec() { return ctx_codec; }
 
+    const char *get_codec_name() const {
+        switch (codec_type) {
+        case H264_CODEC_V4L2M2M: return "h264_v4l2m2m";
+        case H264_CODEC_NVENC:   return "h264_nvenc";
+        case H264_CODEC_VAAPI:   return "h264_vaapi";
+        case H264_CODEC_QSV:     return "h264_qsv";
+        case H264_CODEC_LIBX264: return "libx264";
+        default:                 return "unknown";
+        }
+    }
+
 private:
     cls_camera      *cam;
     AVCodecContext  *ctx_codec;
