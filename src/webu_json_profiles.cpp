@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json_profiles.cpp - Configuration Profile Management API
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Implements JSON REST API endpoints for managing per-camera configuration
+ * profiles: listing, retrieving, creating (with optional config snapshot),
+ * updating, deleting, and setting default profiles. Write operations
+ * validate CSRF tokens and serialize profile metadata with timestamps.
  *
  */
 

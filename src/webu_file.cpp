@@ -16,6 +16,16 @@
  *
 */
 
+/*
+ * webu_file.cpp - Static File and Media Serving
+ *
+ * Serves recorded video files and thumbnails from the motion database
+ * with HTTP Range support for streaming, and serves React UI static
+ * assets with SPA fallback routing. Includes MIME type detection,
+ * cache control headers, and realpath-based path traversal protection.
+ *
+ */
+
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"

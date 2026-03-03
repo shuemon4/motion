@@ -39,6 +39,8 @@
 #include "webu_file.hpp"
 #include "video_v4l2.hpp"
 
+/* MHD header iterator callback: scans request headers and sets gzip_encode
+ * if the client advertises Accept-Encoding: gzip support. */
 static mhdrslt webua_connection_values (void *cls
     , enum MHD_ValueKind kind, const char *src_key, const char *src_val)
 {
@@ -56,6 +58,9 @@ static mhdrslt webua_connection_values (void *cls
   return MHD_YES;
 }
 
+/* Detects changes to the TLS certificate or key files since server start.
+ * If either file has changed (mtime or size), sets webu->restart=true and
+ * returns -1 so the caller can close this connection and restart the server. */
 int cls_webu_ans::check_tls()
 {
     struct stat file_attrib;
@@ -451,6 +456,8 @@ void cls_webu_ans::failauth_log(bool userid_fail, const std::string &username)
 
 }
 
+/* Records a successful authentication: expires stale entries, enforces the
+ * client-list size cap, and upserts the (IP, username) entry as authenticated. */
 void cls_webu_ans::client_connect()
 {
     timespec                                tm_cnct;
@@ -883,6 +890,9 @@ mhdrslt cls_webu_ans::mhd_auth()
 
 }
 
+/* Compresses resp_page into gzip_resp using zlib deflate (gzip wrapper).
+ * The output buffer is allocated with 1024 bytes of headroom; the entire
+ * response must fit in one deflate call. Sets gzip_size=0 on any error. */
 void cls_webu_ans::gzip_deflate()
 {
     uint sz;
@@ -1019,6 +1029,7 @@ void cls_webu_ans::mhd_send()
     }
 }
 
+/* Sends a 400 Bad Request HTML response to the client. */
 void cls_webu_ans::bad_request()
 {
     resp_page =
@@ -1032,6 +1043,8 @@ void cls_webu_ans::bad_request()
     mhd_send();
 }
 
+/* Validates that device_id is non-negative and, for device IDs > 0, that cam is set.
+ * Returns false and logs an error if the camera specified in the URL is invalid. */
 bool cls_webu_ans::valid_request()
 {
     pthread_mutex_lock(&app->mutex_camlst);
@@ -1409,6 +1422,8 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
         return MHD_NO;
     }
 
+    /* Authentication cascade: cookie → X-Session-Token header → query param → HTTP Basic/Digest.
+     * The first valid credential wins; HTTP auth is only reached when no session token exists. */
     if (authenticated == false) {
         /* Priority 1: Check for session cookie (browser streams, <img>/<video> tags) */
         const char* cookie_token = MHD_lookup_connection_value(
@@ -1459,6 +1474,9 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
 
     client_connect();
 
+    /* MHD calls this handler twice for POST/PATCH: first with mhd_first=true to
+     * identify the method and initialize body accumulation, then again with the
+     * actual upload_data chunks until upload_data_size==0 signals body complete. */
     if (mhd_first) {
         mhd_first = false;
         if (mystreq(method,"POST")) {
@@ -1775,6 +1793,9 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
 
 }
 
+/* Decrements the stream connection counters for this connection on destruction.
+ * Handles both per-camera (jpg_cnct) and all-camera (all_cnct) counters, and
+ * frees stream image buffers when all viewers have disconnected. */
 void cls_webu_ans::deinit_counter()
 {
     ctx_stream_data *strm;
@@ -1796,6 +1817,7 @@ void cls_webu_ans::deinit_counter()
         cam_max = 0;
     }
 
+    /* Phase 1: decrement counters for each individual camera in range. */
     for (indx=cam_min; indx<cam_max; indx++) {
         p_cam = app->cam_list[indx];
         pthread_mutex_lock(&p_cam->stream.mutex);
@@ -1829,6 +1851,7 @@ void cls_webu_ans::deinit_counter()
             }
         pthread_mutex_unlock(&p_cam->stream.mutex);
     }
+    /* Phase 2: for device_id==0 (all-camera view), also decrement the allcam counter. */
     if (device_id == 0) {
         pthread_mutex_lock(&app->allcam->stream.mutex);
             if (cnct_type == WEBUI_CNCT_JPG_FULL) {
@@ -1852,6 +1875,9 @@ void cls_webu_ans::deinit_counter()
     }
 }
 
+/* Initializes the connection answer object: zeroes all state, detects locale for
+ * language code, parses the incoming URI into cmd segments, and increments the
+ * global connection count. */
 cls_webu_ans::cls_webu_ans(cls_motapp *p_app, const char *uri)
 {
     app = p_app;
@@ -1914,6 +1940,8 @@ cls_webu_ans::cls_webu_ans(cls_motapp *p_app, const char *uri)
 
 }
 
+/* Tears down the connection: decrements stream counters, deletes sub-objects,
+ * frees auth credential buffers and gzip buffer, and decrements cnct_cnt. */
 cls_webu_ans::~cls_webu_ans()
 {
     deinit_counter();

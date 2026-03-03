@@ -121,6 +121,7 @@ static void setup_signals(void)
     sigaction(SIGVTALRM, &sig_handler_action, NULL);
 }
 
+/* Dispatch actions for received POSIX signals (snapshot, event end, reload, shutdown) */
 void cls_motapp::signal_process()
 {
     int indx;
@@ -182,6 +183,7 @@ void cls_motapp::signal_process()
     motsignal = MOTION_SIGNAL_NONE;
 }
 
+/* Write the current process ID to the configured pid file */
 void cls_motapp::pid_write()
 {
     FILE *pidf = NULL;
@@ -218,6 +220,7 @@ void cls_motapp::pid_remove()
     }
 }
 
+/* Fork into the background, detach from terminal, redirect stdio to /dev/null */
 void cls_motapp::daemon()
 {
     int fd;
@@ -276,6 +279,7 @@ void cls_motapp::daemon()
     sigaction(SIGTSTP, &sig_ign_action, NULL);
 }
 
+/* Initialize FFmpeg libraries and probe for available hardware encoders */
 void cls_motapp::av_init()
 {
     MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO, _("libavcodec  version %d.%d.%d")
@@ -311,11 +315,13 @@ void cls_motapp::av_init()
         , hw_encoders.h264_qsv     ? "available" : "not available");
 }
 
+/* Tear down FFmpeg network subsystem */
 void cls_motapp::av_deinit()
 {
     avformat_network_deinit();
 }
 
+/* Log compile-time feature availability (v4l2, libcam, database backends, etc.) */
 void cls_motapp::ntc()
 {
     #ifdef HAVE_V4L2
@@ -429,6 +435,7 @@ void cls_motapp::watchdog(uint camindx)
 
 }
 
+/* Restart subsystems (log, database, webcontrol) that have been flagged for reload */
 void cls_motapp::check_restart()
 {
     std::string parm_pid_org, parm_pid_new;
@@ -476,6 +483,7 @@ void cls_motapp::check_restart()
 
 }
 
+/* Check all cameras and sound devices; restart stopped handlers. Returns true if any device is active. */
 bool cls_motapp::check_devices()
 {
     int indx;
@@ -520,6 +528,7 @@ bool cls_motapp::check_devices()
 
 }
 
+/* Purge completed delete-progress entries older than 60 seconds */
 void cls_motapp::cleanup_delete_progress()
 {
     time_t now = time(nullptr);
@@ -543,6 +552,7 @@ void cls_motapp::cleanup_delete_progress()
     pthread_mutex_unlock(&mutex_delete_progress);
 }
 
+/* Initialize the application: config, logging, daemon mode, FFmpeg, subsystems, and camera threads */
 void cls_motapp::init(int p_argc, char *p_argv[])
 {
     int indx;
@@ -624,6 +634,7 @@ void cls_motapp::init(int p_argc, char *p_argv[])
 
 }
 
+/* Tear down all subsystems and free resources in reverse initialization order */
 void cls_motapp::deinit()
 {
     int indx;
@@ -668,7 +679,7 @@ void cls_motapp::camera_add()
 
 }
 
-/* Check for whether to delete a new cam */
+/* Stop a camera, remove it from the list, delete its config file, and update main config */
 void cls_motapp::camera_delete()
 {
     cls_camera *cam;

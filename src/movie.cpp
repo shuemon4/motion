@@ -152,6 +152,7 @@ bool movie_probe_qsv_encoder()
     return (ret == 0);
 }
 
+/* FFmpeg I/O interrupt callback; returns 1 (abort) if elapsed time exceeds cb_dur seconds */
 int movie_interrupt(void *ctx)
 {
     cls_movie *movie = (cls_movie *)ctx;
@@ -179,6 +180,7 @@ void cls_movie::free_nal()
     }
 }
 
+/* Prepend SPS/PPS NAL units to the first keyframe for v4l2m2m, which emits them separately */
 void cls_movie::encode_nal()
 {
     // h264_v4l2m2m has NAL units separated from the first frame, which makes
@@ -227,6 +229,7 @@ int cls_movie::timelapse_append(AVPacket *p_pkt)
     return 0;
 }
 
+/* Release the AVFrame, AVCodecContext, and AVFormatContext if allocated */
 void cls_movie::free_context()
 {
     if (picture != nullptr) {
@@ -245,6 +248,7 @@ void cls_movie::free_context()
     }
 }
 
+/* Select the output format and file extension based on the configured container type */
 int cls_movie::get_oformat()
 {
     if (tlapse == TIMELAPSE_APPEND) {
@@ -315,6 +319,7 @@ int cls_movie::get_oformat()
     return 0;
 }
 
+/* Send the current picture to the codec and receive an encoded packet. Returns -2 if buffered. */
 int cls_movie::encode_video()
 {
     int retcd = 0;
@@ -348,6 +353,7 @@ int cls_movie::encode_video()
     return 0;
 }
 
+/* Calculate and set the presentation timestamp for the current frame */
 int cls_movie::set_pts(const struct timespec *ts1)
 {
     int64_t pts_interval;
@@ -399,6 +405,7 @@ static bool is_hardware_encoder(const std::string &codec_name)
            codec_name == "h264_qsv";
 }
 
+/* Configure encoder quality: CRF for libx264/x265, bitrate for v4l2m2m, CQ/QP for nvenc/vaapi/qsv */
 int cls_movie::set_quality()
 {
     int quality;
@@ -489,6 +496,7 @@ int cls_movie::set_quality()
     return 0;
 }
 
+/* Look up the user-preferred encoder by name, falling back to the container default */
 int cls_movie::set_codec_preferred()
 {
     codec = nullptr;
@@ -516,6 +524,7 @@ int cls_movie::set_codec_preferred()
     return 0;
 }
 
+/* Open the video encoder: create stream, configure GOP/quality, with HW-to-SW fallback */
 int cls_movie::set_codec()
 {
     int retcd;
@@ -683,6 +692,7 @@ int cls_movie::set_codec()
     return 0;
 }
 
+/* Copy codec parameters to the output stream and set the stream time base */
 int cls_movie::set_stream()
 {
     int retcd;
@@ -771,6 +781,7 @@ int cls_movie::alloc_video_buffer(AVFrame *frame, int align)
     return 0;
 }
 
+/* Allocate the AVFrame for encoding; uses custom buffer allocation for v4l2m2m */
 int cls_movie::set_picture()
 {
     int retcd;
@@ -809,6 +820,7 @@ int cls_movie::set_picture()
     return 0;
 }
 
+/* Open the output file, write the container header, and set +faststart for MP4/MOV */
 int cls_movie::set_outputfile()
 {
     int retcd;
@@ -886,6 +898,7 @@ int cls_movie::set_outputfile()
     return 0;
 }
 
+/* Drain any buffered frames from the encoder and write them to the output file */
 int cls_movie::flush_codec()
 {
     int retcd;
@@ -936,6 +949,7 @@ int cls_movie::flush_codec()
     return 0;
 }
 
+/* Set PTS, encode one frame, and write the resulting packet to the output */
 int cls_movie::put_frame(const struct timespec *ts1)
 {
     int retcd;
@@ -986,6 +1000,7 @@ void cls_movie::passthru_reset()
 
 }
 
+/* Rescale packet PTS/DTS/duration from the netcam source time base to the output stream time base */
 int cls_movie::passthru_pktpts()
 {
     int64_t ts_interval, base_pdts;
@@ -1085,6 +1100,7 @@ void cls_movie::passthru_write(int indx)
 
 }
 
+/* Find the minimum PTS across all audio and video packets for pass-through base offset */
 void cls_movie::passthru_minpts()
 {
     int indx, indx_audio, indx_video;
@@ -1140,6 +1156,7 @@ void cls_movie::passthru_minpts()
 
 }
 
+/* Write unwritten netcam packets up to the current image to the output file (pass-through mode) */
 int cls_movie::passthru_put(ctx_image_data *img_data)
 {
     int64_t idnbr_image, idnbr_lastwritten, idnbr_stop, idnbr_firstkey;
@@ -1220,6 +1237,7 @@ int cls_movie::passthru_put(ctx_image_data *img_data)
     return 0;
 }
 
+/* Create the output video stream by copying codec parameters from the netcam source */
 int cls_movie::passthru_streams_video(AVStream *stream_in)
 {
     int retcd;
@@ -1250,6 +1268,7 @@ int cls_movie::passthru_streams_video(AVStream *stream_in)
     return 0;
 }
 
+/* Create the output audio stream by copying codec parameters from the netcam source */
 int cls_movie::passthru_streams_audio( AVStream *stream_in)
 {
     int retcd;
@@ -1281,6 +1300,7 @@ int cls_movie::passthru_streams_audio( AVStream *stream_in)
     return 0;
 }
 
+/* Set up all output streams (video + audio) from the netcam transfer format */
 int cls_movie::passthru_streams()
 {
     int         retcd, indx;
@@ -1308,6 +1328,7 @@ int cls_movie::passthru_streams()
     return 0;
 }
 
+/* Verify the netcam is connected and reset packet-written flags for a new pass-through recording */
 int cls_movie::passthru_check()
 {
     if ((netcam_data->status == NETCAM_NOTCONNECTED  ) ||
@@ -1327,6 +1348,7 @@ int cls_movie::passthru_check()
     return 0;
 }
 
+/* Open a pass-through movie: allocate context, set up streams, and write header */
 int cls_movie::passthru_open()
 {
     int retcd;
@@ -1388,6 +1410,7 @@ int cls_movie::passthru_open()
     return 0;
 }
 
+/* Point the AVFrame data planes at the camera's YUV420 image buffer */
 void cls_movie::put_pix_yuv420(ctx_image_data *img_data)
 {
     unsigned char *image;
@@ -1404,6 +1427,7 @@ void cls_movie::put_pix_yuv420(ctx_image_data *img_data)
     picture->data[2] = picture->data[1] + ((ctx_codec->width * ctx_codec->height) / 4);
 }
 
+/* Execute the user's on_movie_start command if configured */
 void cls_movie::on_movie_start()
 {
     MOTION_LOG(DBG, TYPE_EVENTS, NO_ERRNO, _("Creating movie: %s"),full_nm.c_str());
@@ -1412,6 +1436,7 @@ void cls_movie::on_movie_start()
     }
 }
 
+/* Execute the user's on_movie_end command if configured */
 void cls_movie::on_movie_end()
 {
     MOTION_LOG(DBG, TYPE_EVENTS, NO_ERRNO, _("Finished movie: %s"),full_nm.c_str());
@@ -1420,6 +1445,7 @@ void cls_movie::on_movie_end()
     }
 }
 
+/* Open a movie file: dispatches to passthrough, shared encoder, or local encoder path */
 int cls_movie::movie_open()
 {
     if (passthrough) {
@@ -1555,6 +1581,7 @@ int cls_movie::movie_open()
     return 0;
 }
 
+/* Finalize the movie: flush encoder, write trailer, close file, run end hooks, queue thumbnail */
 void cls_movie::stop(bool is_split)
 {
     timespec *ts;
@@ -1679,6 +1706,7 @@ void cls_movie::stop(bool is_split)
 
 }
 
+/* Write raw image data to the external pipe process */
 int cls_movie::extpipe_put()
 {
     int retcd;
@@ -1706,6 +1734,7 @@ int cls_movie::extpipe_put()
     return retcd;
 }
 
+/* Main entry point: write one image frame to the active movie (extpipe, passthrough, shared, or local) */
 int cls_movie::put_image(ctx_image_data *img_data, const struct timespec *ts1)
 {
     int retcd = 0;
@@ -1902,6 +1931,7 @@ int cls_movie::put_encoded_packet(const struct timespec *ts1)
 }
 #endif
 
+/* Adjust the base PTS and start time when pre-capture frames have earlier timestamps */
 void cls_movie::reset_start_time(const struct timespec *ts1)
 {
     int64_t one_frame_interval = av_rescale_q(1,av_make_q(1, fps), strm_video->time_base);
@@ -1915,6 +1945,7 @@ void cls_movie::reset_start_time(const struct timespec *ts1)
 
 }
 
+/* Parse the container config string, extracting optional "container:codec" preferred codec */
 void cls_movie::init_container()
 {
     int codenbr;
@@ -1950,6 +1981,7 @@ void cls_movie::init_container()
 
 }
 
+/* Start a normal event recording: set up paths, resolution, fps, and open the movie file */
 void cls_movie::start_norm()
 {
     char tmp[PATH_MAX];
@@ -2033,6 +2065,7 @@ void cls_movie::start_norm()
 
 }
 
+/* Start a motion-only recording (debug view of detection areas at normal resolution) */
 void cls_movie::start_motion()
 {
     char tmp[PATH_MAX];
@@ -2095,6 +2128,7 @@ void cls_movie::start_motion()
 
 }
 
+/* Start a timelapse recording: MPG (append mode) or MKV (new file per event) */
 void cls_movie::start_timelapse()
 {
     char tmp[PATH_MAX];
@@ -2151,6 +2185,7 @@ void cls_movie::start_timelapse()
     is_running = true;
 }
 
+/* Start recording via an external pipe command (popen) */
 void cls_movie::start_extpipe()
 {
     char tmp[PATH_MAX];
@@ -2200,6 +2235,7 @@ void cls_movie::start_extpipe()
 
 }
 
+/* Start a recording: dispatches to norm, motion, timelapse, or extpipe based on movie_type */
 void cls_movie::start()
 {
     if (is_running == true) {
@@ -2219,6 +2255,7 @@ void cls_movie::start()
     }
 }
 
+/* Reset all member variables to safe defaults (called from constructor) */
 void cls_movie::init_vars()
 {
     cb_st_ts.tv_nsec = 0;

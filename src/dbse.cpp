@@ -63,6 +63,7 @@ static std::string dbse_escape_sql_string(const std::string &input)
     return result;
 }
 
+/* pthread entry point - casts arg to cls_dbse and calls handler() */
 static void *dbse_handler(void *arg)
 {
     ((cls_dbse *)arg)->handler();
@@ -71,6 +72,7 @@ static void *dbse_handler(void *arg)
 
 #ifdef HAVE_DBSE
 
+/* Append a column definition to the expected-columns list */
 void cls_dbse::cols_vec_add(std::string nm, std::string typ)
 {
     ctx_col_item col_itm;
@@ -80,6 +82,7 @@ void cls_dbse::cols_vec_add(std::string nm, std::string typ)
     col_names.push_back(col_itm);
 }
 
+/* Build the list of expected columns in the 'motion' table for schema migration */
 void cls_dbse::cols_vec_create()
 {
     col_names.clear();
@@ -98,6 +101,7 @@ void cls_dbse::cols_vec_create()
     cols_vec_add("sdev_avg","int");
 }
 
+/* Reset file_item to defaults before populating from a database row */
 void cls_dbse::item_default()
 {
     file_item.found = false;
@@ -157,6 +161,7 @@ void cls_dbse::item_assign(std::string col_nm, std::string col_val)
     }
 }
 
+/* Generate SQL for table-level operations (check, create, list columns) per database type */
 void cls_dbse::sql_motion(std::string &sql)
 {
     std::string delimit;
@@ -206,6 +211,7 @@ void cls_dbse::sql_motion(std::string &sql)
 
 }
 
+/* Generate SQL for column-level operations (add column, rename column) */
 void cls_dbse::sql_motion(std::string &sql, std::string col_p1, std::string col_p2)
 {
     if ((is_open == false) || (finish == true)) {
@@ -227,8 +233,15 @@ void cls_dbse::sql_motion(std::string &sql, std::string col_p1, std::string col_
 
 #endif /* HAVE_DBSE */
 
+/*
+ * ============================================================
+ * SQLite3 Backend
+ * Uses callback-based API (sqlite3_exec with callback function)
+ * ============================================================
+ */
 #ifdef HAVE_SQLITE3DB
 
+/* Static callback wrapper for sqlite3_exec - routes to cls_dbse::sqlite3db_cb */
 static int dbse_sqlite3db_cb (void *ptr, int arg_nb, char **arg_val, char **col_nm)
 {
     cls_dbse *dbse = (cls_dbse*)ptr;
@@ -236,6 +249,7 @@ static int dbse_sqlite3db_cb (void *ptr, int arg_nb, char **arg_val, char **col_
     return 0;
 }
 
+/* Execute a SQL statement that returns no result rows */
 bool cls_dbse::sqlite3db_exec(std::string sql)
 {
     int retcd;
@@ -261,6 +275,7 @@ bool cls_dbse::sqlite3db_exec(std::string sql)
     return true;
 }
 
+/* Process a row from sqlite3_exec - dispatches based on current dbse_action */
 void cls_dbse::sqlite3db_cb (int arg_nb, char **arg_val, char **col_nm)
 {
     int indx, indx2;
@@ -300,6 +315,7 @@ void cls_dbse::sqlite3db_cb (int arg_nb, char **arg_val, char **col_nm)
     }
 }
 
+/* Ensure all expected columns exist in the motion table, adding any missing ones */
 void cls_dbse::sqlite3db_cols_verify()
 {
     int retcd, indx;
@@ -334,6 +350,7 @@ void cls_dbse::sqlite3db_cols_verify()
     }
 }
 
+/* Migrate legacy "movie_*" columns to "file_*" naming convention */
 void cls_dbse::sqlite3db_cols_rename()
 {
     int retcd, indx;
@@ -366,6 +383,7 @@ void cls_dbse::sqlite3db_cols_rename()
     }
 }
 
+/* Open SQLite3 database, create motion table if needed, and run schema migrations */
 void cls_dbse::sqlite3db_init()
 {
     int retcd;
@@ -401,6 +419,8 @@ void cls_dbse::sqlite3db_init()
     }
 
     is_open = true;
+
+    /* Configure busy timeout to handle concurrent access from camera threads */
     MOTION_LOG(NTC, TYPE_DB, NO_ERRNO
         ,  _("database_busy_timeout %d msec")
         , app->cfg->database_busy_timeout);
@@ -440,6 +460,7 @@ void cls_dbse::sqlite3db_init()
 
 }
 
+/* Execute a SELECT query and populate filelist via the callback */
 void cls_dbse::sqlite3db_filelist(std::string sql)
 {
     int retcd;
@@ -473,8 +494,16 @@ void cls_dbse::sqlite3db_close()
 
 #endif  /*HAVE_SQLITE3*/
 
+/*
+ * ============================================================
+ * MariaDB/MySQL Backend
+ * Uses mysql_query + mysql_store_result API
+ * Error codes >= 2000 are client-side (connection lost) and trigger shutdown
+ * ============================================================
+ */
 #ifdef HAVE_MARIADB
 
+/* Execute a SQL statement and commit; shuts down on client-side errors (code >= 2000) */
 bool cls_dbse::mariadb_exec (std::string sql)
 {
     int retcd;
@@ -511,6 +540,7 @@ bool cls_dbse::mariadb_exec (std::string sql)
     return true;
 }
 
+/* Execute a query and process result rows based on current dbse_action */
 void cls_dbse::mariadb_recs(std::string sql)
 {
     int retcd, indx, indx2;
@@ -599,6 +629,7 @@ void cls_dbse::mariadb_recs(std::string sql)
     mysql_free_result(qry_result);
 }
 
+/* Ensure all expected columns exist, adding missing ones via ALTER TABLE */
 void cls_dbse::mariadb_cols_verify()
 {
     std::string sql;
@@ -625,6 +656,7 @@ void cls_dbse::mariadb_cols_verify()
     }
 }
 
+/* Migrate legacy "movie_*" columns to "file_*" naming convention */
 void cls_dbse::mariadb_cols_rename()
 {
     std::string sql, tmp;
@@ -650,6 +682,7 @@ void cls_dbse::mariadb_cols_rename()
     }
 }
 
+/* Check for motion table, create if missing, then run schema migrations */
 void cls_dbse::mariadb_setup()
 {
     std::string sql;
@@ -675,6 +708,7 @@ void cls_dbse::mariadb_setup()
 
 }
 
+/* Initialize MariaDB connection, enable auto-reconnect, and set up schema */
 void cls_dbse::mariadb_init()
 {
     bool my_true = true;
@@ -747,8 +781,15 @@ void cls_dbse::mariadb_filelist(std::string sql)
 
 #endif  /*HAVE_MARIADB*/
 
+/*
+ * ============================================================
+ * PostgreSQL Backend
+ * Uses PQexec + PQgetvalue API with automatic reconnect on CONNECTION_BAD
+ * ============================================================
+ */
 #ifdef HAVE_PGSQLDB
 
+/* Execute a SQL statement with automatic reconnect on connection loss */
 bool cls_dbse::pgsqldb_exec(std::string sql)
 {
     PGresult    *res;
@@ -802,6 +843,7 @@ void cls_dbse::pgsqldb_close()
     }
 }
 
+/* Execute a query and process result rows based on current dbse_action */
 void cls_dbse::pgsqldb_recs (std::string sql)
 {
     PGresult    *res;
@@ -878,6 +920,7 @@ void cls_dbse::pgsqldb_recs (std::string sql)
     }
 }
 
+/* Ensure all expected columns exist, adding missing ones via ALTER TABLE */
 void cls_dbse::pgsqldb_cols_verify()
 {
     std::string sql;
@@ -904,6 +947,7 @@ void cls_dbse::pgsqldb_cols_verify()
     }
 }
 
+/* Migrate legacy "movie_*" columns to "file_*" naming convention */
 void cls_dbse::pgsqldb_cols_rename()
 {
     int indx;
@@ -929,6 +973,7 @@ void cls_dbse::pgsqldb_cols_rename()
     }
 }
 
+/* Check for motion table, create if missing, then run schema migrations */
 void cls_dbse::pgsqldb_setup()
 {
     std::string sql;
@@ -954,6 +999,7 @@ void cls_dbse::pgsqldb_setup()
 
 }
 
+/* Connect to PostgreSQL using libpq connection string and set up schema */
 void cls_dbse::pgsqldb_init()
 {
     std::string constr;
@@ -995,6 +1041,7 @@ void cls_dbse::pgsqldb_filelist(std::string sql)
 
 #endif  /*HAVE_PGSQL*/
 
+/* Open the configured database backend (lazy - returns true if already open) */
 bool cls_dbse::dbse_open()
 {
     if (is_open) {
@@ -1027,6 +1074,7 @@ bool cls_dbse::dbse_open()
     return is_open;
 }
 
+/* Execute a SELECT query and return matching file records (mutex-protected) */
 void cls_dbse::filelist_get(std::string sql, vec_files &p_flst)
 {
     int indx;
@@ -1067,6 +1115,7 @@ void cls_dbse::filelist_get(std::string sql, vec_files &p_flst)
 
 }
 
+/* Close all database connections */
 void cls_dbse::shutdown()
 {
     #ifdef HAVE_MARIADB
@@ -1080,6 +1129,7 @@ void cls_dbse::shutdown()
     #endif
 }
 
+/* Execute a SQL statement on the active backend (mutex-protected) */
 bool cls_dbse::exec_sql(std::string sql)
 {
     bool retval = false;
@@ -1113,6 +1163,7 @@ bool cls_dbse::exec_sql(std::string sql)
     return retval;
 }
 
+/* Execute a user-defined SQL template for a camera event (pic_save, movie_start, etc.) */
 void cls_dbse::exec(cls_camera *cam, std::string fname, std::string cmd)
 {
     std::string sql;
@@ -1145,6 +1196,7 @@ void cls_dbse::exec(cls_camera *cam, std::string fname, std::string cmd)
 
 }
 
+/* Insert a file record into the motion table with metadata (size, timestamps, motion stats) */
 void cls_dbse::filelist_add(cls_camera *cam, timespec *ts1, std::string ftyp
     ,std::string filenm, std::string fullnm, std::string dirnm)
 {
@@ -1210,6 +1262,7 @@ void cls_dbse::filelist_add(cls_camera *cam, timespec *ts1, std::string ftyp
 
 }
 
+/* Validate database configuration - disables database if config is invalid */
 void cls_dbse::dbse_edits()
 {
     int retcd = 0;
@@ -1254,6 +1307,7 @@ void cls_dbse::dbse_edits()
 
 }
 
+/* Remove database records for files that no longer exist on disk, then vacuum SQLite */
 void cls_dbse::dbse_clean()
 {
     int delcnt, indx, camindx;
@@ -1272,6 +1326,7 @@ void cls_dbse::dbse_clean()
         sql += " order by file_dtl, file_tml;";
         filelist_get(sql, flst);
 
+        /* Batch deletions in groups of 20 to avoid overly long SQL statements */
         delcnt = 0;
         sql = "";
         for (indx=0;indx<flst.size();indx++) {
@@ -1309,6 +1364,7 @@ void cls_dbse::dbse_clean()
 
 }
 
+/* Validate config and open the database connection */
 void cls_dbse::startup()
 {
     is_open = false;
@@ -1324,6 +1380,7 @@ bool cls_dbse::check_exit()
     return false;
 }
 
+/* Sleep for ~30 seconds in 1-second increments, checking for exit between each */
 void cls_dbse::timing()
 {
     int waitcnt;
@@ -1338,6 +1395,7 @@ void cls_dbse::timing()
     }
 }
 
+/* Background thread: runs dbse_clean() once per hour to purge orphaned records */
 void cls_dbse::handler()
 {
     struct timespec ts2;
@@ -1364,6 +1422,7 @@ void cls_dbse::handler()
     pthread_exit(NULL);
 }
 
+/* Start the background cleanup thread (detached) */
 void cls_dbse::handler_startup()
 {
     int retcd;
@@ -1385,6 +1444,7 @@ void cls_dbse::handler_startup()
     }
 }
 
+/* Stop the background thread - waits watchdog_tmo seconds, then escalates to kill */
 void cls_dbse::handler_shutdown()
 {
     int waitcnt;
@@ -1425,6 +1485,7 @@ void cls_dbse::handler_shutdown()
     }
 }
 
+/* Constructor - opens database connection and starts background cleanup thread */
 cls_dbse::cls_dbse(cls_motapp *p_app)
 {
     app = p_app;
@@ -1443,6 +1504,7 @@ cls_dbse::cls_dbse(cls_motapp *p_app)
 
 }
 
+/* Destructor - stops cleanup thread, closes database, destroys mutex */
 cls_dbse::~cls_dbse()
 {
     handler_shutdown();

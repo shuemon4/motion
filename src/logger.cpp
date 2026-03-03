@@ -35,6 +35,7 @@ cls_log *motlog;
 const char *log_type_str[]  = {NULL, "COR", "STR", "ENC", "NET", "DBS", "EVT", "TRK", "VID", "ALL"};
 const char *log_level_str[] = {NULL, "EMG", "ALR", "CRT", "ERR", "WRN", "NTC", "INF", "DBG", "ALL"};
 
+/* FFmpeg log callback: translate FFmpeg log levels to Motion INF messages, suppressing noise. */
 void ff_log(void *var1, int errnbr, const char *fmt, va_list vlist)
 {
     (void)var1;
@@ -61,6 +62,7 @@ void ff_log(void *var1, int errnbr, const char *fmt, va_list vlist)
     AV_LOG_TRACE    56  9
     */
 
+    /* Map Motion's log_fflevel (2–9) to FFmpeg's AV_LOG_* scale (0, 8, 16, …, 56). */
     fflvl = ((motlog->log_fflevel -2) * 8);
 
     if (errnbr <= fflvl ) {
@@ -68,6 +70,7 @@ void ff_log(void *var1, int errnbr, const char *fmt, va_list vlist)
     }
 }
 
+/* Populate log_vec with 200 blank entries, resetting all message text and counters. */
 void cls_log::log_history_init()
 {
     int             indx;
@@ -80,6 +83,7 @@ void cls_log::log_history_init()
     }
 }
 
+/* Shift the history ring one slot and append msg to the last position, reinitializing on counter overflow. */
 void cls_log::log_history_add(std::string msg)
 {
     int indx, mx;
@@ -99,6 +103,7 @@ void cls_log::log_history_add(std::string msg)
 
 }
 
+/* If the last message was repeated, emit a "repeats N times" summary and add it to history. */
 void cls_log::write_flood(int loglvl)
 {
     char flood_repeats[1024];
@@ -123,6 +128,7 @@ void cls_log::write_flood(int loglvl)
     log_history_add(flood_repeats);
 }
 
+/* Write a new (non-duplicate) message to the log destination, reset flood state, and add to history. */
 void cls_log::write_norm(int loglvl, uint prefixlen)
 {
     flood_cnt = 1;
@@ -147,6 +153,7 @@ void cls_log::write_norm(int loglvl, uint prefixlen)
     log_history_add(msg_full);
 }
 
+/* Append ": <strerror>" to msg_full when flgerr != NO_ERRNO, truncating msg_full if needed. */
 void cls_log::add_errmsg(int flgerr, int err_save)
 {
     size_t errsz, msgsz;
@@ -175,6 +182,7 @@ void cls_log::add_errmsg(int flgerr, int err_save)
 
 }
 
+/* Switch the active log destination, opening or closing the syslog connection as needed. */
 void cls_log::set_mode(int mode_new)
 {
     if ((log_mode != LOGMODE_SYSLOG) && (mode_new == LOGMODE_SYSLOG)) {
@@ -186,6 +194,7 @@ void cls_log::set_mode(int mode_new)
     log_mode = mode_new;
 }
 
+/* Open a log file by path, or fall back to syslog if path is empty or "syslog". */
 void cls_log::set_log_file(std::string pname)
 {
     if ((pname == "") || (pname == "syslog")) {
@@ -207,6 +216,7 @@ void cls_log::set_log_file(std::string pname)
         log_file_ptr = myfopen(pname.c_str(), "ae");
         if (log_file_ptr != nullptr) {
             log_file_name = pname;
+            /* Briefly switch to syslog so the "Logging to file" notice is visible, then activate file mode. */
             set_mode(LOGMODE_SYSLOG);
             MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "Logging to file (%s)"
                 ,pname.c_str());
@@ -220,6 +230,7 @@ void cls_log::set_log_file(std::string pname)
     }
 }
 
+/* Main log entry point: filter by level, format with timestamp/thread/type prefix, dedup flood, and emit. */
 void cls_log::write_msg(int loglvl, int msg_type, int flgerr, int flgfnc, ...)
 {
     int err_save, n;
@@ -269,6 +280,7 @@ void cls_log::write_msg(int loglvl, int msg_type, int flgerr, int flgfnc, ...)
 
     add_errmsg(flgerr, err_save);
 
+    /* Suppress duplicate messages up to 5000 repetitions, counting them for the flood summary. */
     if ((flood_cnt <= 5000) &&
         mystreq(msg_flood, &msg_full[prefixlen])) {
         flood_cnt++;
@@ -284,6 +296,7 @@ void cls_log::write_msg(int loglvl, int msg_type, int flgerr, int flgfnc, ...)
 
 }
 
+/* Close the log file if one is open; called at destruction or before reconfiguration. */
 void cls_log::shutdown()
 {
     if (log_file_ptr != nullptr) {
@@ -292,6 +305,7 @@ void cls_log::shutdown()
     }
 }
 
+/* Apply log_level, log_fflevel, and log_file settings from the application configuration. */
 void cls_log::startup()
 {
     motlog->log_level = app->cfg->log_level;
@@ -299,6 +313,7 @@ void cls_log::startup()
     motlog->set_log_file(app->cfg->log_file);
 }
 
+/* Initialize logger to syslog mode at default level, register FFmpeg log callback, and build history buffer. */
 cls_log::cls_log(cls_motapp *p_app)
 {
     app = p_app;

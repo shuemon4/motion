@@ -280,6 +280,7 @@ void cls_convert::bayer2rgb24(u_char *img_dst, u_char *img_src)
 
 }
 
+/* Convert interleaved YUV422 (YUYV) to planar YUV420P, averaging chroma rows vertically */
 void cls_convert::yuv422to420p(u_char *img_dst, u_char *img_src)
 {
     u_char *src, *dest, *src2, *dest2;
@@ -313,6 +314,7 @@ void cls_convert::yuv422to420p(u_char *img_dst, u_char *img_src)
     }
 }
 
+/* Convert planar YUV422P to YUV420P by averaging adjacent chroma rows */
 void cls_convert::yuv422pto420p(u_char *img_dst, u_char *img_src)
 {
     u_char *src, *dest, *dest2;
@@ -350,6 +352,7 @@ void cls_convert::yuv422pto420p(u_char *img_dst, u_char *img_src)
     }
 }
 
+/* Convert interleaved UYVY to planar YUV420P, averaging chroma rows vertically */
 void cls_convert::uyvyto420p(u_char *img_dst, u_char *img_src)
 {
     u_char *pY = img_dst;
@@ -385,6 +388,7 @@ void cls_convert::uyvyto420p(u_char *img_dst, u_char *img_src)
     }
 }
 
+/* Convert RGB24 (rgb=1) or BGR24 (rgb=0) to YUV420P using fixed-point arithmetic */
 void cls_convert::rgb_bgr(u_char *img_dst, u_char *img_src, int rgb)
 {
     u_char *y, *u, *v;
@@ -432,12 +436,14 @@ void cls_convert::rgb_bgr(u_char *img_dst, u_char *img_src, int rgb)
     }
 }
 
+/* Convert RGB24 to YUV420P */
 void cls_convert::rgb24toyuv420p(u_char *img_dst, u_char *img_src
     )
 {
     rgb_bgr(img_dst, img_src, 1);
 }
 
+/* Convert BGR24 to YUV420P */
 void cls_convert::bgr24toyuv420p(u_char *img_dst, u_char *img_src
     )
 {
@@ -491,6 +497,7 @@ int cls_convert::mjpegtoyuv420p(u_char *img_dst, u_char *img_src, int size)
     return ret;
 }
 
+/* Convert 10-bit or 12-bit packed greyscale (Y10/Y12) to 8-bit RGB24 by right-shifting */
 void cls_convert::y10torgb24(u_char *img_dst, u_char *img_src, int shift)
 {
     /* Source code: raw2rgbpnm project */
@@ -520,6 +527,7 @@ void cls_convert::y10torgb24(u_char *img_dst, u_char *img_src, int shift)
     }
 }
 
+/* Convert 8-bit greyscale to YUV420P: copy Y, fill U/V with neutral 128 */
 void cls_convert::greytoyuv420p(u_char *img_dst, u_char *img_src)
 {
     memcpy(img_dst, img_src, (uint)(width*height));

@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json_mask.cpp - Motion Detection and Privacy Mask API
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Implements JSON REST API endpoints for managing motion detection and
+ * privacy masks: retrieving mask metadata, creating masks from polygon
+ * coordinates via integer scanline fill rasterization, and deleting
+ * mask PGM files with path traversal protection.
  *
  */
 

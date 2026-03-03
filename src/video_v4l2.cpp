@@ -40,6 +40,7 @@
 
 #ifdef HAVE_V4L2
 
+/* Add a pixel format entry to the supported palette list */
 void cls_v4l2cam::palette_add(uint p_v4l2id)
 {
     char    tmp4cc[5];
@@ -53,6 +54,7 @@ void cls_v4l2cam::palette_add(uint p_v4l2id)
     palette.push_back(p_itm);
 }
 
+/* Initialize the list of all pixel formats Motion can handle */
 void cls_v4l2cam::palette_init()
 {
     palette.clear();
@@ -97,6 +99,7 @@ int cls_v4l2cam::xioctl(unsigned long request, void *arg)
     return retcd;
 }
 
+/* Close the V4L2 device file descriptor */
 void cls_v4l2cam::device_close()
 {
     close(fd_device);
@@ -229,6 +232,7 @@ void cls_v4l2cam::ctrls_set()
      }
 }
 
+/* Apply user-configured v4l2_params values to the device control array */
 void cls_v4l2cam::parms_set()
 {
     int indx_p, indx_d;
@@ -456,6 +460,7 @@ void cls_v4l2cam::set_frequency()
     return;
 }
 
+/* Test whether the device accepts a given pixel format at the configured resolution */
 int cls_v4l2cam::pixfmt_try(uint pixformat)
 {
     int retcd;
@@ -487,6 +492,7 @@ int cls_v4l2cam::pixfmt_try(uint pixformat)
     return 0;
 }
 
+/* Check bytesperline stride and pad image width if needed */
 int cls_v4l2cam::pixfmt_stride()
 {
     int wd, bpl, wps;
@@ -539,6 +545,7 @@ int cls_v4l2cam::pixfmt_stride()
 
 }
 
+/* Adjust config resolution if the device negotiated different dimensions */
 int cls_v4l2cam::pixfmt_adjust()
 {
     if ((vidfmt.fmt.pix.width != (uint)cam->cfg->width) ||
@@ -600,6 +607,7 @@ int cls_v4l2cam::pixfmt_set(uint pixformat)
     return 0;
 }
 
+/* Validate width/height are modulo 8 and palette index is in range */
 void cls_v4l2cam::params_check()
 {
     int spec, indx;
@@ -805,6 +813,7 @@ void cls_v4l2cam::set_mmap()
             ,buffer_index, p_buf.length, (void*)buffers[buffer_index].ptr);
     }
 
+    /* Enqueue all buffers for initial capture */
     for (buffer_index = 0; buffer_index < buffer_count; buffer_index++) {
         memset(&vidbuf, 0, sizeof(struct v4l2_buffer));
 
@@ -861,6 +870,7 @@ int cls_v4l2cam::capture()
 
     pthread_sigmask(SIG_BLOCK, &set, &old);
 
+    /* Re-enqueue the previous frame's buffer before dequeuing the next */
     if (pframe >= 0) {
         retcd = xioctl(VIDIOC_QBUF, &vidbuf);
         if (retcd == -1) {
@@ -892,6 +902,7 @@ int cls_v4l2cam::capture()
 
 }
 
+/* Initialize member variables, parse v4l2_params, and set defaults */
 void cls_v4l2cam::init_vars()
 {
     buffer_count= 0;
@@ -940,6 +951,7 @@ void cls_v4l2cam::device_open()
     }
 }
 
+/* Log the device driver info and V4L2 capability flags */
 void cls_v4l2cam::log_types()
 {
     if (fd_device == -1) {
@@ -992,6 +1004,7 @@ void cls_v4l2cam::log_types()
 
 }
 
+/* Log all supported palettes, resolutions, and framerates from the device */
 void cls_v4l2cam::log_formats()
 {
     struct v4l2_fmtdesc         dev_format;
@@ -1051,6 +1064,7 @@ void cls_v4l2cam::log_formats()
 
 }
 
+/* Set the capture framerate on the device */
 void cls_v4l2cam::set_fps()
 {
     int retcd;
@@ -1083,6 +1097,7 @@ void cls_v4l2cam::set_fps()
 
 }
 
+/* Stop streaming, unmap buffers, and release all resources */
 void cls_v4l2cam::stop_cam()
 {
     enum v4l2_buf_type p_type;
@@ -1112,6 +1127,7 @@ void cls_v4l2cam::stop_cam()
     mydelete(params);
 }
 
+/* Full device initialization sequence: open, configure, and begin streaming */
 void cls_v4l2cam::start_cam()
 {
     MOTION_LOG(NTC, TYPE_VIDEO, NO_ERRNO,_("Opening V4L2 device"));
@@ -1139,6 +1155,7 @@ void cls_v4l2cam::start_cam()
 
 #endif /* HAVE_V4L2 */
 
+/* Handle reconnection with progressive backoff: 30s, 10min, then 2hr intervals */
 void cls_v4l2cam::noimage()
 {
     #ifdef HAVE_V4L2
@@ -1170,6 +1187,7 @@ void cls_v4l2cam::noimage()
     #endif
 }
 
+/* Capture next frame, convert to YUV420, and apply rotation */
 int cls_v4l2cam::next(ctx_image_data *img_data)
 {
     #ifdef HAVE_V4L2
@@ -1198,6 +1216,7 @@ int cls_v4l2cam::next(ctx_image_data *img_data)
     #endif // HAVE_V4L2
 }
 
+/* Construct V4L2 camera and start capture if V4L2 support is compiled in */
 cls_v4l2cam::cls_v4l2cam(cls_camera *p_cam)
 {
     cam = p_cam;
@@ -1209,6 +1228,7 @@ cls_v4l2cam::cls_v4l2cam(cls_camera *p_cam)
     #endif // HAVE_V4l2
 }
 
+/* Stop capture and mark device as closed */
 cls_v4l2cam::~cls_v4l2cam()
 {
     #ifdef HAVE_V4L2

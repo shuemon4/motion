@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json_media.cpp - Media Browsing and Management API
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Implements JSON REST API endpoints for browsing and managing recorded
+ * media: paginated picture and movie listings from the database, date
+ * grouping for filters, filesystem folder navigation with statistics,
+ * and file/folder deletion with realpath-based path traversal protection.
  *
  */
 

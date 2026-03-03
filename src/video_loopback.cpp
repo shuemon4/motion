@@ -39,6 +39,7 @@
 #include <linux/videodev2.h>
 #include <errno.h>
 
+/* Maps V4L2 capability flag names to their bitmask values for diagnostic logging. */
 typedef struct capent {const char *cap; unsigned int code;} capentT;
     capentT cap_list[] ={
         {"V4L2_CAP_VIDEO_CAPTURE"        ,0x00000001 },
@@ -70,6 +71,9 @@ typedef struct capent {const char *cap; unsigned int code;} capentT;
         {"Last",0}
 };
 
+/* Scans /sys/class/video4linux/ to find the first writable V4L2 loopback device
+ * (identified by the "Loopback video device" name prefix) and opens it for output.
+ * Returns the open fd on success, or -1 if no suitable device is found. */
 static int vlp_open_vidpipe(void)
 {
 
@@ -83,6 +87,7 @@ static int vlp_open_vidpipe(void)
     int len,min;
     int retcd;
 
+    /* Walk /sys/class/video4linux/ looking for "video*" entries. */
     if ((dir = opendir(prefix)) == NULL) {
         MOTION_LOG(CRT, TYPE_VIDEO, SHOW_ERRNO,_("Failed to open '%s'"), prefix);
         return -1;
@@ -91,6 +96,7 @@ static int vlp_open_vidpipe(void)
     while ((dirp = readdir(dir)) != NULL) {
         if (!strncmp(dirp->d_name, "video", 5)) {
 
+            /* Build path to the sysfs device name file and read it. */
             retcd = snprintf(buffer, sizeof(buffer),"%s%s/name", prefix, dirp->d_name);
             if ((retcd<0) || (retcd >= (int)sizeof(buffer))) {
                 MOTION_LOG(NTC, TYPE_VIDEO, SHOW_ERRNO
@@ -107,6 +113,7 @@ static int vlp_open_vidpipe(void)
                 }
                 buffer[len]=0;
                 MOTION_LOG(NTC, TYPE_VIDEO, SHOW_ERRNO,_("Read buffer: %s"),buffer);
+                /* Skip devices that are not V4L2 loopback (name must start with "Loopback video device"). */
                 if (strncmp(buffer, "Loopback video device",21)) { /* weird stuff after minor */
                     close(fd);
                     continue;
@@ -122,6 +129,7 @@ static int vlp_open_vidpipe(void)
                 }
                 min = (int)parsed;
 
+                /* Build /dev/videoX path and try opening it for read/write output. */
                 retcd = snprintf(buffer,sizeof(buffer),"/dev/%s",dirp->d_name);
                 if ((retcd < 0) || (retcd >= (int)sizeof(buffer))) {
                     MOTION_LOG(NTC, TYPE_VIDEO, SHOW_ERRNO
@@ -154,6 +162,7 @@ static int vlp_open_vidpipe(void)
     return pipe_fd;
 }
 
+/* Logs the V4L2 device capability struct fields and active capability flags. */
 static void vlp_show_vcap(struct v4l2_capability *cap)
 {
     unsigned int vers = cap->version;
@@ -174,6 +183,7 @@ static void vlp_show_vcap(struct v4l2_capability *cap)
     MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO, "------------------------");
 }
 
+/* Logs the V4L2 pixel format fields for a video output buffer. */
 static void vlp_show_vfmt(struct v4l2_format *v)
 {
     MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO, "type: type:           %d",v->type);
@@ -187,6 +197,9 @@ static void vlp_show_vfmt(struct v4l2_format *v)
     MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO, "------------------------");
 }
 
+/* Opens a V4L2 output device and configures it for YUV420 at the given dimensions.
+ * If dev_name is "-", auto-detects the first available loopback device.
+ * Returns the open fd on success, or -1 on failure. */
 int vlp_startpipe(const char *dev_name, int width, int height)
 {
     int dev;
@@ -206,6 +219,7 @@ int vlp_startpipe(const char *dev_name, int width, int height)
     }
 
 
+    /* Verify the device supports the VIDEO_OUTPUT capability. */
     if (ioctl(dev, VIDIOC_QUERYCAP, &vc) == -1) {
         MOTION_LOG(ERR, TYPE_VIDEO, SHOW_ERRNO, "ioctl (VIDIOC_QUERYCAP)");
         return -1;
@@ -213,6 +227,7 @@ int vlp_startpipe(const char *dev_name, int width, int height)
 
     vlp_show_vcap(&vc);
 
+    /* Query existing format, then overwrite with YUV420 at the requested size. */
     memset(&v, 0, sizeof(v));
 
     v.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
@@ -248,6 +263,7 @@ int vlp_startpipe(const char *dev_name, int width, int height)
 
 #endif /* HAVE_V4L2 && !BSD */
 
+/* Writes the current frame to the normal pipe and, if configured, the motion pipe. */
 void vlp_putpipe(cls_camera *cam)
 {
     #if (defined(HAVE_V4L2)) && (!defined(BSD))
@@ -276,6 +292,8 @@ void vlp_putpipe(cls_camera *cam)
     #endif
 }
 
+/* Initializes loopback pipes for the camera: opens normal and motion video pipes
+ * if their device paths are configured, otherwise sets the fds to -1 (disabled). */
 void vlp_init(cls_camera *cam)
 {
     #if defined(HAVE_V4L2) && !defined(BSD)

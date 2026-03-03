@@ -34,12 +34,14 @@
 #include "netcam.hpp"
 #include "movie.hpp"
 
+/* Thread entry point: call cls_netcam::handler() and exit. */
 static void *netcam_handler(void *arg)
 {
     ((cls_netcam *)arg)->handler();
     return nullptr;
 }
 
+/* FFmpeg get_format callback: select AV_PIX_FMT_VAAPI from the offered pixel formats. */
 enum AVPixelFormat netcam_getfmt_vaapi(AVCodecContext *avctx, const enum AVPixelFormat *pix_fmts)
 {
     const enum AVPixelFormat *p;
@@ -55,6 +57,7 @@ enum AVPixelFormat netcam_getfmt_vaapi(AVCodecContext *avctx, const enum AVPixel
     return AV_PIX_FMT_NONE;
 }
 
+/* FFmpeg get_format callback: select AV_PIX_FMT_CUDA from the offered pixel formats. */
 enum AVPixelFormat netcam_getfmt_cuda(AVCodecContext *avctx, const enum AVPixelFormat *pix_fmts)
 {
     const enum AVPixelFormat *p;
@@ -68,6 +71,7 @@ enum AVPixelFormat netcam_getfmt_cuda(AVCodecContext *avctx, const enum AVPixelF
     return AV_PIX_FMT_NONE;
 }
 
+/* FFmpeg get_format callback: select AV_PIX_FMT_DRM_PRIME from the offered pixel formats. */
 enum AVPixelFormat netcam_getfmt_drm(AVCodecContext *avctx, const enum AVPixelFormat *pix_fmts)
 {
     const enum AVPixelFormat *p;
@@ -81,6 +85,7 @@ enum AVPixelFormat netcam_getfmt_drm(AVCodecContext *avctx, const enum AVPixelFo
     return AV_PIX_FMT_NONE;
 }
 
+/* FFmpeg interrupt callback: abort blocking calls on handler_stop or per-state timeout. */
 int netcam_interrupt(void *ctx)
 {
     cls_netcam *netcam = (cls_netcam *)ctx;
@@ -130,11 +135,13 @@ int netcam_interrupt(void *ctx)
     return false;
 }
 
+/* Comparator for sorting filelist entries alphabetically by filename. */
 bool netcam_filelist_cmp(const ctx_filelist_item &a, const ctx_filelist_item &b)
 {
     return a.filenm < b.filenm;
 }
 
+/* Scan filedir and (re)build the sorted filelist; advance filenbr to the next entry. */
 void cls_netcam::filelist_load()
 {
     DIR             *d;
@@ -208,6 +215,7 @@ void cls_netcam::filelist_load()
 
 }
 
+/* Grow buff by NETCAM_BUFFSIZE-aligned chunks until it can hold numbytes more data. */
 void cls_netcam::check_buffsize(netcam_buff_ptr buff, size_t numbytes)
 {
     int min_size_to_alloc;
@@ -231,6 +239,7 @@ void cls_netcam::check_buffsize(netcam_buff_ptr buff, size_t numbytes)
     buff->size = new_size;
 }
 
+/* Extract a regex match group as a newly-allocated C string; returns NULL if the group did not match. */
 char *cls_netcam::url_match(regmatch_t m, const char *input)
 {
     char *match = NULL;
@@ -249,6 +258,7 @@ char *cls_netcam::url_match(regmatch_t m, const char *input)
     return match;
 }
 
+/* Populate parse_url with sentinel error values after a failed URL parse. */
 void cls_netcam::url_invalid(ctx_url *parse_url)
 {
     MOTION_LOG(ERR, TYPE_NETCAM, NO_ERRNO,_("Invalid URL.  Can not parse values."));
@@ -261,6 +271,7 @@ void cls_netcam::url_invalid(ctx_url *parse_url)
 
 }
 
+/* Parse text_url into service/host/port/path/userpass, applying default ports by service name. */
 void cls_netcam::url_parse(ctx_url *parse_url, std::string text_url)
 {
     char *s;
@@ -345,12 +356,14 @@ void cls_netcam::url_parse(ctx_url *parse_url, std::string text_url)
     regfree(&pattbuf);
 }
 
+/* Free and null the current receive packet. */
 void cls_netcam::free_pkt()
 {
     av_packet_free(&packet_recv);
     packet_recv = nullptr;
 }
 
+/* Return 0 if the decoded frame is already in YUV420P, -1 if conversion is needed. */
 int cls_netcam::check_pixfmt()
 {
     int retcd = -1;
@@ -361,6 +374,7 @@ int cls_netcam::check_pixfmt()
     return retcd;
 }
 
+/* Free all packets in the passthrough ring buffer and reset size/index to empty. */
 void cls_netcam::pktarray_free()
 {
     int indx;
@@ -377,6 +391,7 @@ void cls_netcam::pktarray_free()
     pthread_mutex_unlock(&mutex_pktarray);
 }
 
+/* Zero all FFmpeg context pointers without deallocating (called after context_close). */
 void cls_netcam::context_null()
 {
     swsctx          = nullptr;
@@ -389,6 +404,7 @@ void cls_netcam::context_null()
     hw_device_ctx   = nullptr;
 }
 
+/* Release all FFmpeg resources (sws, frames, packet ring, codec, format contexts) in safe order. */
 void cls_netcam::context_close()
 {
     if (swsctx          != nullptr) sws_freeContext(swsctx);
@@ -472,6 +488,7 @@ void cls_netcam::pktarray_resize()
     pthread_mutex_unlock(&mutex_pktarray);
 }
 
+/* Copy the current received packet into the next slot of the passthrough ring buffer. */
 void cls_netcam::pktarray_add()
 {
     int indx_next;
@@ -520,6 +537,7 @@ void cls_netcam::pktarray_add()
     pthread_mutex_unlock(&mutex_pktarray);
 }
 
+/* Receive a software-decoded frame from the codec; returns 1 on success, 0 on EAGAIN, -1 on error. */
 int cls_netcam::decode_sw()
 {
     int retcd;
@@ -549,6 +567,7 @@ int cls_netcam::decode_sw()
     return 1;
 }
 
+/* Receive a VAAPI-decoded frame and transfer it to system memory; returns 1/0/-1. */
 int cls_netcam::decode_vaapi()
 {
     int retcd;
@@ -601,6 +620,7 @@ int cls_netcam::decode_vaapi()
     return 1;
 }
 
+/* Receive a CUDA-decoded frame and transfer it as NV12 to system memory; returns 1/0/-1. */
 int cls_netcam::decode_cuda()
 {
     int retcd;
@@ -646,6 +666,7 @@ int cls_netcam::decode_cuda()
     return 1;
 }
 
+/* Receive a DRM-decoded frame and transfer it as NV12 to system memory; returns 1/0/-1. */
 int cls_netcam::decode_drm()
 {
     int retcd;
@@ -691,6 +712,7 @@ int cls_netcam::decode_drm()
     return 1;
 }
 
+/* Send packet_recv to the codec and dispatch to the appropriate hw/sw receive path. */
 int cls_netcam::decode_video()
 {
     int retcd;
@@ -743,6 +765,7 @@ int cls_netcam::decode_video()
     return retcd;
 }
 
+/* Decode a video packet and copy the resulting frame into img_recv; returns frame size or ≤0 on error. */
 int cls_netcam::decode_packet()
 {
     int frame_size;
@@ -788,6 +811,7 @@ int cls_netcam::decode_packet()
     return frame_size;
 }
 
+/* Log available VAAPI/CUDA/DRM hardware decoders once on the first image (informational). */
 void cls_netcam::hwdecoders()
 {
     /* High Res pass through does not decode images into frames*/
@@ -817,6 +841,7 @@ void cls_netcam::hwdecoders()
     return;
 }
 
+/* Log a decoder failure and clear the user-specified decoder name so the default is used next attempt. */
 void cls_netcam::decoder_error(int retcd, const char* fnc_nm)
 {
     char errstr[128];
@@ -859,6 +884,7 @@ void cls_netcam::decoder_error(int retcd, const char* fnc_nm)
     }
 }
 
+/* Initialize VAAPI hardware decoder: allocate codec context, hw device, and frame pool. */
 int cls_netcam::init_vaapi()
 {
     int retcd, indx;
@@ -963,6 +989,7 @@ int cls_netcam::init_vaapi()
     return 0;
 }
 
+/* Initialize CUDA hardware decoder: allocate codec context and hw device. */
 int cls_netcam::init_cuda()
 {
     int retcd;
@@ -1007,6 +1034,7 @@ int cls_netcam::init_cuda()
     return 0;
 }
 
+/* Initialize DRM hardware decoder: allocate codec context and hw device. */
 int cls_netcam::init_drm()
 {
     int retcd;
@@ -1052,6 +1080,7 @@ int cls_netcam::init_drm()
     return 0;
 }
 
+/* Initialize software decoder, preferring the user-specified codec name before auto-detection. */
 int cls_netcam::init_swdecoder()
 {
     int retcd;
@@ -1098,6 +1127,7 @@ int cls_netcam::init_swdecoder()
     return 0;
 }
 
+/* Find best audio/video streams, initialize the selected decoder, and open the codec context. */
 int cls_netcam::open_codec()
 {
     int retcd;
@@ -1157,6 +1187,7 @@ int cls_netcam::open_codec()
     return 0;
 }
 
+/* Allocate SWScale frames and create a scaling context for pixel format/resolution conversion to YUV420P. */
 int cls_netcam::open_sws()
 {
     if (handler_stop) {
@@ -1234,6 +1265,7 @@ int cls_netcam::open_sws()
     return 0;
 }
 
+/* Rescale and reformat img_recv to the configured (imgsize) dimensions using SWScale. */
 int cls_netcam::resize()
 {
     int      retcd;
@@ -1327,6 +1359,7 @@ int cls_netcam::resize()
     return 0;
 }
 
+/* Assign PTS/DTS to packets that lack them, synthesizing values from wall-clock elapsed time. */
 void cls_netcam::pkt_ts()
 {
     int64_t usec_ltncy;
@@ -1371,6 +1404,7 @@ void cls_netcam::pkt_ts()
 
 }
 
+/* Read one frame from the network stream, decode/resize it, and swap it into img_latest. */
 int cls_netcam::read_image()
 {
     int  size_decoded, retcd, errcnt, nodata;
@@ -1394,6 +1428,7 @@ int cls_netcam::read_image()
     haveimage = false;
     nodata = 0;
 
+    /* Read packets until a decodable video frame is obtained or an error/interrupt occurs. */
     while ((!haveimage) && (!interrupted)) {
         clock_gettime(CLOCK_MONOTONIC, &ist_tm);
         retcd = av_read_frame(format_context, packet_recv);
@@ -1474,6 +1509,7 @@ int cls_netcam::read_image()
         }
     }
 
+    /* Under mutex: bump frame counter, enqueue for passthrough, and swap img buffers. */
     pthread_mutex_lock(&mutex);
         idnbr++;
         if (passthrough) {
@@ -1520,6 +1556,7 @@ int cls_netcam::read_image()
     return 0;
 }
 
+/* Log a notice if the camera's native resolution does not match the configured resolution. */
 int cls_netcam::ntc()
 {
     if ((handler_stop) || (!first_image)) {
@@ -1553,6 +1590,7 @@ int cls_netcam::ntc()
     return 0;
 }
 
+/* Apply service-specific defaults and user netcam_params as FFmpeg AVDictionary options. */
 void cls_netcam::set_options()
 {
     std::string tmp;
@@ -1617,6 +1655,7 @@ void cls_netcam::set_options()
     }
 }
 
+/* Parse the camera URL from config and build the FFmpeg-ready path string, embedding credentials. */
 void cls_netcam::set_path ()
 {
     ctx_url url;
@@ -1658,6 +1697,7 @@ void cls_netcam::set_path ()
     service = url.service;
 }
 
+/* Initialize all per-connection state and parse netcam_params for decoder, capture_rate, and interrupt settings. */
 void cls_netcam::set_parms ()
 {
     int indx;
@@ -1766,7 +1806,7 @@ void cls_netcam::set_parms ()
     set_path();
 }
 
-/* Make a static copy of the stream information for use in passthrough processing */
+/* Copy codec parameters from the live format_context into transfer_format for passthrough movie writing. */
 int cls_netcam::copy_stream()
 {
     AVStream  *transfer_stream, *stream_in;
@@ -1800,6 +1840,7 @@ int cls_netcam::copy_stream()
     return 0;
 }
 
+/* Open the FFmpeg format context, probe stream info, open codec, allocate frame, and read first image. */
 int cls_netcam::open_context()
 {
     int  retcd;
@@ -1876,10 +1917,8 @@ int cls_netcam::open_context()
         return -1;
     }
 
+    /* Temporarily rename this thread so avcodec worker threads inherit a meaningful name. */
     clock_gettime(CLOCK_MONOTONIC, &ist_tm);
-    /* there is no way to set the avcodec thread names, but they inherit
-     * our thread name - so temporarily change our thread name to the
-     * desired name */
 
     mythreadname_get(threadname);
     mythreadname_set("av", threadnbr, camera_name.c_str());
@@ -1954,6 +1993,7 @@ int cls_netcam::open_context()
     return 0;
 }
 
+/* Open context, log connection details (FPS, audio), and set status to NETCAM_CONNECTED. */
 int cls_netcam::connect()
 {
 
@@ -2020,6 +2060,7 @@ int cls_netcam::connect()
     return 0;
 }
 
+/* Sleep for the remainder of the frame interval to pace capture to the configured capture_rate. */
 void cls_netcam::handler_wait()
 {
     int64_t usec_ltncy;
@@ -2056,6 +2097,7 @@ void cls_netcam::handler_wait()
     }
 }
 
+/* Attempt to reconnect, sleeping with increasing back-off (10 s → 10 min → 2 hr) on repeated failures. */
 void cls_netcam::handler_reconnect()
 {
     int retcd, slp_dur;
@@ -2124,6 +2166,7 @@ void cls_netcam::handler_reconnect()
     }
 }
 
+/* Main capture loop: continuously reads frames, reconnecting on failure, until handler_stop is set. */
 void cls_netcam::handler()
 {
     handler_running = true;
@@ -2163,6 +2206,7 @@ void cls_netcam::handler()
 
 }
 
+/* Launch the detached handler thread and wait up to 30 s for the first image to be available. */
 void cls_netcam::handler_startup()
 {
     int wait_counter, retcd;
@@ -2205,6 +2249,7 @@ void cls_netcam::handler_startup()
 
 }
 
+/* Signal handler_stop, wait up to watchdog_tmo seconds for the thread to exit, then free all resources. */
 void cls_netcam::handler_shutdown()
 {
     int waitcnt;
@@ -2273,6 +2318,7 @@ void cls_netcam::handler_shutdown()
 
 }
 
+/* Initialize parameters, connect to the camera, and start the background handler thread. */
 void cls_netcam::netcam_start()
 {
     int retcd;
@@ -2332,11 +2378,13 @@ void cls_netcam::netcam_start()
 
 }
 
+/* Stop the handler thread and free all resources. */
 void cls_netcam::netcam_stop()
 {
     handler_shutdown();
 }
 
+/* Called by the Motion loop when handler_running is false; waits with back-off then restarts the camera. */
 void cls_netcam::noimage()
 {
     int slp_dur;
@@ -2372,6 +2420,7 @@ void cls_netcam::noimage()
     }
 }
 
+/* Copy the latest decoded image into img_data for the Motion main loop; returns CAPTURE_SUCCESS or CAPTURE_ATTEMPTED. */
 int cls_netcam::next(ctx_image_data *img_data)
 {
     if ((status == NETCAM_RECONNECTING) ||
@@ -2399,6 +2448,7 @@ int cls_netcam::next(ctx_image_data *img_data)
     return CAPTURE_SUCCESS;
 }
 
+/* Initialize mutexes and set the high-resolution flag; actual setup is deferred to netcam_start(). */
 cls_netcam::cls_netcam(cls_camera *p_cam, bool p_is_high)
 {
     cam = p_cam;

@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json_system.cpp - System Monitoring and Control API
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Implements JSON REST API endpoints for system-level operations: CPU
+ * temperature reading, comprehensive system status (uptime, memory, disk,
+ * device model, Pi generation, encoder availability, per-camera FPS),
+ * and privileged actions (reboot, shutdown, service restart) with CSRF validation.
  *
  */
 

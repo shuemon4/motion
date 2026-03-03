@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json_auth.cpp - Authentication and Session Management API
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Implements JSON REST API endpoints for user authentication: login with
+ * bcrypt password validation, logout with session destruction, session
+ * token management with CSRF protection, and auth status checks supporting
+ * both session-based and HTTP Basic/Digest authentication fallback.
  *
  */
 

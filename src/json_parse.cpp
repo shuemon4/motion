@@ -30,6 +30,7 @@
 #include <cstdlib>
 #include <sstream>
 
+/* Parse a JSON object string, populating values_. Returns false and sets error_ on failure. */
 bool JsonParser::parse(const std::string& json) {
     json_ = json;
     pos_ = 0;
@@ -50,18 +51,22 @@ bool JsonParser::parse(const std::string& json) {
     return true;
 }
 
+/* Return true if the parsed object contains the given key. */
 bool JsonParser::has(const std::string& key) const {
     return values_.find(key) != values_.end();
 }
 
+/* Return the raw JsonValue variant for the given key. Throws std::out_of_range if missing. */
 JsonParser::JsonValue JsonParser::get(const std::string& key) const {
     return values_.at(key);
 }
 
+/* Return all key-value pairs from the last successful parse. */
 const std::map<std::string, JsonParser::JsonValue>& JsonParser::getAll() const {
     return values_;
 }
 
+/* Return the value for key as a string, coercing numbers and bools. Returns def if absent. */
 std::string JsonParser::getString(const std::string& key, const std::string& def) const {
     auto it = values_.find(key);
     if (it == values_.end()) {
@@ -81,6 +86,7 @@ std::string JsonParser::getString(const std::string& key, const std::string& def
     return def;
 }
 
+/* Return the value for key as a double, coercing string values via strtod. Returns def if absent or not convertible. */
 double JsonParser::getNumber(const std::string& key, double def) const {
     auto it = values_.find(key);
     if (it == values_.end()) {
@@ -99,6 +105,7 @@ double JsonParser::getNumber(const std::string& key, double def) const {
     return def;
 }
 
+/* Return the value for key as a bool, coercing strings ("true"/"1") and non-zero numbers. Returns def if absent. */
 bool JsonParser::getBool(const std::string& key, bool def) const {
     auto it = values_.find(key);
     if (it == values_.end()) {
@@ -116,12 +123,14 @@ bool JsonParser::getBool(const std::string& key, bool def) const {
     return def;
 }
 
+/* Advance pos_ past any whitespace characters. */
 void JsonParser::skipWhitespace() {
     while (pos_ < json_.length() && std::isspace(json_[pos_])) {
         pos_++;
     }
 }
 
+/* Parse a JSON object ('{' key:value pairs '}'), populating values_ with each entry. */
 bool JsonParser::parseObject() {
     if (!expect('{')) {
         return false;
@@ -153,6 +162,7 @@ bool JsonParser::parseObject() {
     return true;
 }
 
+/* Parse a single "key": value pair and store it in values_. */
 bool JsonParser::parseKeyValue() {
     skipWhitespace();
 
@@ -176,6 +186,7 @@ bool JsonParser::parseKeyValue() {
     return true;
 }
 
+/* Parse a JSON quoted string with backslash escape handling. Returns "" and sets error_ on failure. */
 std::string JsonParser::parseString() {
     if (!expect('"')) {
         return "";
@@ -217,6 +228,7 @@ std::string JsonParser::parseString() {
     return "";
 }
 
+/* Dispatch to the appropriate parse function based on the leading character of the value. */
 JsonParser::JsonValue JsonParser::parseValue() {
     skipWhitespace();
 
@@ -243,6 +255,7 @@ JsonParser::JsonValue JsonParser::parseValue() {
     return nullptr;
 }
 
+/* Parse a JSON number (optional leading '-', integer digits, optional decimal). Returns 0.0 on error. */
 double JsonParser::parseNumber() {
     size_t start = pos_;
 
@@ -283,6 +296,7 @@ double JsonParser::parseNumber() {
     return value;
 }
 
+/* Parse a JSON boolean literal ("true" or "false"). Sets error_ and returns false if neither matches. */
 bool JsonParser::parseBool() {
     if (pos_ + 4 <= json_.length() && json_.substr(pos_, 4) == "true") {
         pos_ += 4;
@@ -298,12 +312,14 @@ bool JsonParser::parseBool() {
     return false;
 }
 
+/* Record an error message with the current position; only the first error is retained. */
 void JsonParser::setError(const std::string& msg) {
     if (error_.empty()) {  // Only set first error
         error_ = msg + " at position " + std::to_string(pos_);
     }
 }
 
+/* Consume the next non-whitespace character, setting error_ and returning false if it doesn't match ch. */
 bool JsonParser::expect(char ch) {
     skipWhitespace();
     if (pos_ >= json_.length() || json_[pos_] != ch) {
@@ -314,6 +330,7 @@ bool JsonParser::expect(char ch) {
     return true;
 }
 
+/* Return the current character without advancing pos_, or '\0' at end of input. */
 char JsonParser::peek() const {
     if (pos_ >= json_.length()) {
         return '\0';
@@ -321,6 +338,7 @@ char JsonParser::peek() const {
     return json_[pos_];
 }
 
+/* Return the current character and advance pos_, or '\0' at end of input. */
 char JsonParser::next() {
     if (pos_ >= json_.length()) {
         return '\0';

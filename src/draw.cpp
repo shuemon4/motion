@@ -38,6 +38,8 @@ struct draw_char {
     u_char pix[8][7];
 };
 
+/* Pixel bitmaps for each supported glyph, stored as 8 rows × 7 columns of u_char.
+ * Pixel values: 0 = transparent, 1 = black (shadow/outline), 2 = white (fill). */
 struct draw_char draw_table[]= {
     {
         ' ',
@@ -1081,6 +1083,9 @@ struct draw_char draw_table[]= {
     }
 };
 
+/* Render a fixed-length string into the luma (Y) plane at (startx, starty).
+ * Each character is drawn as 7*factor × 8*factor pixels using the draw_table bitmap.
+ * Clips the string to fit within frame width; mirrors x position if startx > width/2. */
 int cls_draw::textn(u_char *image
         , int startx,  int starty,  int width
         , const char *text, int len, int factor)
@@ -1102,7 +1107,9 @@ int cls_draw::textn(u_char *image
         return 0;
     }
 
+    /* Advance past the 7 glyph columns to the start of the next row in the frame buffer. */
     line_offset = width - (7 * factor);
+    /* After rendering all 8 rows of a character, step back to the start of the next character. */
     next_char_offs = (width * 8 * factor) - (6 * factor);
 
     image_ptr = image + startx + (starty * width);
@@ -1143,6 +1150,9 @@ int cls_draw::textn(u_char *image
     return 0;
 }
 
+/* Render a multi-line text string, auto-scaling factor to fit within the frame.
+ * Splits on NEWLINE tokens, adjusts starty upward for multi-line blocks, and reduces
+ * factor if the text would overflow either the frame width or height. */
 int cls_draw::text(u_char *image
         , int width, int height, int startx, int starty
         , const char *text, int factor)
@@ -1203,6 +1213,8 @@ int cls_draw::text(u_char *image
     return 0;
 }
 
+/* Build the char_arr_ptr lookup table mapping ASCII codes to glyph pixel data.
+ * Unsupported characters default to the space glyph (all-transparent pixels). */
 void cls_draw::init_chars(void)
 {
     unsigned int i;
@@ -1222,6 +1234,7 @@ void cls_draw::init_chars(void)
 
 }
 
+/* Validate and clamp text_scale so that two text rows fit within one quarter of the frame. */
 void cls_draw::init_scale()
 {
     cam->text_scale = cam->cfg->text_scale;
@@ -1252,6 +1265,9 @@ void cls_draw::init_scale()
 
 }
 
+/* Draw a bounding box around the motion region on the motion image using inverted pixels.
+ * For "box" style, also inverts the box outline on new_var (the current frame).
+ * For "cross" style, draws a ±10px crosshair at the motion centroid on both buffers. */
 void cls_draw::location(ctx_coord *cent, ctx_images *imgs
     , int width, u_char *new_var)
 {
@@ -1310,6 +1326,9 @@ void cls_draw::location(ctx_coord *cent, ctx_images *imgs
     }
 }
 
+/* Draw a colored motion marker with explicit YUV chroma coloring for red overlay.
+ * Sets U=128, V=255 in the chroma planes to produce a red tint in YUV420p format.
+ * For "redbox" draws a red bounding box; for "redcross" draws a red crosshair. */
 void cls_draw::red_location(ctx_coord *cent
         , ctx_images *imgs, int width, u_char *new_var)
 {
@@ -1325,6 +1344,7 @@ void cls_draw::red_location(ctx_coord *cent
 
     cwidth = width / 2;
     cblock = imgs->motionsize / 4;
+    /* Compute byte offsets into the YUV420p buffer: U plane starts at motionsize, V at motionsize + U-size. */
     x = imgs->motionsize;
     v = x + cblock;
     out = imgs->image_motion.image_norm;
@@ -1419,6 +1439,7 @@ void cls_draw::red_location(ctx_coord *cent
     }
 }
 
+/* Dispatch to location() or red_location() based on the configured locate_motion_style. */
 void cls_draw::locate()
 {
     ctx_images *imgs;
@@ -1447,6 +1468,9 @@ void cls_draw::locate()
 
 }
 
+/* Overlay the adaptive smart mask on the motion image in red (V=255, U=128).
+ * Masked pixels have their luma zeroed for contrast. Chroma operates at 2×2 block granularity
+ * to match YUV420p subsampling. */
 void cls_draw::smartmask()
 {
     int i, x, v, width, height, line;
@@ -1487,6 +1511,9 @@ void cls_draw::smartmask()
     }
 }
 
+/* Overlay the fixed privacy mask on the motion image in green (U=0, V=0).
+ * Masked pixels have their luma zeroed for contrast. Chroma operates at 2×2 block granularity
+ * to match YUV420p subsampling. */
 void cls_draw::fixed_mask()
 {
     int i, x, v, width, height, line;
@@ -1527,6 +1554,9 @@ void cls_draw::fixed_mask()
     }
 }
 
+/* Overlay the largest detected motion label in blue (U=255, V=128) on the motion image.
+ * Pixels whose label entry has bit 15 set belong to the largest connected region and are
+ * highlighted. Luma is zeroed on those pixels to improve visibility. */
 void cls_draw::largest_label()
 {
     int i, x, v, width, height, line;
@@ -1567,6 +1597,7 @@ void cls_draw::largest_label()
     }
 }
 
+/* Initialize the draw context for the given camera, building the char lookup table and validating text scale. */
 cls_draw::cls_draw(cls_camera *p_cam)
 {
     cam = p_cam;

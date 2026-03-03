@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json_config.cpp - Configuration Management API
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Implements JSON REST API endpoints for reading, updating, and persisting
+ * Motion configuration parameters. Supports hot-reload of libcam camera
+ * controls via hash-map dispatch, bcrypt hashing of auth passwords,
+ * permission enforcement via webcontrol_parms, and write-to-disk.
  *
  */
 

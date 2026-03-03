@@ -319,6 +319,7 @@ static std::string conf_expand_env(const std::string& value)
     return std::string(env_val);
 }
 
+/* Convert string to bool - accepts "1", "yes", "on", "true" as true */
 void cls_config::edit_set_bool(bool &parm_dest, std::string &parm_in)
 {
     if ((parm_in == "1") || (parm_in == "yes") || (parm_in == "on") || (parm_in == "true") ) {
@@ -328,6 +329,7 @@ void cls_config::edit_set_bool(bool &parm_dest, std::string &parm_in)
     }
 }
 
+/* Convert bool to string - returns "on" or "off" */
 void cls_config::edit_get_bool(std::string &parm_dest, bool &parm_in)
 {
     if (parm_in == true) {
@@ -424,6 +426,7 @@ void cls_config::edit_generic_list(std::string& target, std::string& parm,
     }
 }
 
+/* Handle log_file parameter - supports strftime format specifiers in the path */
 void cls_config::edit_log_file(std::string &parm, enum PARM_ACT pact)
 {
     char    lognm[4096];
@@ -444,6 +447,7 @@ void cls_config::edit_log_file(std::string &parm, enum PARM_ACT pact)
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","log_file",_("log_file"));
 }
 
+/* Handle device_id - enforces uniqueness across all cameras and sound devices */
 void cls_config::edit_device_id(std::string &parm, enum PARM_ACT pact)
 {
     int parm_in, indx;
@@ -489,6 +493,7 @@ void cls_config::edit_device_id(std::string &parm, enum PARM_ACT pact)
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","device_id",_("device_id"));
 }
 
+/* Handle pause - tri-state: "schedule" (default), "on" (paused), "off" (always active) */
 void cls_config::edit_pause(std::string &parm, enum PARM_ACT pact)
 {
     if (pact == PARM_ACT_DFLT) {
@@ -526,6 +531,7 @@ void cls_config::edit_pause(std::string &parm, enum PARM_ACT pact)
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","pause",_("pause"));
 }
 
+/* Handle target_dir - strips trailing slash, rejects conversion specifiers */
 void cls_config::edit_target_dir(std::string &parm, enum PARM_ACT pact)
 {
     if (pact == PARM_ACT_DFLT) {
@@ -550,6 +556,7 @@ void cls_config::edit_target_dir(std::string &parm, enum PARM_ACT pact)
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","target_dir",_("target_dir"));
 }
 
+/* Handle webcontrol_html_path - base directory for serving frontend assets */
 void cls_config::edit_webcontrol_html_path(std::string &parm, enum PARM_ACT pact)
 {
     if (pact == PARM_ACT_DFLT) {
@@ -583,6 +590,11 @@ void cls_config::edit_text_changes(std::string &parm, enum PARM_ACT pact)
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","text_changes",_("text_changes"));
 }
 
+/*
+ * Filename parameter editors (picture, snapshot, movie, timelapse)
+ * All strip leading '/' to prevent absolute paths overriding target_dir.
+ * Values support strftime and Motion conversion specifiers (%v, %q, etc.)
+ */
 void cls_config::edit_picture_filename(std::string &parm, enum PARM_ACT pact)
 {
     if (pact == PARM_ACT_DFLT) {
@@ -663,6 +675,7 @@ void cls_config::edit_timelapse_filename(std::string &parm, enum PARM_ACT pact)
     MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","timelapse_filename",_("timelapse_filename"));
 }
 
+/* Handle snd_alerts - array-type parameter for sound alert frequency/level pairs */
 void cls_config::edit_snd_alerts(std::list<std::string> &parm, enum PARM_ACT pact)
 {
     if (pact == PARM_ACT_DFLT) {
@@ -969,6 +982,11 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     if (name == "pause") return edit_pause(parm, pact);
 }
 
+/*
+ * Per-category edit wrappers (edit_cat00 through edit_cat18)
+ * All delegate to dispatch_edit(). Retained as the interface called by edit_cat()
+ * to allow future per-category pre/post processing if needed.
+ */
 void cls_config::edit_cat00(std::string cmd, std::string &parm_val, enum PARM_ACT pact)
 {
     dispatch_edit(cmd, parm_val, pact);
@@ -1064,12 +1082,14 @@ void cls_config::edit_cat18(std::string parm_nm, std::string &parm_val, enum PAR
     dispatch_edit(parm_nm, parm_val, pact);
 }
 
+/* Overload for array-type parameters (only snd_alerts uses PARM_TYP_ARRAY) */
 void cls_config::edit_cat18(std::string parm_nm,std::list<std::string> &parm_val, enum PARM_ACT pact)
 {
     if (parm_nm == "snd_alerts") {  edit_snd_alerts(parm_val, pact);
     }
 }
 
+/* Route array-type parameter edits to the appropriate category handler */
 void cls_config::edit_cat(std::string parm_nm, std::list<std::string> &parm_val, enum PARM_ACT pact, enum PARM_CAT pcat)
 {
     if (pcat == PARM_CAT_18) {
@@ -1077,6 +1097,7 @@ void cls_config::edit_cat(std::string parm_nm, std::list<std::string> &parm_val,
     }
 }
 
+/* Route string parameter edits to the appropriate category handler */
 void cls_config::edit_cat(std::string parm_nm, std::string &parm_val, enum PARM_ACT pact, enum PARM_CAT pcat)
 {
     if (pcat == PARM_CAT_00) {          edit_cat00(parm_nm, parm_val, pact);
@@ -1102,6 +1123,7 @@ void cls_config::edit_cat(std::string parm_nm, std::string &parm_val, enum PARM_
 
 }
 
+/* Initialize all parameters to their default values via the registry */
 void cls_config::defaults()
 {
     std::string dflt = "";
@@ -1113,6 +1135,7 @@ void cls_config::defaults()
     }
 }
 
+/* Set a parameter by name - returns 0 on success, -1 if parameter not found */
 int cls_config::edit_set_active(std::string parm_nm, std::string parm_val)
 {
     /* O(1) lookup via parameter registry (Phase 3 optimization) */
@@ -1124,16 +1147,19 @@ int cls_config::edit_set_active(std::string parm_nm, std::string parm_val)
     return -1;
 }
 
+/* Retrieve a parameter's current value as a string */
 void cls_config::edit_get(std::string parm_nm, std::string &parm_val, enum PARM_CAT parm_cat)
 {
     edit_cat(parm_nm, parm_val, PARM_ACT_GET, parm_cat);
 }
 
+/* Retrieve an array parameter's current values */
 void cls_config::edit_get(std::string parm_nm, std::list<std::string> &parm_val, enum PARM_CAT parm_cat)
 {
     edit_cat(parm_nm, parm_val, PARM_ACT_GET, parm_cat);
 }
 
+/* Set a parameter by name, logging an alert if the parameter is unknown */
 void cls_config::edit_set(std::string parm_nm, std::string parm_val)
 {
     if (edit_set_active(parm_nm, parm_val) == 0) {
@@ -1143,11 +1169,13 @@ void cls_config::edit_set(std::string parm_nm, std::string parm_val)
     MOTION_LOG(ALR, TYPE_ALL, NO_ERRNO, _("Unknown config option \"%s\""), parm_nm.c_str());
 }
 
+/* Retrieve the valid values list for a list-type parameter as JSON array */
 void cls_config::edit_list(std::string parm_nm, std::string &parm_val, enum PARM_CAT parm_cat)
 {
     edit_cat(parm_nm, parm_val, PARM_ACT_LIST, parm_cat);
 }
 
+/* Return human-readable type name for a parameter type enum */
 std::string cls_config::type_desc(enum PARM_TYP ptype)
 {
     if (ptype == PARM_TYP_BOOL) {           return "bool";
@@ -1161,6 +1189,7 @@ std::string cls_config::type_desc(enum PARM_TYP ptype)
     }
 }
 
+/* Return category display name - short form for keys, long form for UI labels */
 std::string cls_config::cat_desc(enum PARM_CAT pcat, bool shrt) {
 
     if (shrt) {
@@ -1210,6 +1239,7 @@ std::string cls_config::cat_desc(enum PARM_CAT pcat, bool shrt) {
     }
 }
 
+/* Print command-line usage help to stdout */
 void cls_config::usage(void)
 {
     printf("Motion version %s, Copyright 2020-2025\n",PACKAGE_VERSION);
@@ -1228,6 +1258,7 @@ void cls_config::usage(void)
     printf("\n");
 }
 
+/* Parse command-line arguments and apply them as configuration overrides */
 void cls_config::cmdline()
 {
     int c;
@@ -1268,6 +1299,7 @@ void cls_config::cmdline()
     optind = 1;
 }
 
+/* Generate next available camera config filename (camera1.conf, camera2.conf, ...) */
 void cls_config::camera_filenm()
 {
     int indx_cam, indx;
@@ -1303,6 +1335,7 @@ void cls_config::camera_filenm()
     conf_filename = fullnm;
 }
 
+/* Find the lowest unused device_id across all cameras and sound devices */
 int cls_config::get_next_devid()
 {
     int indx, dev_id;
@@ -1327,6 +1360,7 @@ int cls_config::get_next_devid()
     return dev_id;
 }
 
+/* Add a new camera - inherits app defaults, then overlays camera-specific config */
 void cls_config::camera_add(std::string fname, bool srcdir)
 {
     struct stat statbuf;
@@ -1412,7 +1446,7 @@ void cls_config::camera_add_from_detection(const ctx_detected_cam &detected)
         detected.device_name.c_str(), detected.device_path.c_str());
 }
 
-/* Create default configuration file name*/
+/* Generate next available sound config filename (sound1.conf, sound2.conf, ...) */
 void cls_config::sound_filenm()
 {
     int indx_snd, indx;
@@ -1448,6 +1482,7 @@ void cls_config::sound_filenm()
     conf_filename = fullnm;
 }
 
+/* Add a new sound device - inherits app defaults, then overlays sound-specific config */
 void cls_config::sound_add(std::string fname, bool srcdir)
 {
     struct stat statbuf;
@@ -1486,6 +1521,7 @@ void cls_config::sound_add(std::string fname, bool srcdir)
     app->snd_cnt = (int)app->snd_list.size();
 }
 
+/* Scan config_dir for .conf files, adding each as a camera or sound device */
 void cls_config::config_dir_parm(std::string confdir)
 {
     DIR *dp;
@@ -1498,6 +1534,7 @@ void cls_config::config_dir_parm(std::string confdir)
             file.assign(ep->d_name);
             if (file.length() >= 5) {
                 if (file.substr(file.length()-5,5) == ".conf") {
+                    /* Files containing "sound" are sound configs; all others are cameras */
                     if (file.find("sound") == std::string::npos) {
                         file = confdir + "/" + file;
                         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
@@ -1528,6 +1565,7 @@ void cls_config::process()
     file_handler.process();
 }
 
+/* Log a single parameter value, redacting sensitive fields (passwords, URLs, certs) */
 void cls_config::parms_log_parm(std::string parm_nm, std::string parm_vl)
 {
     if ((parm_nm == "netcam_url") ||
@@ -1562,6 +1600,7 @@ void cls_config::parms_log()
     file_handler.parms_log();
 }
 
+/* Write a single parameter to a config file, inserting category section headers on change */
 void cls_config::parms_write_parms(FILE *conffile, std::string parm_nm
     , std::string parm_vl, enum PARM_CAT parm_ct, bool reset)
 {
@@ -1586,6 +1625,7 @@ void cls_config::parms_write_parms(FILE *conffile, std::string parm_nm
     }
 }
 
+/* Write the main application config file with all global parameters and camera/sound references */
 void cls_config::parms_write_app()
 {
     int i, indx;
@@ -1665,6 +1705,7 @@ void cls_config::parms_write_app()
 
 }
 
+/* Write per-camera config files containing only parameters that differ from app defaults */
 void cls_config::parms_write_cam()
 {
     int i, indx;
@@ -1725,6 +1766,7 @@ void cls_config::parms_write_cam()
 
 }
 
+/* Write per-sound config files containing only parameters that differ from app defaults */
 void cls_config::parms_write_snd()
 {
     int i, indx;
@@ -1791,6 +1833,7 @@ void cls_config::parms_write()
     file_handler.parms_write();
 }
 
+/* Copy all parameters from src config via string get/set (type-safe but O(n)) */
 void cls_config::parms_copy(cls_config *src)
 {
     std::string parm_val;
@@ -1803,6 +1846,7 @@ void cls_config::parms_copy(cls_config *src)
     }
 }
 
+/* Copy parameters of a single category from src config */
 void cls_config::parms_copy(cls_config *src, PARM_CAT p_cat)
 {
     std::string parm_val;
@@ -1848,6 +1892,7 @@ void cls_config::init()
     file_handler.init();
 }
 
+/* Constructor - sets app context and initializes all parameters to defaults */
 cls_config::cls_config(cls_motapp *p_app)
 {
     app = p_app;

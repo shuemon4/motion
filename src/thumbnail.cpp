@@ -39,6 +39,7 @@ static const int64_t THUMB_TARGET_SEC = 2;
 static const int THUMB_WIDTH = 320;
 static const int THUMB_QUALITY = 70;
 
+/* Initialize thumbnail worker: allocate state and start background thread. */
 cls_thumbnail::cls_thumbnail(cls_motapp *p_app)
 {
     app = p_app;
@@ -50,6 +51,7 @@ cls_thumbnail::cls_thumbnail(cls_motapp *p_app)
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Thumbnail worker started"));
 }
 
+/* Destructor: signal worker shutdown and block until the thread exits. */
 cls_thumbnail::~cls_thumbnail()
 {
     /* Signal shutdown and wake worker */
@@ -67,6 +69,7 @@ cls_thumbnail::~cls_thumbnail()
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Thumbnail worker stopped"));
 }
 
+/* Enqueue a video path for asynchronous thumbnail generation. */
 void cls_thumbnail::queue(const std::string &video_path)
 {
     std::lock_guard<std::mutex> lock(queue_mutex);
@@ -74,6 +77,7 @@ void cls_thumbnail::queue(const std::string &video_path)
     queue_cv.notify_one();
 }
 
+/* Return true if a thumbnail file already exists for the given video path. */
 bool cls_thumbnail::exists(const std::string &video_path)
 {
     std::string thumb_path = path_for(video_path);
@@ -81,11 +85,13 @@ bool cls_thumbnail::exists(const std::string &video_path)
     return (stat(thumb_path.c_str(), &st) == 0);
 }
 
+/* Derive the thumbnail file path from a video path by appending ".thumb.jpg". */
 std::string cls_thumbnail::path_for(const std::string &video_path)
 {
     return video_path + ".thumb.jpg";
 }
 
+/* Background thread: wait for queued video paths and generate thumbnails one at a time. */
 void cls_thumbnail::worker_loop()
 {
     /* Set thread name for debugging */
@@ -123,6 +129,7 @@ void cls_thumbnail::worker_loop()
     }
 }
 
+/* Generate a JPEG thumbnail for one video file; skips if thumbnail already exists. */
 void cls_thumbnail::generate(const std::string &video_path)
 {
     AVFrame *frame = nullptr;
@@ -161,6 +168,8 @@ void cls_thumbnail::generate(const std::string &video_path)
         , _("Generated thumbnail: %s"), thumb_path.c_str());
 }
 
+/* Open a video file and decode the frame nearest to THUMB_TARGET_SEC using FFmpeg.
+ * Caller must av_frame_free() the returned frame on success (retcd == 0). */
 int cls_thumbnail::extract_frame(const std::string &video_path, AVFrame **frame)
 {
     AVFormatContext *fmt_ctx = nullptr;
@@ -304,6 +313,7 @@ cleanup:
     return retcd;
 }
 
+/* Scale the decoded frame to THUMB_WIDTH and write it as a JPEG to thumb_path. */
 int cls_thumbnail::encode_thumbnail(AVFrame *frame, const std::string &thumb_path)
 {
     uint8_t *src_buffer = nullptr;

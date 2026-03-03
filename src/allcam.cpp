@@ -34,12 +34,14 @@
 #include "jpegutils.hpp"
 
 
+/* C-linkage thread entry point; delegates to cls_allcam::handler(). */
 static void *allcam_handler(void *arg)
 {
     ((cls_allcam *)arg)->handler();
     return nullptr;
 }
 
+/* Compute the scaled destination dimensions for one camera, aligned to 8-pixel boundaries with a 64-pixel minimum. */
 void cls_allcam::getsizes_img(cls_camera *p_cam)
 {
     int src_w, src_h, dst_w, dst_h;
@@ -67,6 +69,7 @@ void cls_allcam::getsizes_img(cls_camera *p_cam)
     p_cam->all_sizes.dst_sz = (dst_w * dst_h * 3)/2;
 }
 
+/* Fetch and scale one camera's current stream frame into dst_img; waits briefly if the frame is not yet ready. */
 void cls_allcam::getimg_src(cls_camera *p_cam, std::string imgtyp, u_char *dst_img, u_char *src_img)
 {
     int indx;
@@ -121,6 +124,8 @@ void cls_allcam::getimg_src(cls_camera *p_cam, std::string imgtyp, u_char *dst_i
 
 }
 
+/* Composite all active camera frames into a combined YUV420P image, scale it,
+ * JPEG-encode the result, and write it to the given all-camera stream slot. */
 void cls_allcam::getimg(ctx_stream_data *strm_a, std::string imgtyp)
 {
     int a_y, a_u, a_v; /* all img y,u,v */
@@ -132,6 +137,7 @@ void cls_allcam::getimg(ctx_stream_data *strm_a, std::string imgtyp)
 
     getsizes();
 
+    /* Allocate composite canvas and fill with mid-grey (0x80 = neutral chroma). */
     a_y = 0;
     a_u = (all_sizes.src_w * all_sizes.src_h);
     a_v = a_u + (a_u / 4);
@@ -140,6 +146,7 @@ void cls_allcam::getimg(ctx_stream_data *strm_a, std::string imgtyp)
     memset(all_img , 0x80, (size_t)a_u);
     memset(all_img  + a_u, 0x80, (size_t)(a_u/2));
 
+    /* Paste each camera's scaled frame into its grid position on the canvas. */
     for (indx=0; indx<active_cnt; indx++) {
         p_cam = active_cam[indx];
         dst_w = p_cam->all_sizes.dst_w;
@@ -181,6 +188,7 @@ void cls_allcam::getimg(ctx_stream_data *strm_a, std::string imgtyp)
         myfree(src_img);
     }
 
+    /* Scale composite to final output dimensions and JPEG-encode into the stream slot. */
     pthread_mutex_lock(&stream.mutex);
         memset(strm_a->img_data, 0x80, (size_t)all_sizes.dst_sz);
         util_resize(all_img, all_sizes.src_w, all_sizes.src_h
@@ -197,6 +205,7 @@ void cls_allcam::getimg(ctx_stream_data *strm_a, std::string imgtyp)
 
 }
 
+/* Free YUV and JPEG data buffers for all five stream slots. */
 void cls_allcam::stream_free()
 {
     int indx;
@@ -220,6 +229,7 @@ void cls_allcam::stream_free()
 
 }
 
+/* Allocate YUV and JPEG data buffers for all five stream slots at the current dst_sz. */
 void cls_allcam::stream_alloc()
 {
     int indx;
@@ -246,6 +256,7 @@ void cls_allcam::stream_alloc()
 
 }
 
+/* For cameras with scale == -1, auto-compute a scale so all cameras in the same row match the tallest one. */
 void cls_allcam::getsizes_scale()
 {
     int indx, row, mx_h;
@@ -291,6 +302,7 @@ void cls_allcam::getsizes_scale()
     }
 }
 
+/* Compute column pixel offsets and vertically center each camera within its row's tallest image. */
 void cls_allcam::getsizes_alignv()
 {
     int indx, row, col;
@@ -330,6 +342,7 @@ void cls_allcam::getsizes_alignv()
     }
 }
 
+/* Horizontally center each camera within its column area, ensuring columns don't overlap. */
 void cls_allcam::getsizes_alignh()
 {
     int indx, col;
@@ -370,6 +383,7 @@ void cls_allcam::getsizes_alignh()
     }
 }
 
+/* Apply user-configured column and row pixel offsets, clamping to prevent overflow outside the canvas. */
 void cls_allcam::getsizes_offset_user()
 {
     int indx, chk_sz;
@@ -415,6 +429,7 @@ void cls_allcam::getsizes_offset_user()
 
 }
 
+/* Rebuild the active camera list and return true if any camera dimension changed (triggering a full layout recalculation). */
 bool cls_allcam::getsizes_reset()
 {
     int indx;
@@ -443,6 +458,7 @@ bool cls_allcam::getsizes_reset()
     return reset;
 }
 
+/* Compute each camera's percentage position within the canvas and the final scaled output dimensions. */
 void cls_allcam::getsizes_pct()
 {
     int indx, dst_w, dst_h, dst_scale;
@@ -494,6 +510,7 @@ void cls_allcam::getsizes_pct()
 
 }
 
+/* Parse each camera's stream_preview_params (row, col, offsets, scale) and store in all_loc. */
 void cls_allcam::init_params()
 {
     int indx, indx1;
@@ -541,6 +558,8 @@ void cls_allcam::init_params()
 
 }
 
+/* Validate that all cameras have unique, non-zero, contiguous row/col assignments;
+ * falls back to a sequential 2-column grid if any constraint is violated. */
 void cls_allcam::init_validate()
 {
     int indx, indx1;
@@ -549,6 +568,7 @@ void cls_allcam::init_validate()
     std::string cfg_row, cfg_col;
     cls_camera *p_cam, *p_cam1;
 
+    /* Find the maximum declared row and column across all cameras. */
     mx_row = 0;
     mx_col = 0;
     for (indx=0; indx<active_cnt; indx++) {
@@ -561,6 +581,7 @@ void cls_allcam::init_validate()
         }
     }
 
+    /* Verify no camera is missing a position, zero-indexed, or sharing a slot with another. */
     cfg_valid = true;
 
     for (indx=0; indx<active_cnt; indx++) {
@@ -604,6 +625,7 @@ void cls_allcam::init_validate()
         }
     }
 
+    /* Check that no row is entirely absent and columns within each row are contiguous. */
     for (row=1; row<=mx_row; row++) {
         chk = false;
         for (indx=0; indx<active_cnt; indx++) {
@@ -637,6 +659,7 @@ void cls_allcam::init_validate()
         }
     }
 
+    /* Fall back to a sequential 2-column grid assignment when any constraint fails. */
     if (cfg_valid == false) {
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
             ,"Creating default stream preview values");
@@ -657,6 +680,7 @@ void cls_allcam::init_validate()
 
 }
 
+/* Orchestrate per-camera parameter loading and validation, then capture source dimensions and max row/col. */
 void cls_allcam::init_cams()
 {
     int indx;
@@ -694,6 +718,7 @@ void cls_allcam::init_cams()
     }
 }
 
+/* Orchestrate a full layout recalculation when a camera reset is needed; skips if nothing changed. */
 void cls_allcam::getsizes()
 {
     if (getsizes_reset() == false) {
@@ -710,6 +735,7 @@ void cls_allcam::getsizes()
 
 }
 
+/* Rate-limit the all-camera loop to stream_maxrate fps, accounting for elapsed processing time. */
 void cls_allcam::timing()
 {
     struct timespec ts2;
@@ -736,6 +762,7 @@ void cls_allcam::timing()
 
 }
 
+/* Main loop: produce composite frames for each active stream type that has consumers and is ready for a new frame. */
 void cls_allcam::handler()
 {
     mythreadname_set("ac", 0, "allcam");
@@ -770,6 +797,7 @@ void cls_allcam::handler()
     pthread_exit(NULL);
 }
 
+/* Spawn a detached pthread for the all-camera compositing loop; no-op if already running. */
 void cls_allcam::handler_startup()
 {
     int retcd;
@@ -791,6 +819,7 @@ void cls_allcam::handler_startup()
     }
 }
 
+/* Signal the all-camera thread to stop; waits watchdog_tmo seconds then kills if unresponsive. */
 void cls_allcam::handler_shutdown()
 {
     int waitcnt;
@@ -832,6 +861,7 @@ void cls_allcam::handler_shutdown()
     }
 }
 
+/* Constructor: initialize all stream slots and layout state, then start the compositing thread. */
 cls_allcam::cls_allcam(cls_motapp *p_app)
 {
     app = p_app;
@@ -856,6 +886,7 @@ cls_allcam::cls_allcam(cls_motapp *p_app)
     handler_startup();
 }
 
+/* Destructor: shut down the compositing thread and release all stream buffers. */
 cls_allcam::~cls_allcam()
 {
     finish = true;

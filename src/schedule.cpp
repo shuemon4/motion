@@ -34,12 +34,14 @@
 #include "dbse.hpp"
 #include "schedule.hpp"
 
+/* C-linkage thread entry point; delegates to cls_schedule::handler(). */
 static void *schedule_handler(void *arg)
 {
     ((cls_schedule *)arg)->handler();
     return nullptr;
 }
 
+/* Evaluate today's schedule for one camera and start or stop it accordingly. */
 void cls_schedule::schedule_cam(cls_camera *p_cam)
 {
     int indx, cur_dy;
@@ -61,6 +63,7 @@ void cls_schedule::schedule_cam(cls_camera *p_cam)
     localtime_r(&curr_ts.tv_sec, &c_tm);
     cur_dy = c_tm.tm_wday;
 
+    /* Scan today's schedule entries; last matching "stop" window wins. */
     stopcam = false;
     for (indx=0; indx<p_cam->schedule[cur_dy].size(); indx++) {
         if ((p_cam->schedule[cur_dy][indx].action == "stop") &&
@@ -76,6 +79,7 @@ void cls_schedule::schedule_cam(cls_camera *p_cam)
         }
     }
 
+    /* Start or stop the camera handler based on the schedule decision. */
     if ((stopcam == true) && (p_cam->handler_stop == false)) {
         p_cam->event_stop = true;
         p_cam->restart = false;
@@ -96,6 +100,7 @@ void cls_schedule::schedule_cam(cls_camera *p_cam)
 
 }
 
+/* Remove a directory only if it contains no entries other than "." and "..". */
 void cls_schedule::cleandir_remove_dir(std::string dirnm)
 {
     DIR *dp;
@@ -125,6 +130,7 @@ void cls_schedule::cleandir_remove_dir(std::string dirnm)
     }
 }
 
+/* Fetch files matching sql from the DB, delete them from disk, and remove their DB records. */
 void cls_schedule::cleandir_remove(std::string sql, bool removedir)
 {
     vec_files flst;
@@ -152,6 +158,7 @@ void cls_schedule::cleandir_remove(std::string sql, bool removedir)
     }
 }
 
+/* Build a SELECT query for files belonging to device_id recorded before timestamp ts. */
 void cls_schedule::cleandir_sql(int device_id, std::string &sql, struct timespec ts)
 {
     struct tm c_tm;
@@ -179,6 +186,7 @@ void cls_schedule::cleandir_sql(int device_id, std::string &sql, struct timespec
 
 }
 
+/* Compute the file-age cutoff timestamp for a camera and delete files older than it. */
 void cls_schedule::cleandir_run(cls_camera *p_cam)
 {
     struct timespec test_ts;
@@ -217,6 +225,7 @@ void cls_schedule::cleandir_run(cls_camera *p_cam)
 
 }
 
+/* Check if cleanup is due for a camera and run it, then advance the next-run timestamp. */
 void cls_schedule::cleandir_cam(cls_camera *p_cam)
 {
     struct tm c_tm;
@@ -266,6 +275,7 @@ void cls_schedule::cleandir_cam(cls_camera *p_cam)
     }
 }
 
+/* Sleep ~30 seconds between scheduling passes, checking for shutdown each second. */
 void cls_schedule::timing()
 {
     int indx;
@@ -277,6 +287,7 @@ void cls_schedule::timing()
     }
 }
 
+/* Main scheduling loop: evaluate camera start/stop and cleandir for all cameras every 30 s. */
 void cls_schedule::handler()
 {
     int indx;
@@ -298,6 +309,7 @@ void cls_schedule::handler()
     pthread_exit(NULL);
 }
 
+/* Spawn a detached pthread to run the scheduling loop; no-op if already running. */
 void cls_schedule::handler_startup()
 {
     int retcd;
@@ -319,6 +331,7 @@ void cls_schedule::handler_startup()
     }
 }
 
+/* Signal the scheduling thread to stop; waits watchdog_tmo seconds before forcing kill. */
 void cls_schedule::handler_shutdown()
 {
     int waitcnt;
@@ -360,6 +373,7 @@ void cls_schedule::handler_shutdown()
     }
 }
 
+/* Constructor: initialize state and launch the scheduling thread. */
 cls_schedule::cls_schedule(cls_motapp *p_app)
 {
     app = p_app;
@@ -372,6 +386,7 @@ cls_schedule::cls_schedule(cls_motapp *p_app)
     handler_startup();
 }
 
+/* Destructor: stop the scheduling thread before destroying the object. */
 cls_schedule::~cls_schedule()
 {
     finish = true;

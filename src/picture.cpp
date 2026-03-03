@@ -37,6 +37,7 @@
 #include "picture.hpp"
 
 
+/* Build the full output path from format string, base filename, and extension */
 void cls_picture::picname(char* fullname, std::string fmtstr
     , std::string basename, std::string extname)
 {
@@ -58,6 +59,7 @@ void cls_picture::picname(char* fullname, std::string fmtstr
 
 }
 
+/* Log the saved filename and execute the on_picture_save command if configured */
 void cls_picture::on_picture_save_command(char *fname)
 {
     MOTION_LOG(NTC, TYPE_EVENTS, NO_ERRNO, _("File saved to: %s"), fname);
@@ -67,6 +69,7 @@ void cls_picture::on_picture_save_command(char *fname)
     }
 }
 
+/* Save a normal picture if enabled, enforcing per-event count and interval limits */
 void cls_picture::process_norm()
 {
     char filename[PATH_MAX];
@@ -108,6 +111,7 @@ void cls_picture::process_norm()
     }
 }
 
+/* Save a motion-debug image (full frame or ROI-only crop) if configured */
 void cls_picture::process_motion()
 {
     char filename[PATH_MAX];
@@ -132,6 +136,7 @@ void cls_picture::process_motion()
     }
 }
 
+/* Save a snapshot image, either as a new timestamped file or overwriting a "lastsnap" symlink */
 void cls_picture::process_snapshot()
 {
     char filename[PATH_MAX];
@@ -186,6 +191,7 @@ void cls_picture::process_snapshot()
     cam->action_snapshot = false;
 }
 
+/* Save the best preview image (highest motion frame) captured during the event */
 void cls_picture::process_preview()
 {
     char filename[PATH_MAX];
@@ -219,6 +225,7 @@ void cls_picture::process_preview()
 }
 
 #ifdef HAVE_WEBP
+/* Attach EXIF metadata to a WebP mux object, stripping the 6-byte JPEG EXIF marker */
 void cls_picture::webp_exif(WebPMux* webp_mux
         , timespec *ts1, ctx_coord *box)
 {
@@ -364,7 +371,7 @@ void cls_picture::save_grey(FILE *picture, u_char *image, int width, int height
     free(buf);
 }
 
-/** Save image as greyscale ppm image to file */
+/* Convert YUV420P image to RGB and write as a P6 (color) PPM file */
 void cls_picture::save_ppm(FILE *picture, u_char *image, int width, int height)
 {
     int x, y;
@@ -492,7 +499,7 @@ void cls_picture::save_norm(char *file, u_char *image)
     myfclose(picture);
 }
 
-/* Saves image to a file in format requested */
+/* Crop the motion bounding box from the image and save as a greyscale JPEG */
 void cls_picture::save_roi(char *file, u_char *image)
 {
     FILE *picture;
@@ -627,6 +634,7 @@ u_char *cls_picture::load_pgm(FILE *picture, int width, int height)
     return image;
 }
 
+/* Write a blank (all-white) PGM mask file as a template for the user to edit */
 void cls_picture::write_mask(const char *file)
 {
     FILE *picture;
@@ -666,6 +674,7 @@ void cls_picture::write_mask(const char *file)
         "re-run motion to enable mask feature"), cam->cfg->mask_file.c_str());
 }
 
+/* Downsample a YUV420P image by 2x in each dimension (every other pixel and row) */
 void cls_picture::scale_img(int width_src, int height_src, u_char *img_src, u_char *img_dst)
 {
 
@@ -684,6 +693,7 @@ void cls_picture::scale_img(int width_src, int height_src, u_char *img_src, u_ch
     return;
 }
 
+/* Copy the current frame into the preview buffer, preserving the best-motion image for the event */
 void cls_picture::save_preview()
 {
     u_char *image_norm, *image_high;
@@ -719,6 +729,7 @@ void cls_picture::save_preview()
 
 }
 
+/* Load the privacy mask PGM file and build Y/UV bitmasks for normal and high-res images */
 void cls_picture::init_privacy()
 {
     int indxrow, indxcol;
@@ -830,6 +841,7 @@ void cls_picture::init_privacy()
 
 }
 
+/* Load the motion detection mask PGM file, or create an empty template if it doesn't exist */
 void cls_picture::init_mask()
 {
     FILE *picture;

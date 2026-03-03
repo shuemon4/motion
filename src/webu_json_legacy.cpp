@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json_legacy.cpp - Legacy JSON API Endpoints
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Implements legacy JSON API endpoints for backwards compatibility:
+ * configuration and version info, camera listing, SQLite-based movie
+ * file queries, real-time camera status (FPS, resolution, connection
+ * state, hardware capabilities), and log history retrieval.
  *
  */
 
@@ -54,6 +55,7 @@
 #include <dirent.h>
 #include <set>
 
+/* Build JSON object with camera count, names, IDs, viewport positions, and URLs */
 void cls_webu_json::cameras_list()
 {
     int indx_cam;
@@ -83,6 +85,7 @@ void cls_webu_json::cameras_list()
 
 }
 
+/* Build JSON object of all configuration parameter categories (short and display names) */
 void cls_webu_json::categories_list()
 {
     int indx_cat;
@@ -108,6 +111,7 @@ void cls_webu_json::categories_list()
     webua->resp_page += "}";
 }
 
+/* Legacy config.json endpoint: returns version, camera list, all params, and categories */
 void cls_webu_json::config()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -126,6 +130,8 @@ void cls_webu_json::config()
     webua->resp_page += "}";
 }
 
+/* Query SQLite for movie files for a single camera, returning name, size, date, and
+ * motion statistics (diff_avg, sdev_min/max/avg) for each found file */
 void cls_webu_json::movies_list()
 {
     int indx, indx2;
@@ -134,6 +140,7 @@ void cls_webu_json::movies_list()
     vec_files flst;
     std::string sql;
 
+    /* Check if movies endpoint is disabled via webcontrol params */
     for (indx=0;indx<webu->wb_actions->params_cnt;indx++) {
         if (webu->wb_actions->params_array[indx].param_name == "movies") {
             if (webu->wb_actions->params_array[indx].param_value == "off") {
@@ -149,6 +156,7 @@ void cls_webu_json::movies_list()
         }
     }
 
+    /* Fetch files from database ordered by date/time */
     sql  = " select * from motion ";
     sql += " where device_id = " + std::to_string(webua->cam->cfg->device_id);
     sql += " order by file_dtl, file_tml;";
@@ -158,6 +166,7 @@ void cls_webu_json::movies_list()
     indx = 0;
     for (indx2=0;indx2<flst.size();indx2++){
         if (flst[indx2].found == true) {
+            /* Format file size as KB/MB/GB for display */
             if ((flst[indx2].file_sz/1000) < 1000) {
                 snprintf(fmt,PATH_MAX,"%.1fKB"
                     ,((double)flst[indx2].file_sz/1000));
@@ -204,6 +213,7 @@ void cls_webu_json::movies_list()
     webua->resp_page += std::to_string(webua->cam->cfg->device_id);
     webua->resp_page += "}";
 }
+/* Legacy movies.json endpoint: wraps movies_list() for all cameras or a single camera */
 void cls_webu_json::movies()
 {
     int indx_cam, indx_req;
@@ -236,6 +246,9 @@ void cls_webu_json::movies()
     webua->resp_page += "}";
 }
 
+/* Build detailed JSON status for a single camera: resolution, FPS, connection state,
+ * motion detection state, pause status, and hardware-specific info (libcam controls,
+ * V4L2 controls, netcam status, WebRTC encoder state) */
 void cls_webu_json::status_vars(int indx_cam)
 {
     char buf[32];
@@ -247,6 +260,7 @@ void cls_webu_json::status_vars(int indx_cam)
 
     webua->resp_page += "{";
 
+    /* Basic camera identity and frame info */
     webua->resp_page += "\"name\":\"" + escstr(cam->cfg->device_name)+"\"";
     webua->resp_page += ",\"id\":" + std::to_string(cam->cfg->device_id);
     webua->resp_page += ",\"width\":" + std::to_string(cam->imgs.width);
@@ -258,6 +272,7 @@ void cls_webu_json::status_vars(int indx_cam)
     strftime(buf, sizeof(buf), "%FT%T", &timestamp_tm);
     webua->resp_page += ",\"current_time\":\"" + std::string(buf)+"\"";
 
+    /* Connection health indicators */
     webua->resp_page += ",\"missing_frame_counter\":" +
         std::to_string(cam->missing_frame_counter);
 
@@ -274,6 +289,7 @@ void cls_webu_json::status_vars(int indx_cam)
     } else {
         webua->resp_page += ",\"connection_lost_time\":\"\"" ;
     }
+    /* Motion detection and pause state */
     if (cam->detecting_motion) {
         webua->resp_page += ",\"detecting\":true";
     } else {
@@ -386,6 +402,7 @@ void cls_webu_json::status_vars(int indx_cam)
         }
     }
 
+    /* WebRTC shared H.264 encoder status and peer count */
     #ifdef HAVE_WEBRTC
     if (cam->h264_enc != nullptr) {
         webua->resp_page += ",\"webrtc_encoder\":\"" +
@@ -407,6 +424,7 @@ void cls_webu_json::status_vars(int indx_cam)
     webua->resp_page += "}";
 }
 
+/* Legacy status.json endpoint: returns version and status for all cameras */
 void cls_webu_json::status()
 {
     int indx_cam;
@@ -427,6 +445,7 @@ void cls_webu_json::status()
     webua->resp_page += "}";
 }
 
+/* Return log messages newer than the log number specified in uri_cmd2 */
 void cls_webu_json::loghistory()
 {
     int indx, cnt;
@@ -438,6 +457,7 @@ void cls_webu_json::loghistory()
     frst = true;
     cnt = 0;
 
+    /* Walk the log buffer under lock, emitting entries with log_nbr > requested */
     pthread_mutex_lock(&motlog->mutex_log);
         for (indx=0; indx<motlog->log_vec.size();indx++) {
             if (motlog->log_vec[indx].log_nbr > mtoi(webua->uri_cmd2)) {

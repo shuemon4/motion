@@ -31,6 +31,7 @@
 #include "logger.hpp"
 #include "sound.hpp"
 
+/* C-linkage thread entry point; delegates to cls_sound::handler(). */
 static void *sound_handler(void *arg)
 {
     ((cls_sound *)arg)->handler();
@@ -38,6 +39,7 @@ static void *sound_handler(void *arg)
     return nullptr;
 }
 
+/* Zero-initialize all snd_info fields; called before loading config on each (re)start. */
 void cls_sound::init_values()
 {
     #ifdef HAVE_FFTW3
@@ -58,6 +60,7 @@ void cls_sound::init_values()
     snd_info->pulse_server = "";
 }
 
+/* Initialize a single alert struct to safe defaults before parsing its config values. */
 void cls_sound::init_alerts(ctx_snd_alert  *tmp_alert)
 {
     tmp_alert->alert_id = 0;
@@ -73,6 +76,8 @@ void cls_sound::init_alerts(ctx_snd_alert  *tmp_alert)
 
 }
 
+/* Validate that all alert IDs are unique; reassign sequential IDs if duplicates are found.
+ * Also assigns a default name to any unnamed alert and logs all alert parameters. */
 void cls_sound::edit_alerts()
 {
     std::list<ctx_snd_alert>::iterator it_a0;
@@ -124,6 +129,7 @@ void cls_sound::edit_alerts()
 
 }
 
+/* Parse the snd_alerts config string and populate snd_info->alerts, then validate them. */
 void cls_sound::load_alerts()
 {
     ctx_snd_alert  tmp_alert;
@@ -174,6 +180,7 @@ void cls_sound::load_alerts()
     edit_alerts();
 }
 
+/* Parse snd_params from config, apply defaults, and populate snd_info fields. */
 void cls_sound::load_params()
 {
     int indx;
@@ -214,6 +221,7 @@ void cls_sound::load_params()
 
 #ifdef HAVE_ALSA  /************ Start ALSA *******************/
 
+/* Log the subdevices available for the current ALSA card and PCM device. */
 void cls_sound::alsa_list_subdev()
 {
     ctx_snd_alsa *alsa = snd_info->snd_alsa;
@@ -249,6 +257,7 @@ void cls_sound::alsa_list_subdev()
 
 }
 
+/* Enumerate all capture-capable PCM devices on the current ALSA card. */
 void cls_sound::alsa_list_card()
 {
     ctx_snd_alsa *alsa = snd_info->snd_alsa;
@@ -290,6 +299,7 @@ void cls_sound::alsa_list_card()
 
 }
 
+/* Iterate all ALSA sound cards and log their capture devices to the motion log. */
 void cls_sound::alsa_list()
 {
     ctx_snd_alsa *alsa = snd_info->snd_alsa;
@@ -328,6 +338,7 @@ void cls_sound::alsa_list()
 
 }
 
+/* Open and configure the ALSA PCM device for S16_LE interleaved capture, then allocate the capture buffer. */
 void cls_sound::alsa_start()
 {
     ctx_snd_alsa *alsa = snd_info->snd_alsa;
@@ -340,6 +351,7 @@ void cls_sound::alsa_start()
     frames_per = (uint)snd_info->frames;
     smpl_rate = (unsigned int)snd_info->sample_rate;
 
+    /* Open device and configure hardware parameters. */
     retcd = snd_pcm_open(&alsa->pcm_dev
         , cfg->snd_device.c_str(), SND_PCM_STREAM_CAPTURE, 0);
     if (retcd < 0) {
@@ -436,7 +448,7 @@ void cls_sound::alsa_start()
         return;
     }
 
-    /* get actual parms selected */
+    /* Query actual parameters selected by ALSA (may differ from requested). */
 	retcd = snd_pcm_hw_params_get_format(hw_params, &actl_sndfmt);
     if (retcd < 0) {
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
@@ -476,9 +488,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Sound format 32"));
     }
 
-    /*************************************************************/
-    /** allocate and initialize the sound buffers                */
-    /*************************************************************/
+    /* Allocate and zero the interleaved S16 capture buffer (frames × channels). */
     snd_info->frames = (int)frames_per;
     snd_info->buffer_size = snd_info->frames * 2;
     snd_info->buffer = (int16_t*)mymalloc(
@@ -491,6 +501,7 @@ void cls_sound::alsa_start()
 
 }
 
+/* Initialize the ALSA context, enumerate devices, and open the capture stream. */
 void cls_sound::alsa_init()
 {
     ctx_snd_alsa *alsa = snd_info->snd_alsa;
@@ -515,6 +526,7 @@ void cls_sound::alsa_init()
     alsa_start();
 }
 
+/* Read one period of PCM frames from ALSA into snd_info->buffer; sets STATUS_CLOSED on error. */
 void cls_sound::alsa_capture()
 {
     ctx_snd_alsa *alsa = snd_info->snd_alsa;
@@ -533,6 +545,7 @@ void cls_sound::alsa_capture()
     }
 }
 
+/* Close the ALSA PCM device and release the global ALSA configuration. */
 void cls_sound::alsa_cleanup()
 {
     if (snd_info->source != "alsa") {
@@ -548,6 +561,7 @@ void cls_sound::alsa_cleanup()
 
 #ifdef HAVE_PULSE /************ Start PULSE *******************/
 
+/* Open a PulseAudio simple capture stream with S16LE format at the configured rate. */
 void cls_sound::pulse_init()
 {
     pa_sample_spec specs;
@@ -585,6 +599,7 @@ void cls_sound::pulse_init()
 
 }
 
+/* Read one period from PulseAudio into snd_info->buffer; sets STATUS_CLOSED on error. */
 void cls_sound::pulse_capture()
 {
     ctx_snd_pulse *pulse = snd_info->snd_pulse;
@@ -604,6 +619,7 @@ void cls_sound::pulse_capture()
     }
 }
 
+/* Free the PulseAudio simple connection handle. */
 void cls_sound::pulse_cleanup()
 {
     if (snd_info->source != "pulse") {
@@ -619,6 +635,7 @@ void cls_sound::pulse_cleanup()
 
 #ifdef HAVE_FFTW3 /************ Start FFTW3 *******************/
 
+/* Allocate FFTW input/output buffers, create the real-to-complex DFT plan, and compute bin metrics. */
 void cls_sound::fftw_open()
 {
     ctx_snd_fftw *fftw = snd_info->snd_fftw;
@@ -647,14 +664,18 @@ void cls_sound::fftw_open()
 
 }
 
+/* Return the Hamming window coefficient for sample n1 in a window of size N2. */
 float cls_sound::HammingWindow(int n1, int N2){
     return 0.54F - 0.46F * (float)(cos((2 * M_PI * n1)) / (N2 - 1));
 }
 
+/* Return the Hann window coefficient for sample n1 in a window of size N2. */
 float cls_sound::HannWindow(int n1, int N2){
     return 0.5F * (float)(1 - (cos(2 * M_PI * n1 * N2)));
 }
 
+/* Apply the configured window function, run the FFT, identify the dominant frequency bin,
+ * and fire any alert whose frequency and volume thresholds are satisfied. */
 void cls_sound::check_alerts()
 {
     double freq_value;
@@ -668,6 +689,7 @@ void cls_sound::check_alerts()
     std::list<ctx_snd_alert>::iterator it;
     struct timespec trig_ts;
 
+    /* Apply window function to raw PCM samples before FFT. */
     for (indx=0;indx <snd_info->frames;indx++){
         if (cfg->snd_window == "hamming") {
             snd_info->snd_fftw->ff_in[indx] =
@@ -682,6 +704,7 @@ void cls_sound::check_alerts()
 
     fftw_execute(snd_info->snd_fftw->ff_plan);
 
+    /* Find the FFT bin with the highest intensity (dominant frequency). */
     pMaxIntensity = 0;
     pMaxBinIndex = 0;
 
@@ -705,6 +728,7 @@ void cls_sound::check_alerts()
             , snd_info->vol_count, snd_info->vol_max);
     }
 
+    /* Check each configured alert against the dominant frequency and volume. */
     for (it=snd_info->alerts.begin(); it!=snd_info->alerts.end(); it++) {
         trigger = false;
         if ((freq_value >= it->freq_low) && (freq_value <= it->freq_high)) {
@@ -748,6 +772,7 @@ void cls_sound::check_alerts()
 
 #endif  /************ End FFTW3 *******************/
 
+/* Capture one audio period from the active backend and push samples into the WebRTC ring buffer. */
 void cls_sound::capture()
 {
     if (device_status == STATUS_CLOSED) {
@@ -779,6 +804,7 @@ void cls_sound::capture()
     }
 }
 
+/* Tear down the audio ring buffer and all active backends, then free all snd_info memory. */
 void cls_sound::cleanup()
 {
     /* Deactivate audio ring buffer before cleaning up device */
@@ -821,6 +847,8 @@ void cls_sound::cleanup()
 
 }
 
+/* (Re)initialize sound subsystems: allocate snd_info, load config, open ALSA/Pulse/FFTW,
+ * and set up the WebRTC audio ring buffer. */
 void cls_sound::init()
 {
     if ((device_status != STATUS_INIT) && (restart == false)) {
@@ -899,6 +927,7 @@ void cls_sound::init()
 
 }
 
+/* Compute the peak and above-threshold sample count for the current period; trigger alert analysis if non-zero. */
 void cls_sound::check_levels()
 {
     #ifdef HAVE_FFTW3
@@ -923,6 +952,7 @@ void cls_sound::check_levels()
     #endif
  }
 
+/* Main sound thread loop: init → capture one period → analyze levels → repeat until stopped. */
 void cls_sound::handler()
 {
     device_status = STATUS_INIT;
@@ -945,6 +975,7 @@ void cls_sound::handler()
     pthread_exit(nullptr);
 }
 
+/* Spawn a detached sound thread; aborts if FFTW3 or audio backend libraries are absent. */
 void cls_sound::handler_startup()
 {
     int retcd;
@@ -971,6 +1002,7 @@ void cls_sound::handler_startup()
     }
 }
 
+/* Signal the sound thread to stop; waits watchdog_tmo seconds, then kills if unresponsive. */
 void cls_sound::handler_shutdown()
 {
     int waitcnt;
@@ -1013,6 +1045,7 @@ void cls_sound::handler_shutdown()
 
 }
 
+/* Constructor: initialize state and audio ring buffer; does not start capture yet. */
 cls_sound::cls_sound(cls_motapp *p_app)
 {
     app = p_app;
@@ -1032,6 +1065,7 @@ cls_sound::cls_sound(cls_motapp *p_app)
     pthread_mutex_init(&audio_ring.mutex, NULL);
 }
 
+/* Destructor: release the audio ring buffer and config objects. */
 cls_sound::~cls_sound()
 {
     /* Clean up audio ring buffer */

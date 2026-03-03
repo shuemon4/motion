@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json_camera.cpp - Camera Control and Management API
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Implements JSON REST API endpoints for camera operations: restart,
+ * snapshot, pause, event triggers, PTZ commands, camera detection and
+ * add/delete, stream info, and WebRTC signaling (offer, candidate,
+ * status, disconnect) for real-time peer-to-peer streaming.
  *
  */
 
@@ -55,6 +56,7 @@
 #include <dirent.h>
 #include <set>
 
+/* Return JSON array of all configured cameras with id, name, and URL */
 void cls_webu_json::api_cameras()
 {
     int indx_cam;
@@ -88,6 +90,7 @@ void cls_webu_json::api_cameras()
     webua->resp_type = WEBUI_RESP_JSON;
 }
 
+/* Restart one camera or all cameras. device_id 0 means all cameras. */
 void cls_webu_json::api_camera_restart()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -125,6 +128,7 @@ void cls_webu_json::api_camera_restart()
     webua->resp_page = "{\"status\":\"ok\"}";
 }
 
+/* Trigger a snapshot capture for one or all cameras */
 void cls_webu_json::api_camera_snapshot()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -160,6 +164,7 @@ void cls_webu_json::api_camera_snapshot()
     webua->resp_page = "{\"status\":\"ok\"}";
 }
 
+/* Pause or unpause motion detection. Accepts "on", "off", or "schedule" action. */
 void cls_webu_json::api_camera_pause()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -214,6 +219,7 @@ void cls_webu_json::api_camera_pause()
     webua->resp_page = "{\"status\":\"ok\",\"action\":\"" + action + "\"}";
 }
 
+/* Permanently stop one or all cameras (ends events and prevents restart) */
 void cls_webu_json::api_camera_stop()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -257,6 +263,7 @@ void cls_webu_json::api_camera_stop()
     webua->resp_page = "{\"status\":\"ok\"}";
 }
 
+/* Manually trigger a motion event start for one or all cameras */
 void cls_webu_json::api_camera_event_start()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -292,6 +299,7 @@ void cls_webu_json::api_camera_event_start()
     webua->resp_page = "{\"status\":\"ok\"}";
 }
 
+/* Manually end an in-progress motion event for one or all cameras */
 void cls_webu_json::api_camera_event_end()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -327,6 +335,7 @@ void cls_webu_json::api_camera_event_end()
     webua->resp_page = "{\"status\":\"ok\"}";
 }
 
+/* Execute a PTZ command (pan/tilt/zoom) by mapping action to configured shell commands */
 void cls_webu_json::api_camera_ptz()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -384,6 +393,7 @@ void cls_webu_json::api_camera_ptz()
         return;
     }
 
+    /* Skip frames during PTZ move to avoid false motion triggers */
     pthread_mutex_lock(&app->mutex_post);
     cam->frame_skip = cam->cfg->ptz_wait;
     util_exec_command(cam, ptz_cmd);
@@ -395,6 +405,7 @@ void cls_webu_json::api_camera_ptz()
     webua->resp_page = "{\"status\":\"ok\",\"action\":\"" + action + "\"}";
 }
 
+/* Return platform capabilities (Pi model, libcamera/V4L2 availability) */
 void cls_webu_json::api_cameras_platform()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -412,6 +423,7 @@ void cls_webu_json::api_cameras_platform()
     webua->resp_page += "}";
 }
 
+/* Detect and return cameras not yet configured (available for add) */
 void cls_webu_json::api_cameras_detected()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -467,6 +479,7 @@ void cls_webu_json::api_cameras_detected()
     webua->resp_page += "]}";
 }
 
+/* Add a new camera from detected camera details (type, path, resolution, fps) */
 void cls_webu_json::api_cameras_add()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -531,6 +544,7 @@ void cls_webu_json::api_cameras_add()
     webua->resp_page = "{\"status\":\"ok\",\"message\":\"Camera added successfully\"}";
 }
 
+/* Delete a camera by index; signals main loop and polls for completion */
 void cls_webu_json::api_cameras_delete()
 {
     int indx, maxcnt;
@@ -553,7 +567,7 @@ void cls_webu_json::api_cameras_delete()
     app->cam_delete = webua->camindx;
     pthread_mutex_unlock(&app->mutex_post);
 
-    /* Wait for main loop to complete the deletion */
+    /* Poll up to 5 seconds (100 x 50ms) for main loop to finish deletion */
     maxcnt = 100;
     indx = 0;
     while ((app->cam_delete != -1) && (indx < maxcnt)) {
@@ -571,6 +585,7 @@ void cls_webu_json::api_cameras_delete()
     webua->resp_page = "{\"status\":\"ok\",\"message\":\"Camera removed successfully\"}";
 }
 
+/* Test connectivity to a network camera URL with optional credentials */
 void cls_webu_json::api_cameras_test_netcam()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -601,6 +616,8 @@ void cls_webu_json::api_cameras_test_netcam()
     }
 }
 
+/* Return MJPEG stream connection counts and status for each stream variant
+ * (norm, sub, motion, source, secondary) per camera */
 void cls_webu_json::api_stream_info()
 {
     cls_camera *p_cam;
@@ -608,6 +625,7 @@ void cls_webu_json::api_stream_info()
 
     webua->resp_page = "{\"stream_info\":{";
 
+    /* device_id 0 returns all cameras, otherwise just the one requested */
     if (webua->device_id == 0) {
         cam_min = 0;
         cam_max = app->cam_cnt;
@@ -679,8 +697,7 @@ void cls_webu_json::api_stream_info()
     webua->resp_type = WEBUI_RESP_JSON;
 }
 
-/* WebRTC signaling API endpoints */
-
+/* Handle WebRTC SDP offer from browser and return SDP answer */
 void cls_webu_json::api_webrtc_offer()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -719,6 +736,7 @@ void cls_webu_json::api_webrtc_offer()
     #endif
 }
 
+/* Handle ICE candidate trickle from browser for WebRTC connection setup */
 void cls_webu_json::api_webrtc_candidate()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -762,6 +780,7 @@ void cls_webu_json::api_webrtc_candidate()
     #endif
 }
 
+/* Return WebRTC status: peer count, encoder state, max peers */
 void cls_webu_json::api_webrtc_status()
 {
     webua->resp_type = WEBUI_RESP_JSON;
@@ -785,6 +804,7 @@ void cls_webu_json::api_webrtc_status()
     #endif
 }
 
+/* Disconnect a specific WebRTC peer by ID from URI path */
 void cls_webu_json::api_webrtc_disconnect()
 {
     webua->resp_type = WEBUI_RESP_JSON;

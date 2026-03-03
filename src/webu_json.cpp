@@ -17,11 +17,12 @@
  */
 
 /*
- * webu_json.cpp - JSON REST API Implementation
+ * webu_json.cpp - JSON REST API Router and Dispatcher
  *
- * This module implements the JSON REST API for configuration management,
- * camera control, status queries, and profile operations, serving as the
- * primary interface between the React frontend and Motion backend.
+ * Central dispatcher for the JSON REST API. Routes incoming HTTP requests
+ * to specialized webu_json_*.cpp modules (auth, camera, config, legacy,
+ * mask, media, profiles, system) that implement each API domain. Also
+ * handles legacy GET endpoints (config.json, movies.json, status.json).
  *
  */
 
