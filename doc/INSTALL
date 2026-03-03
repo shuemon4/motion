@@ -4,47 +4,46 @@ Motion Installation Guide
 PLATFORM REQUIREMENTS
 ---------------------
 Ubuntu / Debian (64-bit)
-    Motion 5.0 builds on Ubuntu 22.04+ and Debian 12+ (amd64 or arm64).
-    Any system with the required libraries and a supported camera interface
-    (V4L2 or libcamera) should work.
+    Motion builds on Ubuntu 22.04+ and Debian 12+ (amd64 or arm64).
+    FFmpeg 5.0 or newer is required; Ubuntu 22.04 and Debian 12 both
+    provide a compatible version from their default repositories.
+    Any system with the required libraries and a supported camera
+    interface (V4L2 or libcamera) should work.
 
 Raspberry Pi (64-bit)
-    Raspberry Pi 4 or newer running Raspberry Pi OS (64-bit).
-    Raspberry Pi 3 and older are NOT supported.
+    Raspberry Pi 4 or newer running Raspberry Pi OS Bookworm or newer (64-bit, arm64). Raspberry Pi 3 and older are NOT supported. Pi 5 requires libcamera; the legacy V4L2 camera stack was removed from Pi 5 Raspberry Pi OS images.
 
 DEBIAN / UBUNTU INSTALLATION
 ----------------------------
-For full instructions on how to build and install Motion, see the motion_build.html that is
-distributed with this source code.
+The packages and library names change occasionally across operating
+system versions. Adjust the following as needed for your OS.
 
-The packages and library names change frequently and vary across base operating systems.
-Adjust the following lines as required by the base operating system.
+Install required packages:
+    sudo apt install autoconf automake autopoint build-essential pkgconf \
+        libtool gettext git \
+        libjpeg-dev zlib1g-dev libmicrohttpd-dev libxcrypt-dev \
+        libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev
 
-Install basic build packages:
-    sudo apt install autoconf automake autopoint build-essential pkgconf libtool libzip-dev \
-        libjpeg-dev git libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
-        libwebp-dev gettext libmicrohttpd-dev libsqlite3-dev
+Install optional but recommended packages:
+    sudo apt install libsqlite3-dev libwebp-dev libsystemd-dev
 
-For bcrypt password hashing support (required for authentication):
-    sudo apt install libcrypt-dev
+For libcamera support (required on Pi 5, recommended on Pi 4):
+    sudo apt install libcamera-dev libcamera-tools libcamera-v4l2
 
-For frontend development (optional):
+For frontend development (optional — rebuilds the React web UI):
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt install nodejs
 
 Once required packages are installed, execute:
     autoreconf -fiv
-    ./configure
+    ./configure --with-sqlite3
     make
     sudo make install
 
 RASPBERRY PI INSTALLATION (Recommended)
 ---------------------------------------
-For Raspberry Pi 4/5, use the automated installation script:
-
-    # Clone the repository
-    git clone https://github.com/Motion-Project/motion.git
-    cd motion
+For Raspberry Pi 4/5, use the automated installation script.
+Clone or copy the source to the Pi, then from the source directory run:
 
     # Run the automated installer (interactive)
     sudo scripts/install.sh
@@ -74,32 +73,30 @@ If you prefer to run each step manually:
     # 1. Install dependencies
     sudo scripts/pi-setup.sh
 
-    # 2. Build Motion
+    # 2. Build Motion (backend + frontend)
     scripts/pi-build.sh
 
-    # 3. Install system-wide
+    # 3. Install system-wide (binaries, webui, service file)
     sudo make install
+    sudo make install-service
 
     # 4. Configure authentication (required)
     sudo motion-setup
 
-    # 5. Set up systemd service
-    sudo scripts/setup-motion-service.sh
-
-    # 6. Start the service
+    # 5. Set up and start the systemd service
     sudo systemctl enable motion
     sudo systemctl start motion
 
     # Access the web UI
     http://<pi-ip>:8080/
 
-The setup script installs:
+The pi-setup.sh script installs:
 - Build tools (autoconf, automake, g++, etc.)
 - Camera support (libcamera for Pi camera modules)
-- Video encoding (FFmpeg)
+- Video encoding (FFmpeg 5.0+)
 - Web server (libmicrohttpd)
 - Database (SQLite3)
-- Node.js (for frontend development/rebuilds)
+- Node.js (for frontend build)
 
 AUTHENTICATION SETUP
 --------------------
@@ -108,12 +105,25 @@ After installation, configure authentication credentials:
     sudo motion-setup
 
 This creates admin and viewer accounts with bcrypt-hashed passwords.
-See README.md for password reset and manual configuration options.
+Run with --reset to update passwords on an existing installation.
 
 CONFIGURE OPTIONS
 -----------------
-    --prefix               :  Specify the install location for the motion package
-    --with-ffmpeg=[dir]    :  Specify the location in which ffmpeg/libav is installed.
-    --with-libcam          :  Enable libcamera support (required for Pi 5)
-    --with-sqlite3         :  Enable SQLite3 database support
-    --without-v4l2         :  Disable V4L2 support (Pi 5 only uses libcamera)
+    --prefix=DIR             Install to DIR instead of /usr/local
+    --with-libcam[=DIR]      Enable libcamera support (auto-detected;
+                             required on Pi 5, recommended on Pi 4)
+    --without-v4l2           Disable V4L2 support (use when only
+                             libcamera cameras are present)
+    --with-sqlite3           Enable SQLite3 event database support
+    --with-webp              Enable WebP image output support
+    --with-webrtc            Enable WebRTC streaming via libdatachannel
+                             (requires libdatachannel to be built separately)
+    --with-opencv[=DIR]      Enable OpenCV support
+    --with-mariadb[=DIR]     Enable MariaDB database support
+    --with-mysql[=DIR]       Enable MySQL database support
+    --with-pgsql[=DIR]       Enable PostgreSQL database support
+    --with-ffmpeg[=DIR]      Specify a non-system FFmpeg location (FFmpeg
+                             5.0+ is required and cannot be disabled)
+    --without-systemd        Disable systemd watchdog integration
+    --with-developer-flags   Enable strict compiler warnings (for development)
+    --disable-hardening      Disable compiler security hardening flags
