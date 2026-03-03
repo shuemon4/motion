@@ -1739,6 +1739,9 @@ int cls_movie::put_encoded_packet(const struct timespec *ts1)
 {
     int retcd;
     char errstr[128];
+    int64_t shared_pts, shared_dts;
+
+    (void)ts1;
 
     if (cam->h264_enc == nullptr) {
         return -1;
@@ -1773,17 +1776,24 @@ int cls_movie::put_encoded_packet(const struct timespec *ts1)
         pkt->flags |= AV_PKT_FLAG_KEY;
     }
 
+    /* Read PTS/DTS from shared encoder under mutex protection.
+     * picture is nullptr in the shared encoder path (no local encoder),
+     * so set_pts() must not be called here. */
+    shared_pts = cam->h264_enc->h264_front.pts;
+    shared_dts = cam->h264_enc->h264_front.dts;
+
     pthread_mutex_unlock(&cam->h264_enc->h264_mutex);
 
-    /* Set PTS/DTS for the container */
-    retcd = set_pts(ts1);
-    if (retcd < 0) {
+    /* Skip non-monotonic frames */
+    if (last_pts >= 0 && shared_pts <= last_pts) {
         av_packet_free(&pkt);
         pkt = nullptr;
         return 0;
     }
-    pkt->pts = picture->pts;
-    pkt->dts = pkt->pts;
+    last_pts = shared_pts;
+
+    pkt->pts = shared_pts;
+    pkt->dts = (shared_dts != AV_NOPTS_VALUE) ? shared_dts : shared_pts;
     pkt->stream_index = 0;
 
     retcd = av_write_frame(oc, pkt);
