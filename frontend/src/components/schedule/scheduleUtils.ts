@@ -32,8 +32,9 @@ export function createEmptySchedule(): WeekSchedule {
 function parseParams(value: string): Map<string, string[]> {
   const params = new Map<string, string[]>();
 
-  // Split by whitespace and process each key=value pair
-  const parts = value.trim().split(/\s+/);
+  // Support both comma-separated (new) and whitespace-separated (legacy) formats
+  const delimiter = value.includes(',') ? ',' : /\s+/;
+  const parts = value.trim().split(delimiter).map(p => p.trim()).filter(Boolean);
 
   for (const part of parts) {
     const eqIndex = part.indexOf('=');
@@ -243,7 +244,7 @@ export function toBackendFormat(
     for (const range of ranges) {
       parts.push(`sun-sat=${formatTimeRange(range)}`);
     }
-    return parts.join(' ');
+    return parts.join(',');
   }
 
   // Check if Mon-Fri are identical - use mon-fri shortcut
@@ -266,7 +267,7 @@ export function toBackendFormat(
         }
       }
     }
-    return parts.join(' ');
+    return parts.join(',');
   }
 
   // Output each day individually
@@ -279,7 +280,7 @@ export function toBackendFormat(
     }
   }
 
-  return parts.join(' ');
+  return parts.join(',');
 }
 
 /**

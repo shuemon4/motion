@@ -60,11 +60,11 @@ export function SchedulePicker({
         </span>
         {defaultOn ? (
           <span className="text-xs text-gray-500">
-            Detection paused during selected times
+            Recording off during painted times
           </span>
         ) : (
           <span className="text-xs text-gray-500">
-            Detection active during selected times
+            Recording on during painted times
           </span>
         )}
       </div>

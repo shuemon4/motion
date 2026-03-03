@@ -21,7 +21,7 @@ export function ScheduleSettings({ config, onChange, getError }: ScheduleSetting
       onChange('schedule_params', '');
     } else {
       // Default: pause motion detection Mon-Fri 9am-5pm
-      onChange('schedule_params', 'default=true action=pause mon-fri=0900-1700');
+      onChange('schedule_params', 'default=true,action=pause,mon-fri=0900-1700');
     }
   };
 
@@ -34,7 +34,7 @@ export function ScheduleSettings({ config, onChange, getError }: ScheduleSetting
       onChange('picture_schedule_params', '');
     } else {
       // Default: enable continuous recording Mon-Fri 9am-5pm
-      onChange('picture_schedule_params', 'default=false action=pause mon-fri=0900-1700');
+      onChange('picture_schedule_params', 'default=false,action=pause,mon-fri=0900-1700');
     }
   };
 

@@ -14,22 +14,22 @@ interface ScheduleControlsProps {
 const PRESETS: SchedulePreset[] = [
   {
     label: 'Business Hours',
-    value: 'default=true action=pause mon-fri=0900-1700',
+    value: 'default=true,action=pause,mon-fri=0900-1700',
     description: 'Pause Mon-Fri 9am-5pm',
   },
   {
     label: 'Night Watch',
-    value: 'default=false action=pause sun-sat=1800-2359 sun-sat=0000-0600',
+    value: 'default=false,action=pause,sun-sat=1800-2359,sun-sat=0000-0600',
     description: 'Active 6pm-6am only',
   },
   {
     label: 'Weekends Only',
-    value: 'default=false action=pause sat=0000-2359 sun=0000-2359',
+    value: 'default=false,action=pause,sat=0000-2359,sun=0000-2359',
     description: 'Active Sat & Sun only',
   },
   {
     label: 'Always On',
-    value: 'default=true action=pause',
+    value: 'default=true,action=pause',
     description: 'No schedule restrictions',
   },
 ];
@@ -58,13 +58,13 @@ export const ScheduleControls = memo(function ScheduleControls({
             disabled={disabled}
             className="w-full bg-surface-elevated border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="on">On by default</option>
-            <option value="off">Off by default</option>
+            <option value="on">Recording Off</option>
+            <option value="off">Recording On</option>
           </select>
           <p className="text-xs text-gray-500 mt-1">
             {defaultOn
-              ? 'Schedule defines when detection is paused'
-              : 'Schedule defines when detection is active'}
+              ? 'Painted times = recording off (detection paused)'
+              : 'Painted times = recording on (detection active)'}
           </p>
         </div>
 
