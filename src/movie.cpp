@@ -1438,6 +1438,18 @@ int cls_movie::movie_open()
             MOTION_LOG(WRN, TYPE_ENCODER, NO_ERRNO
                 , _("Shared encoder not ready, falling back to own encoder"));
             shared_enc_active = false;
+        } else if (enc_ctx->extradata == nullptr || enc_ctx->extradata_size <= 0) {
+            /* Hardware encoders (v4l2m2m) may not populate extradata (SPS/PPS)
+             * until after the first frame is encoded. Without extradata, the
+             * MP4 container's avcC box is empty, producing an invalid file.
+             * Defer the actual file creation until put_encoded_packet() confirms
+             * extradata is available and a keyframe is ready to write. */
+            shared_enc_deferred_open = true;
+            shared_enc_tb = enc_ctx->time_base;
+            shared_enc_base_pts = -1;
+            MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+                , _("Shared encoder movie: deferring open until extradata available"));
+            return 0;
         } else {
             oc = avformat_alloc_context();
             if (oc == nullptr) {
@@ -1479,12 +1491,22 @@ int cls_movie::movie_open()
                 strm_video->time_base = enc->time_base;
                 strm_video->avg_frame_rate = av_make_q(fps, 1);
                 ctx_codec = nullptr;
+                /* Store encoder time_base BEFORE avformat_write_header() which
+                 * may change strm_video->time_base (e.g., MP4 muxer enforces
+                 * minimum timescale). put_encoded_packet() rescales PTS from
+                 * this stored time_base to the stream's actual time_base. */
+                shared_enc_tb = enc->time_base;
+                shared_enc_base_pts = -1;
                 if (set_outputfile() < 0) {
                     MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
                         , _("Could not open output file for shared encoder"));
                     free_context();
                     shared_enc_active = false;
                 } else {
+                    MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
+                        , _("Shared encoder movie opened: enc_tb=%d/%d strm_tb=%d/%d")
+                        , shared_enc_tb.num, shared_enc_tb.den
+                        , strm_video->time_base.num, strm_video->time_base.den);
                     return 0;
                 }
             }
@@ -1533,7 +1555,7 @@ int cls_movie::movie_open()
     return 0;
 }
 
-void cls_movie::stop()
+void cls_movie::stop(bool is_split)
 {
     timespec *ts;
 
@@ -1541,13 +1563,32 @@ void cls_movie::stop()
         return;
     }
 
+#ifdef HAVE_WEBRTC
+    if (shared_enc_deferred_open) {
+        /* Movie file was never created (deferred open waiting for encoder
+         * extradata). Clean up flags without touching file handles. */
+        shared_enc_deferred_open = false;
+        if (shared_enc_active) {
+            shared_enc_active = false;
+            if (cam->h264_enc != nullptr && !is_split) {
+                cam->h264_enc->recording_stopped();
+            }
+        }
+        is_running = false;
+        return;
+    }
+#endif
+
     clock_gettime(CLOCK_MONOTONIC, &cb_st_ts);
 
 #ifdef HAVE_WEBRTC
     bool was_shared = shared_enc_active;
     if (shared_enc_active) {
         shared_enc_active = false;
-        if (cam->h264_enc != nullptr) {
+        if (cam->h264_enc != nullptr && !is_split) {
+            /* Only transition encoder to IDLE on final stop (event end).
+             * On movie_max_time splits, keep the encoder running to avoid
+             * close/reopen overhead and stale buffer issues. */
             cam->h264_enc->recording_stopped();
         }
     }
@@ -1747,6 +1788,33 @@ int cls_movie::put_encoded_packet(const struct timespec *ts1)
         return -1;
     }
 
+    /* Complete deferred movie open if encoder extradata is now available.
+     * v4l2m2m doesn't populate extradata (SPS/PPS) until after the first
+     * frame is encoded, so movie_open() defers the file creation. We
+     * complete it here once we have both extradata and a keyframe. */
+    if (shared_enc_deferred_open) {
+        AVCodecContext *enc = cam->h264_enc->get_ctx_codec();
+        if (enc == nullptr || enc->extradata == nullptr || enc->extradata_size <= 0) {
+            return 0;
+        }
+        /* Also wait for a keyframe so the file starts with a decodable frame */
+        pthread_mutex_lock(&cam->h264_enc->h264_mutex);
+        bool has_keyframe = (cam->h264_enc->h264_front.nal_data != nullptr &&
+                             cam->h264_enc->h264_front.nal_sz > 0 &&
+                             cam->h264_enc->h264_front.is_keyframe);
+        pthread_mutex_unlock(&cam->h264_enc->h264_mutex);
+        if (!has_keyframe) {
+            return 0;
+        }
+        shared_enc_deferred_open = false;
+        if (movie_open() < 0) {
+            MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO
+                , _("Shared encoder: deferred movie open failed"));
+            shared_enc_active = false;
+            return -1;
+        }
+    }
+
     pthread_mutex_lock(&cam->h264_enc->h264_mutex);
 
     if (cam->h264_enc->h264_front.nal_data == nullptr ||
@@ -1784,7 +1852,7 @@ int cls_movie::put_encoded_packet(const struct timespec *ts1)
 
     pthread_mutex_unlock(&cam->h264_enc->h264_mutex);
 
-    /* Skip non-monotonic frames */
+    /* Skip non-monotonic frames (compare raw encoder PTS) */
     if (last_pts >= 0 && shared_pts <= last_pts) {
         av_packet_free(&pkt);
         pkt = nullptr;
@@ -1792,8 +1860,31 @@ int cls_movie::put_encoded_packet(const struct timespec *ts1)
     }
     last_pts = shared_pts;
 
-    pkt->pts = shared_pts;
-    pkt->dts = (shared_dts != AV_NOPTS_VALUE) ? shared_dts : shared_pts;
+    /* Wait for first keyframe before writing to this file. This ensures:
+     * 1. SPS/PPS-only packets from v4l2m2m are not written as data samples
+     * 2. Split files start with a decodable IDR frame
+     * last_pts is still updated above so monotonicity tracking is correct. */
+    if (shared_enc_base_pts < 0) {
+        if (!(pkt->flags & AV_PKT_FLAG_KEY)) {
+            av_packet_free(&pkt);
+            pkt = nullptr;
+            return 0;
+        }
+        shared_enc_base_pts = shared_pts;
+    }
+
+    /* Compute file-relative PTS (0-based for this file) and rescale from
+     * the encoder's time_base to the stream's time_base.
+     * avformat_write_header() may change strm_video->time_base (e.g., MP4
+     * muxer sets a different timescale), but the encoder's PTS is in
+     * ctx_codec->time_base. av_write_frame() expects stream time_base. */
+    int64_t file_pts = shared_pts - shared_enc_base_pts;
+    int64_t file_dts = (shared_dts != AV_NOPTS_VALUE) ?
+                       (shared_dts - shared_enc_base_pts) : file_pts;
+
+    pkt->pts = av_rescale_q(file_pts, shared_enc_tb, strm_video->time_base);
+    pkt->dts = av_rescale_q(file_dts, shared_enc_tb, strm_video->time_base);
+    pkt->duration = av_rescale_q(1, shared_enc_tb, strm_video->time_base);
     pkt->stream_index = 0;
 
     retcd = av_write_frame(oc, pkt);
@@ -1895,6 +1986,9 @@ void cls_movie::start_norm()
     pkt = nullptr;
     tlapse = TIMELAPSE_NONE;
     fps = cam->lastrate;
+    if (fps < 2) {
+        fps = 2;
+    }
     start_time.tv_sec = cam->current_image->imgts.tv_sec;
     start_time.tv_nsec = cam->current_image->imgts.tv_nsec;
     last_pts = -1;
@@ -1972,6 +2066,9 @@ void cls_movie::start_motion()
     netcam_data = nullptr;
     tlapse = TIMELAPSE_NONE;
     fps = cam->lastrate;
+    if (fps < 2) {
+        fps = 2;
+    }
     start_time.tv_sec = cam->imgs.image_motion.imgts.tv_sec;
     start_time.tv_nsec = cam->imgs.image_motion.imgts.tv_nsec;
     last_pts = -1;
@@ -2165,6 +2262,9 @@ void cls_movie::init_vars()
 
     #ifdef HAVE_WEBRTC
     shared_enc_active = false;
+    shared_enc_tb = av_make_q(1, 15);
+    shared_enc_base_pts = -1;
+    shared_enc_deferred_open = false;
     #endif
 
 }

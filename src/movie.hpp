@@ -53,7 +53,7 @@ class cls_movie {
         cls_movie(cls_camera *p_cam, std::string pmovie_type);
         ~cls_movie();
         void start();
-        void stop();
+        void stop(bool is_split = false);
         int put_image(ctx_image_data *img_data, const struct timespec *ts1);
         void reset_start_time(const struct timespec *ts1);
 
@@ -67,7 +67,10 @@ class cls_movie {
 
     #ifdef HAVE_WEBRTC
         int put_encoded_packet(const struct timespec *ts1);
-        bool shared_enc_active;  /* true when using shared H.264 encoder */
+        bool shared_enc_active;      /* true when using shared H.264 encoder */
+        AVRational shared_enc_tb;    /* Encoder time_base at file open (before muxer may change strm time_base) */
+        int64_t shared_enc_base_pts; /* First PTS from encoder for this file (for file-relative timestamps) */
+        bool shared_enc_deferred_open; /* true when movie open deferred (waiting for encoder extradata) */
     #endif
 
     private:

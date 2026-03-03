@@ -582,6 +582,31 @@ void cls_h264_encoder::close_encoder()
         sws_ctx = nullptr;
     }
 
+    /* Clear encoded frame buffers to prevent stale data from poisoning
+     * last_pts in movie recordings after movie_max_time split.
+     * Without this, put_encoded_packet() reads a stale high-PTS packet
+     * from h264_front, sets last_pts high, and all subsequent frames
+     * from the new encoder (PTS starting at 0) are silently dropped. */
+    pthread_mutex_lock(&h264_mutex);
+    if (h264_front.nal_data) {
+        free(h264_front.nal_data);
+        h264_front.nal_data = nullptr;
+    }
+    h264_front.nal_sz = 0;
+    h264_front.is_keyframe = false;
+    h264_front.pts = 0;
+    h264_front.dts = 0;
+
+    if (h264_back.nal_data) {
+        free(h264_back.nal_data);
+        h264_back.nal_data = nullptr;
+    }
+    h264_back.nal_sz = 0;
+    h264_back.is_keyframe = false;
+    h264_back.pts = 0;
+    h264_back.dts = 0;
+    pthread_mutex_unlock(&h264_mutex);
+
     codec = nullptr;
     frame_cnt = 0;
 }

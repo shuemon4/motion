@@ -1844,8 +1844,21 @@ void cls_camera::actions_event()
             cfg->movie_max_time) &&
         (current_image->postcap == false) &&
         (current_image->precap == false)) {
-        movie_end();
+        /* movie_max_time split: pass is_split=true so the shared H.264
+         * encoder keeps running rather than being closed and reopened.
+         * This prevents stale h264_front buffers from poisoning last_pts
+         * in the new recording segment (see doc/issues/20260303). */
+        movie_norm->stop(true);
+        movie_motion->stop(true);
+        movie_extpipe->stop(true);
         movie_start();
+#ifdef HAVE_WEBRTC
+        /* Request IDR from the shared encoder so the new file starts
+         * with a decodable keyframe rather than mid-GOP P-frames. */
+        if (h264_enc != nullptr) {
+            h264_enc->request_keyframe();
+        }
+#endif
     }
 
 }
