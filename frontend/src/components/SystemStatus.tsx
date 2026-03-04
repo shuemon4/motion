@@ -110,9 +110,12 @@ export const VersionDisplay = memo(function VersionDisplay() {
 
   if (!status?.version) return null
 
+  // Show only the simple version number (e.g., "5.0.0" from "5.0.0-dirty-20260227-f4af7ca")
+  const simpleVersion = status.version.match(/^[\d.]+/)?.[0] ?? status.version
+
   return (
     <span className="text-xs text-gray-500 hidden sm:inline">
-      v{status.version}
+      v{simpleVersion}
     </span>
   )
 })
