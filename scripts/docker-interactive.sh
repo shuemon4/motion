@@ -33,8 +33,8 @@ case "$DISTRO" in
                 vim less tree
 
             echo "[INFO] Cleaning Mac build artifacts..."
-            make distclean 2>/dev/null || true
-            rm -f src/*.o
+            rm -f src/*.o src/.deps/*.Po config.hpp config.status config.log
+            rm -f Makefile src/Makefile po/Makefile po/Makefile.in
 
             echo ""
             echo "==================================================================="
@@ -72,8 +72,8 @@ case "$DISTRO" in
                 vim less tree
 
             echo "[INFO] Cleaning Mac build artifacts..."
-            make distclean 2>/dev/null || true
-            rm -f src/*.o
+            rm -f src/*.o src/.deps/*.Po config.hpp config.status config.log
+            rm -f Makefile src/Makefile po/Makefile po/Makefile.in
 
             echo ""
             echo "==================================================================="
@@ -104,8 +104,8 @@ case "$DISTRO" in
                 vim less tree
 
             echo "[INFO] Cleaning Mac build artifacts..."
-            make distclean 2>/dev/null || true
-            rm -f src/*.o
+            rm -f src/*.o src/.deps/*.Po config.hpp config.status config.log
+            rm -f Makefile src/Makefile po/Makefile po/Makefile.in
 
             echo ""
             echo "==================================================================="

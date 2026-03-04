@@ -5,6 +5,9 @@
 # Tests Motion build and configuration across multiple Linux distributions
 # with different FFmpeg versions.
 #
+# Source is mounted read-only and copied into the container so the host
+# workspace is never modified by the build.
+#
 # Usage:
 #   ./scripts/docker-test.sh [distro]
 #
@@ -43,7 +46,7 @@ log_warn() {
 test_debian12() {
     log_info "Testing on Debian 12 (FFmpeg 5.x)..."
 
-    docker run --rm -v "${MOTION_ROOT}:/motion" -w /motion debian:12 bash -c '
+    docker run --rm -v "${MOTION_ROOT}:/motion-src:ro" debian:12 bash -c '
         set -e
 
         echo "[INFO] Installing dependencies..."
@@ -54,9 +57,10 @@ test_debian12() {
             libmicrohttpd-dev libjpeg-dev libsqlite3-dev zlib1g-dev \
             >/dev/null 2>&1
 
-        echo "[INFO] Cleaning host build artifacts..."
-        make distclean 2>/dev/null || true
-        rm -f src/*.o
+        echo "[INFO] Copying source to build directory..."
+        mkdir -p /motion
+        tar -C /motion-src --exclude=.git --exclude=node_modules -cf - . | tar -C /motion -xf -
+        cd /motion
 
         echo "[INFO] Checking FFmpeg version..."
         FFMPEG_VER=$(pkg-config --modversion libavformat)
@@ -91,10 +95,6 @@ test_debian12() {
         set +e  # Disable exit-on-error for motion -h (help exits with 1)
         /tmp/motion-install/usr/local/bin/motion -h >/dev/null 2>&1
         set -e  # Re-enable exit-on-error
-
-        echo "[INFO] Cleaning build artifacts from host source tree..."
-        make distclean 2>/dev/null || true
-        rm -f src/*.o
 
         echo "[SUCCESS] Debian 12 test passed!"
     '
@@ -112,7 +112,7 @@ test_debian12() {
 test_ubuntu2404() {
     log_info "Testing on Ubuntu 24.04 (FFmpeg 6.x)..."
 
-    docker run --rm -v "${MOTION_ROOT}:/motion" -w /motion ubuntu:24.04 bash -c '
+    docker run --rm -v "${MOTION_ROOT}:/motion-src:ro" ubuntu:24.04 bash -c '
         set -e
 
         echo "[INFO] Installing dependencies..."
@@ -123,9 +123,10 @@ test_ubuntu2404() {
             libmicrohttpd-dev libjpeg-dev libsqlite3-dev zlib1g-dev \
             >/dev/null 2>&1
 
-        echo "[INFO] Cleaning host build artifacts..."
-        make distclean 2>/dev/null || true
-        rm -f src/*.o
+        echo "[INFO] Copying source to build directory..."
+        mkdir -p /motion
+        tar -C /motion-src --exclude=.git --exclude=node_modules -cf - . | tar -C /motion -xf -
+        cd /motion
 
         echo "[INFO] Checking FFmpeg version..."
         FFMPEG_VER=$(pkg-config --modversion libavformat)
@@ -160,10 +161,6 @@ test_ubuntu2404() {
         set +e  # Disable exit-on-error for motion -h (help exits with 1)
         /tmp/motion-install/usr/local/bin/motion -h >/dev/null 2>&1
         set -e  # Re-enable exit-on-error
-
-        echo "[INFO] Cleaning build artifacts from host source tree..."
-        make distclean 2>/dev/null || true
-        rm -f src/*.o
 
         echo "[SUCCESS] Ubuntu 24.04 test passed!"
     '
@@ -181,7 +178,7 @@ test_ubuntu2404() {
 test_fedora40() {
     log_info "Testing on Fedora 40 (FFmpeg 6.x)..."
 
-    docker run --rm -v "${MOTION_ROOT}:/motion" -w /motion fedora:40 bash -c '
+    docker run --rm -v "${MOTION_ROOT}:/motion-src:ro" fedora:40 bash -c '
         set -e
 
         echo "[INFO] Installing dependencies..."
@@ -190,9 +187,10 @@ test_fedora40() {
             ffmpeg-free-devel libmicrohttpd-devel libjpeg-turbo-devel sqlite-devel zlib-devel \
             >/dev/null 2>&1
 
-        echo "[INFO] Cleaning host build artifacts..."
-        make distclean 2>/dev/null || true
-        rm -f src/*.o
+        echo "[INFO] Copying source to build directory..."
+        mkdir -p /motion
+        tar -C /motion-src --exclude=.git --exclude=node_modules -cf - . | tar -C /motion -xf -
+        cd /motion
 
         echo "[INFO] Checking FFmpeg version..."
         FFMPEG_VER=$(pkg-config --modversion libavformat)
@@ -227,10 +225,6 @@ test_fedora40() {
         set +e  # Disable exit-on-error for motion -h (help exits with 1)
         /tmp/motion-install/usr/local/bin/motion -h >/dev/null 2>&1
         set -e  # Re-enable exit-on-error
-
-        echo "[INFO] Cleaning build artifacts from host source tree..."
-        make distclean 2>/dev/null || true
-        rm -f src/*.o
 
         echo "[SUCCESS] Fedora 40 test passed!"
     '
