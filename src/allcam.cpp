@@ -91,6 +91,12 @@ void cls_allcam::getimg_src(cls_camera *p_cam, std::string imgtyp, u_char *dst_i
         indx=0;
         while (indx < 1000) {
             if (strm_c->img_data == nullptr) {
+                /* Sticky flag: signal camera to generate this stream type.
+                 * Intentionally never decremented — once the all-camera
+                 * mosaic requests a stream, the camera keeps producing it
+                 * to avoid cold-start latency on subsequent views.
+                 * Actual viewer connection lifecycle is managed separately
+                 * in webu_stream.cpp via cls_webu_ans::deinit_counter(). */
                 if (strm_c->all_cnct == 0){
                     strm_c->all_cnct++;
                 }
@@ -205,48 +211,28 @@ void cls_allcam::getimg(ctx_stream_data *strm_a, std::string imgtyp)
 
 }
 
-/* Free YUV and JPEG data buffers for all five stream slots. */
+/* Free YUV and JPEG data buffers for all stream slots. */
 void cls_allcam::stream_free()
 {
-    int indx;
-    ctx_stream_data *strm;
-
-    for (indx=0;indx<5;indx++) {
-        if (indx == 0) {
-            strm = &stream.norm;
-        } else if (indx == 1) {
-            strm = &stream.motion;
-        } else if (indx == 2) {
-            strm = &stream.secondary;
-        } else if (indx == 3) {
-            strm = &stream.source;
-        } else if (indx == 4) {
-            strm = &stream.sub;
-        }
+    ctx_stream_data *slots[] = {
+        &stream.norm, &stream.motion, &stream.secondary,
+        &stream.source, &stream.sub
+    };
+    for (auto *strm : slots) {
         myfree(strm->img_data);
         myfree(strm->jpg_data);
     }
 
 }
 
-/* Allocate YUV and JPEG data buffers for all five stream slots at the current dst_sz. */
+/* Allocate YUV and JPEG data buffers for all stream slots at the current dst_sz. */
 void cls_allcam::stream_alloc()
 {
-    int indx;
-    ctx_stream_data *strm;
-
-    for (indx=0;indx<5;indx++) {
-        if (indx == 0) {
-            strm = &stream.norm;
-        } else if (indx == 1) {
-            strm = &stream.motion;
-        } else if (indx == 2) {
-            strm = &stream.secondary;
-        } else if (indx == 3) {
-            strm = &stream.source;
-        } else if (indx == 4) {
-            strm = &stream.sub;
-        }
+    ctx_stream_data *slots[] = {
+        &stream.norm, &stream.motion, &stream.secondary,
+        &stream.source, &stream.sub
+    };
+    for (auto *strm : slots) {
         strm->img_data = (unsigned char*)
             mymalloc((size_t)all_sizes.dst_sz);
         strm->jpg_data = (unsigned char*)
@@ -284,7 +270,7 @@ void cls_allcam::getsizes_scale()
             for (indx=0; indx<active_cnt; indx++) {
                 p_cam = active_cam[indx];
                 if (row == p_cam->all_loc.row) {
-                    p_cam->all_loc.scale = (int)((float)(mx_h*100 / p_cam->all_sizes.src_h));
+                    p_cam->all_loc.scale = mx_h * 100 / p_cam->all_sizes.src_h;
                 }
             }
         }

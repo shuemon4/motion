@@ -130,6 +130,30 @@
     * Fix mutex held during external command execution in failauth_check() —
       lock script could stall all web connections; now releases mutex before
       exec (webu_ans.cpp)
+    * Fix stream_max_connections config parameter unreachable — handler existed
+      in dispatch_edit() but missing from config_parms[] array; users could not
+      configure max concurrent stream connections (conf.cpp)
+    * Fix CLOCK_MONOTONIC passed to localtime_r in database handler — produced
+      meaningless wall-clock hours; cleanup ran at boot-relative intervals instead
+      of aligned to real hours; changed to CLOCK_REALTIME (dbse.cpp)
+    * Fix mysql_init() return value not checked — NULL return on library init
+      failure would leave struct in indeterminate state before mysql_real_connect;
+      added null check with error logging and cleanup (dbse.cpp)
+    * Fix 'M' glyph bitmap missing 7th pixel in row 4 — only 6 values instead
+      of 7; zero-initialized gap caused one-pixel cosmetic defect in text
+      overlays (draw.cpp)
+    * Remove 11 unreachable MOTION_LOG statements after return in config edit
+      handlers — dead code from disabled debug traces (conf.cpp)
+    * Remove dead float cast in allcam getsizes_scale — (float) applied to
+      already-computed integer was a no-op (allcam.cpp)
+    * Remove redundant duplicate assignment of out pointer in draw location() —
+      variable initialized and immediately reassigned to same value (draw.cpp)
+    * Remove duplicate #include "picture.hpp" (picture.cpp)
+    * Remove 3 dead imgts self-assignments in process_preview() — pointer
+      save/restore made the struct copies no-ops (picture.cpp)
+    * Refactor stream_free()/stream_alloc() from magic-number if/else chains to
+      range-for over pointer array — eliminates fragile hard-coded stream slot
+      count (allcam.cpp)
 
     DOCUMENTATION
     * Add authentication setup documentation to README.md

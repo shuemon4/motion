@@ -728,7 +728,14 @@ void cls_dbse::mariadb_init()
     }
 
     database_mariadb = (MYSQL *) mymalloc(sizeof(MYSQL));
-    mysql_init(database_mariadb);
+    if (mysql_init(database_mariadb) == nullptr) {
+        MOTION_LOG(ERR, TYPE_DB, NO_ERRNO
+            , _("MariaDB mysql_init failed"));
+        free(database_mariadb);
+        database_mariadb = nullptr;
+        is_open = false;
+        return;
+    }
 
     if (mysql_real_connect(
         database_mariadb
@@ -1418,7 +1425,7 @@ void cls_dbse::handler()
 
     hr_prev = 0;
     while (check_exit() == false) {
-        clock_gettime(CLOCK_MONOTONIC, &ts2);
+        clock_gettime(CLOCK_REALTIME, &ts2);
         localtime_r(&ts2.tv_sec, &lcl_tm);
         hr_cur = lcl_tm.tm_hour;
         if (hr_cur != hr_prev) {

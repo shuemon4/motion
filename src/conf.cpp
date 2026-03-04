@@ -238,6 +238,7 @@ ctx_parm config_parms[] = {
     {"stream_grey",               PARM_TYP_BOOL,   PARM_CAT_14, PARM_LEVEL_LIMITED,  true},   /* Can toggle greyscale */
     {"stream_motion",             PARM_TYP_BOOL,   PARM_CAT_14, PARM_LEVEL_LIMITED,  true},   /* Can toggle motion view */
     {"stream_maxrate",            PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  true},   /* Can adjust rate */
+    {"stream_max_connections",    PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  true},
     {"stream_scan_time",          PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
     {"stream_scan_scale",         PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  false},
     {"substream_quality",         PARM_TYP_INT,    PARM_CAT_14, PARM_LEVEL_LIMITED,  true},
@@ -443,8 +444,6 @@ void cls_config::edit_log_file(std::string &parm, enum PARM_ACT pact)
     } else if (pact == PARM_ACT_GET) {
         parm = log_file;
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","log_file",_("log_file"));
 }
 
 /* Handle device_id - enforces uniqueness across all cameras and sound devices */
@@ -489,8 +488,6 @@ void cls_config::edit_device_id(std::string &parm, enum PARM_ACT pact)
     } else if (pact == PARM_ACT_GET) {
         parm = std::to_string(device_id);
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","device_id",_("device_id"));
 }
 
 /* Handle pause - tri-state: "schedule" (default), "on" (paused), "off" (always active) */
@@ -527,8 +524,6 @@ void cls_config::edit_pause(std::string &parm, enum PARM_ACT pact)
         parm = parm + "\"schedule\",\"on\",\"off\"";
         parm = parm + "]";
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","pause",_("pause"));
 }
 
 /* Handle target_dir - strips trailing slash, rejects conversion specifiers */
@@ -552,8 +547,6 @@ void cls_config::edit_target_dir(std::string &parm, enum PARM_ACT pact)
     } else if (pact == PARM_ACT_GET) {
         parm = target_dir;
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","target_dir",_("target_dir"));
 }
 
 /* Handle webcontrol_html_path - base directory for serving frontend assets */
@@ -573,8 +566,6 @@ void cls_config::edit_webcontrol_html_path(std::string &parm, enum PARM_ACT pact
     } else if (pact == PARM_ACT_GET) {
         parm = webcontrol_html_path;
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","webcontrol_html_path",_("webcontrol_html_path"));
 }
 
 void cls_config::edit_text_changes(std::string &parm, enum PARM_ACT pact)
@@ -586,8 +577,6 @@ void cls_config::edit_text_changes(std::string &parm, enum PARM_ACT pact)
     } else if (pact == PARM_ACT_GET) {
         edit_get_bool(parm, text_changes);
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","text_changes",_("text_changes"));
 }
 
 /*
@@ -611,8 +600,6 @@ void cls_config::edit_picture_filename(std::string &parm, enum PARM_ACT pact)
     } else if (pact == PARM_ACT_GET) {
         parm = picture_filename;
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","picture_filename",_("picture_filename"));
 }
 
 void cls_config::edit_snapshot_filename(std::string &parm, enum PARM_ACT pact)
@@ -631,8 +618,6 @@ void cls_config::edit_snapshot_filename(std::string &parm, enum PARM_ACT pact)
     } else if (pact == PARM_ACT_GET) {
         parm = snapshot_filename;
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","snapshot_filename",_("snapshot_filename"));
 }
 
 void cls_config::edit_movie_filename(std::string &parm, enum PARM_ACT pact)
@@ -651,8 +636,6 @@ void cls_config::edit_movie_filename(std::string &parm, enum PARM_ACT pact)
     } else if (pact == PARM_ACT_GET) {
         parm = movie_filename;
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","movie_filename",_("movie_filename"));
 }
 
 void cls_config::edit_timelapse_filename(std::string &parm, enum PARM_ACT pact)
@@ -671,8 +654,6 @@ void cls_config::edit_timelapse_filename(std::string &parm, enum PARM_ACT pact)
     } else if (pact == PARM_ACT_GET) {
         parm = timelapse_filename;
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","timelapse_filename",_("timelapse_filename"));
 }
 
 /* Handle snd_alerts - array-type parameter for sound alert frequency/level pairs */
@@ -686,8 +667,6 @@ void cls_config::edit_snd_alerts(std::list<std::string> &parm, enum PARM_ACT pac
     } else if (pact == PARM_ACT_GET) {
         parm = snd_alerts;
     }
-    return;
-    MOTION_LOG(DBG, TYPE_ALL, NO_ERRNO,"%s:%s","snd_alerts",_("snd_alerts"));
 }
 
 /* Centralized parameter dispatch function - consolidates ~150 individual edit handlers */

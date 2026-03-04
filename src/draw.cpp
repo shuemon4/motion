@@ -905,7 +905,7 @@ struct draw_char draw_table[]= {
             {0,1,1,0,1,1,0},
             {1,2,2,1,2,2,1},
             {1,2,1,2,1,2,1},
-            {1,2,1,1,1,2,},
+            {1,2,1,1,1,2,1},
             {1,2,1,0,1,2,1},
             {1,2,1,0,1,2,1},
             {1,2,1,0,1,2,1},
@@ -1274,8 +1274,6 @@ void cls_draw::location(ctx_coord *cent, ctx_images *imgs
     int width_miny, width_maxy;
     int width_miny_x, width_maxy_x;
     int width_minx_y, width_maxx_y;
-
-    out = imgs->image_motion.image_norm;
 
     width_miny = width * cent->miny;
     width_maxy = width * cent->maxy;

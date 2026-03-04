@@ -34,7 +34,6 @@
 #include "jpegutils.hpp"
 #include "draw.hpp"
 #include "dbse.hpp"
-#include "picture.hpp"
 
 
 /* Build the full output path from format string, base filename, and extension */
@@ -199,10 +198,8 @@ void cls_picture::process_preview()
 
     if (cam->imgs.image_preview.diffs) {
         saved_current_image = cam->current_image;
-        saved_current_image->imgts= cam->current_image->imgts;
 
         cam->current_image = &cam->imgs.image_preview;
-        cam->current_image->imgts = cam->imgs.image_preview.imgts;
 
         picname(filename,"%s/%s.%s"
             , cam->cfg->picture_filename
@@ -220,7 +217,6 @@ void cls_picture::process_preview()
 
         /* Restore global context values. */
         cam->current_image = saved_current_image;
-        cam->current_image->imgts = saved_current_image->imgts;
     }
 }
 

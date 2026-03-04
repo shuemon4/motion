@@ -127,7 +127,8 @@ void cls_log::write_flood(int loglvl)
         fputs(flood_repeats, log_file_ptr);
         fflush(log_file_ptr);
 
-    } else {    /* The syslog level values are one less*/
+    } else {
+        /* Motion levels (1=EMG..8=DBG) map to syslog (0=EMERG..7=DEBUG) with -1 offset */
         syslog(loglvl-1, "%s", flood_repeats);
         fputs(flood_repeats, stderr);
         fflush(stderr);
@@ -157,6 +158,7 @@ void cls_log::write_norm(int loglvl, uint prefixlen)
         fputs(msg_full, log_file_ptr);
         fflush(log_file_ptr);
     } else {
+        /* Motion levels (1=EMG..8=DBG) map to syslog (0=EMERG..7=DEBUG) with -1 offset */
         syslog(loglvl-1, "%s", msg_full);
         n = strlen(msg_full);
         if (n < sizeof(msg_full) - 2) {
