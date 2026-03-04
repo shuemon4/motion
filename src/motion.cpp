@@ -467,7 +467,7 @@ void cls_motapp::check_restart()
             dbse->shutdown();
             cfg->parms_copy(conf_src, PARM_CAT_15);
             dbse->startup();
-        pthread_mutex_lock(&dbse->mutex_dbse);
+        pthread_mutex_unlock(&dbse->mutex_dbse);
         dbse->restart = false;
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Restarted database"));
     }

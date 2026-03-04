@@ -65,12 +65,14 @@ void cls_schedule::schedule_cam(cls_camera *p_cam)
 
     /* Scan today's schedule entries; last matching "stop" window wins. */
     stopcam = false;
-    for (indx=0; indx<p_cam->schedule[cur_dy].size(); indx++) {
+    int cur_total = c_tm.tm_hour * 60 + c_tm.tm_min;
+    for (indx=0; indx<(int)p_cam->schedule[cur_dy].size(); indx++) {
+        int st_total = p_cam->schedule[cur_dy][indx].st_hr * 60
+                     + p_cam->schedule[cur_dy][indx].st_min;
+        int en_total = p_cam->schedule[cur_dy][indx].en_hr * 60
+                     + p_cam->schedule[cur_dy][indx].en_min;
         if ((p_cam->schedule[cur_dy][indx].action == "stop") &&
-            (c_tm.tm_hour >= p_cam->schedule[cur_dy][indx].st_hr) &&
-            (c_tm.tm_min  >= p_cam->schedule[cur_dy][indx].st_min) &&
-            (c_tm.tm_hour <= p_cam->schedule[cur_dy][indx].en_hr) &&
-            (c_tm.tm_min  <= p_cam->schedule[cur_dy][indx].en_min) ) {
+            (cur_total >= st_total) && (cur_total <= en_total) ) {
             if (p_cam->schedule[cur_dy][indx].detect) {
                 stopcam = false;
             } else {
@@ -256,6 +258,11 @@ void cls_schedule::cleandir_cam(cls_camera *p_cam)
             p_cam->cleandir->next_ts.tv_sec += (60 * 60 * 24);
         } else if (p_cam->cleandir->freq == "weekly") {
             p_cam->cleandir->next_ts.tv_sec += (60 * 60 * 24 * 7);
+        } else {
+            MOTION_LOG(WRN, TYPE_ALL, NO_ERRNO
+                , _("Unknown cleandir freq '%s', defaulting to daily")
+                , p_cam->cleandir->freq.c_str());
+            p_cam->cleandir->next_ts.tv_sec += (60 * 60 * 24);
         }
         localtime_r(&p_cam->cleandir->next_ts.tv_sec, &c_tm);
         if (p_cam->cleandir->action == "delete") {

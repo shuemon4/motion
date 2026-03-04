@@ -1010,10 +1010,22 @@ void cls_dbse::pgsqldb_init()
         return;
     }
 
-    constr = "dbname='" + app->cfg->database_dbname + "' ";
-    constr += " host='" + app->cfg->database_host + "' ";
-    constr += " user='" + app->cfg->database_user + "' ";
-    constr += " password='" + app->cfg->database_password + "' ";
+    /* Escape single quotes and backslashes in connection string values
+     * per libpq connection string syntax */
+    auto pq_escape = [](const std::string &val) -> std::string {
+        std::string escaped;
+        for (char c : val) {
+            if (c == '\'' || c == '\\') {
+                escaped += '\\';
+            }
+            escaped += c;
+        }
+        return escaped;
+    };
+    constr = "dbname='" + pq_escape(app->cfg->database_dbname) + "' ";
+    constr += " host='" + pq_escape(app->cfg->database_host) + "' ";
+    constr += " user='" + pq_escape(app->cfg->database_user) + "' ";
+    constr += " password='" + pq_escape(app->cfg->database_password) + "' ";
     constr += " port="+std::to_string(app->cfg->database_port) + " ";
     database_pgsqldb = PQconnectdb(constr.c_str());
     if (PQstatus(database_pgsqldb) == CONNECTION_BAD) {

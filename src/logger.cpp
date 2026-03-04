@@ -44,7 +44,13 @@ void ff_log(void *var1, int errnbr, const char *fmt, va_list vlist)
 
     vsnprintf(buff, sizeof(buff), fmt, vlist);
 
-    buff[strlen(buff)-1] = 0;
+    size_t len = strlen(buff);
+    if (len == 0) {
+        return;
+    }
+    if (buff[len - 1] == '\n') {
+        buff[len - 1] = '\0';
+    }
 
     if (strstr(buff, "forced frame type") != nullptr) {
         return;
@@ -77,6 +83,7 @@ void cls_log::log_history_init()
     ctx_log_item    log_item;
 
     log_item.log_msg= "";
+    log_vec.clear();
     for (indx=0;indx<200;indx++){
         log_item.log_nbr = indx;
         log_vec.push_back(log_item);
@@ -131,6 +138,7 @@ void cls_log::write_flood(int loglvl)
 /* Write a new (non-duplicate) message to the log destination, reset flood state, and add to history. */
 void cls_log::write_norm(int loglvl, uint prefixlen)
 {
+    size_t n;
     flood_cnt = 1;
 
     if (snprintf(msg_flood, sizeof(msg_flood), "%s", &msg_full[prefixlen]) < 0) {
@@ -141,12 +149,20 @@ void cls_log::write_norm(int loglvl, uint prefixlen)
     }
 
     if (log_mode == LOGMODE_FILE) {
-        strcpy(msg_full + strlen(msg_full),"\n");
+        n = strlen(msg_full);
+        if (n < sizeof(msg_full) - 2) {
+            msg_full[n] = '\n';
+            msg_full[n + 1] = '\0';
+        }
         fputs(msg_full, log_file_ptr);
         fflush(log_file_ptr);
     } else {
         syslog(loglvl-1, "%s", msg_full);
-        strcpy(msg_full + strlen(msg_full),"\n");
+        n = strlen(msg_full);
+        if (n < sizeof(msg_full) - 2) {
+            msg_full[n] = '\n';
+            msg_full[n + 1] = '\0';
+        }
         fputs(msg_full, stderr);
         fflush(stderr);
     }

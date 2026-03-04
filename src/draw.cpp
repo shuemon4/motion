@@ -1115,17 +1115,15 @@ int cls_draw::textn(u_char *image
     image_ptr = image + startx + (starty * width);
 
     for (pos = 0; pos < len; pos++) {
-        int pos_check = (int)text[pos];
+        int pos_check = (unsigned char)text[pos];
+        if (pos_check >= ASCII_MAX) {
+            pos_check = ' ';
+        }
 
         char_ptr = char_arr_ptr[pos_check];
 
         for (y = 0; y < 8 * factor; y++) {
             for (x = 0; x < 7 * factor; x++) {
-
-                if (pos_check < 0) {
-                    image_ptr++;
-                    continue;
-                }
 
                 char_ptr = char_arr_ptr[pos_check] + y/factor*7 + x/factor;
 

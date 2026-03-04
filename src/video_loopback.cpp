@@ -146,6 +146,7 @@ static int vlp_open_vidpipe(void)
                         close(pipe_fd);
                     }
                     pipe_fd = tfd;
+                    close(fd);
                     break;
                 }
             }
@@ -222,6 +223,7 @@ int vlp_startpipe(const char *dev_name, int width, int height)
     /* Verify the device supports the VIDEO_OUTPUT capability. */
     if (ioctl(dev, VIDIOC_QUERYCAP, &vc) == -1) {
         MOTION_LOG(ERR, TYPE_VIDEO, SHOW_ERRNO, "ioctl (VIDIOC_QUERYCAP)");
+        close(dev);
         return -1;
     }
 
@@ -234,6 +236,7 @@ int vlp_startpipe(const char *dev_name, int width, int height)
 
     if (ioctl(dev, VIDIOC_G_FMT, &v) == -1) {
         MOTION_LOG(ERR, TYPE_VIDEO, SHOW_ERRNO, "ioctl (VIDIOC_G_FMT)");
+        close(dev);
         return -1;
     }
     MOTION_LOG(INF, TYPE_VIDEO, NO_ERRNO,_("Original pipe specifications"));
@@ -252,6 +255,7 @@ int vlp_startpipe(const char *dev_name, int width, int height)
 
     if (ioctl(dev,VIDIOC_S_FMT, &v) == -1) {
         MOTION_LOG(ERR, TYPE_VIDEO, SHOW_ERRNO, "ioctl (VIDIOC_S_FMT)");
+        close(dev);
         return -1;
     }
 

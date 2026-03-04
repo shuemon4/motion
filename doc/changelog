@@ -73,10 +73,68 @@
     * Add motion-setup to bin_PROGRAMS in Makefile.am
     * Add webu_auth.cpp/hpp to motion_SOURCES
 
+    BUG FIXES
+    * Fix deadlock in check_restart() — second pthread_mutex_lock should be
+      pthread_mutex_unlock; database config restart permanently deadlocked
+      the main application thread (motion.cpp)
+    * Fix null pointer dereference in passthru_check() — nullptr guard was
+      placed after the pointer dereference, causing potential SEGV during
+      netcam disconnect/reconnect (movie.cpp)
+    * Fix buffer underflow in ff_log() — strlen(buff)-1 wraps to SIZE_MAX
+      when FFmpeg emits an empty log message, causing out-of-bounds write
+      (logger.cpp)
+    * Fix schedule time-range comparison — independent hour/minute inequalities
+      failed for virtually all practical schedule windows; replaced with
+      linearized total-minutes comparison (schedule.cpp)
+    * Fix HammingWindow formula — incorrect parentheses produced a flat
+      constant (~0.54) for all samples instead of a smooth taper (sound.cpp)
+    * Fix HannWindow formula — multiplication instead of division zeroed all
+      input samples, completely disabling sound detection for Hann window
+      users (sound.cpp)
+    * Fix movie_retain config parameter silently ignored — missing handler in
+      dispatch_edit() caused the value to be discarded; "secondary" retention
+      mode had no effect (conf.cpp)
+    * Fix PostgreSQL connection string injection — single quotes and backslashes
+      in database credentials broke PQconnectdb() connection string (dbse.cpp)
+    * Fix out-of-bounds array access in text overlay — non-ASCII characters in
+      text_left/text_right caused undefined behavior via negative or >126 index
+      into char_arr_ptr[127] (draw.cpp)
+    * Fix JSON parser rejecting valid \uXXXX unicode escape sequences — added
+      full RFC 8259 compliant handler with UTF-8 encoding and surrogate pair
+      support (json_parse.cpp)
+    * Fix log history vector growing unbounded on counter overflow — reinit
+      appended 200 entries without clearing existing ones (logger.cpp)
+    * Fix potential 1-byte buffer overflow in write_norm() — newline append
+      could write past msg_full[1024] when SHOW_ERRNO filled buffer to capacity
+      (logger.cpp)
+    * Fix uninitialized retcd in passthru_streams() — non-video/non-audio stream
+      types caused undefined behavior on first loop iteration (movie.cpp)
+    * Fix cleandir running every 30 seconds with unknown freq value — missing
+      else clause left next_ts unchanged; now defaults to daily with warning
+      (schedule.cpp)
+    * Fix ALSA hw_params and PCM handle leak — 10 error paths after
+      snd_pcm_hw_params_malloc returned without freeing resources; converted to
+      goto-cleanup pattern (sound.cpp)
+    * Fix thumbnail false success reporting — encode/write failures after
+      sws_scale left retcd positive, causing "Generated thumbnail" log for
+      broken files (thumbnail.cpp)
+    * Fix partial thumbnail file permanently blocking regeneration — write
+      failures left empty/partial file on disk; exists() check prevented retry;
+      now removes partial files on failure (thumbnail.cpp)
+    * Fix fd leak in vlp_open_vidpipe() — sysfs name file descriptor not closed
+      on successful loopback pipe detection (video_loopback.cpp)
+    * Fix fd leak in vlp_startpipe() — three ioctl error paths returned without
+      closing the opened device fd (video_loopback.cpp)
+    * Fix misleading CIDR support comment in is_trusted_proxy() — code only
+      performs exact IP matching, not CIDR range matching (webu_ans.cpp)
+    * Fix mutex held during external command execution in failauth_check() —
+      lock script could stall all web connections; now releases mutex before
+      exec (webu_ans.cpp)
+
     DOCUMENTATION
     * Add authentication setup documentation to README.md
     * Add deployment guide (doc/project/DEPLOYMENT.md)
     * Add architecture documentation (doc/project/ARCHITECTURE.md)
     * Add implementation patterns guide (doc/project/PATTERNS.md)
-    
+
 

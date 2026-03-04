@@ -269,8 +269,8 @@ void cls_webu_ans::parms_edit()
 }
 
 /**
- * Check if an IP address is in the trusted proxies list
- * Supports comma-separated list of IPs or CIDR ranges
+ * Check if an IP address is in the trusted proxies list.
+ * Supports comma-separated list of exact IP addresses.
  */
 static bool is_trusted_proxy(const std::string &ip, const std::string &trusted_list)
 {
@@ -545,38 +545,48 @@ mhdrslt cls_webu_ans::failauth_check()
 {
     timespec                                tm_cnct;
     std::list<ctx_webu_clients>::iterator   it;
-    std::string                             tmp;
+    std::string                             exec_cmd;
+    bool                                    is_locked = false;
 
-    std::lock_guard<std::mutex> lock(webu->clients_mtx);
+    {
+        std::lock_guard<std::mutex> lock(webu->clients_mtx);
 
-    if (webu->wb_clients.size() == 0) {
-        return MHD_YES;
+        if (webu->wb_clients.size() == 0) {
+            return MHD_YES;
+        }
+
+        clock_gettime(CLOCK_MONOTONIC, &tm_cnct);
+        it = webu->wb_clients.begin();
+        while (it != webu->wb_clients.end()) {
+            if ((it->clientip == clientip) &&
+                ((tm_cnct.tv_sec - it->conn_time.tv_sec) <
+                 (app->cfg->webcontrol_lock_minutes*60)) &&
+                (it->authenticated == false) &&
+                (it->conn_nbr > app->cfg->webcontrol_lock_attempts)) {
+                MOTION_LOG(EMG, TYPE_STREAM, NO_ERRNO
+                    , "Ignoring connection from: %s"
+                    , clientip.c_str());
+                it->conn_time = tm_cnct;
+                if (app->cfg->webcontrol_lock_script != "") {
+                    exec_cmd = app->cfg->webcontrol_lock_script + " " +
+                        std::to_string(it->userid_fail_nbr) + " " +  clientip;
+                }
+                is_locked = true;
+                break;
+            } else if ((tm_cnct.tv_sec - it->conn_time.tv_sec) >=
+                (app->cfg->webcontrol_lock_minutes*60)) {
+                it = webu->wb_clients.erase(it);
+            } else {
+                it++;
+            }
+        }
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &tm_cnct);
-    it = webu->wb_clients.begin();
-    while (it != webu->wb_clients.end()) {
-        if ((it->clientip == clientip) &&
-            ((tm_cnct.tv_sec - it->conn_time.tv_sec) <
-             (app->cfg->webcontrol_lock_minutes*60)) &&
-            (it->authenticated == false) &&
-            (it->conn_nbr > app->cfg->webcontrol_lock_attempts)) {
-            MOTION_LOG(EMG, TYPE_STREAM, NO_ERRNO
-                , "Ignoring connection from: %s"
-                , clientip.c_str());
-            it->conn_time = tm_cnct;
-            if (app->cfg->webcontrol_lock_script != "") {
-                tmp = app->cfg->webcontrol_lock_script + " " +
-                    std::to_string(it->userid_fail_nbr) + " " +  clientip;
-                util_exec_command(cam, tmp.c_str(), NULL);
-            }
-            return MHD_NO;
-        } else if ((tm_cnct.tv_sec - it->conn_time.tv_sec) >=
-            (app->cfg->webcontrol_lock_minutes*60)) {
-            it = webu->wb_clients.erase(it);
-        } else {
-            it++;
+    if (is_locked) {
+        if (!exec_cmd.empty()) {
+            util_exec_command(cam, exec_cmd.c_str(), NULL);
         }
+        return MHD_NO;
     }
 
     return MHD_YES;

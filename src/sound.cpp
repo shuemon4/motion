@@ -367,6 +367,8 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_malloc(%s)")
             , snd_strerror (retcd));
+        snd_pcm_close(alsa->pcm_dev);
+        alsa->pcm_dev = nullptr;
         device_status = STATUS_CLOSED;
         return;
     }
@@ -376,8 +378,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_any(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_hw_params_set_access(alsa->pcm_dev
@@ -386,8 +387,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_set_access(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_hw_params_set_format(alsa->pcm_dev
@@ -396,8 +396,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_set_format(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_hw_params_set_rate_near(alsa->pcm_dev
@@ -406,8 +405,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_set_rate_near(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_hw_params_set_channels(alsa->pcm_dev
@@ -416,8 +414,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_set_channels(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_hw_params_set_period_size_near(alsa->pcm_dev
@@ -426,8 +423,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_set_period_size_near(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_hw_params(alsa->pcm_dev, hw_params);
@@ -435,8 +431,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_prepare(alsa->pcm_dev);
@@ -444,18 +439,16 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_prepare(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     /* Query actual parameters selected by ALSA (may differ from requested). */
-	retcd = snd_pcm_hw_params_get_format(hw_params, &actl_sndfmt);
+    retcd = snd_pcm_hw_params_get_format(hw_params, &actl_sndfmt);
     if (retcd < 0) {
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_get_format(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_hw_params_get_rate(hw_params, &actl_rate, NULL);
@@ -463,8 +456,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_get_rate(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     retcd = snd_pcm_hw_params_get_period_size(hw_params, &frames_per, NULL);
@@ -472,8 +464,7 @@ void cls_sound::alsa_start()
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO
             , _("error: snd_pcm_hw_params_get_period_size(%s)")
             , snd_strerror (retcd));
-        device_status = STATUS_CLOSED;
-        return;
+        goto err_cleanup;
     }
 
     snd_pcm_hw_params_free(hw_params);
@@ -498,7 +489,13 @@ void cls_sound::alsa_start()
 
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, "Started.");
     device_status =STATUS_OPENED;
+    return;
 
+err_cleanup:
+    snd_pcm_hw_params_free(hw_params);
+    snd_pcm_close(alsa->pcm_dev);
+    alsa->pcm_dev = nullptr;
+    device_status = STATUS_CLOSED;
 }
 
 /* Initialize the ALSA context, enumerate devices, and open the capture stream. */
@@ -666,12 +663,12 @@ void cls_sound::fftw_open()
 
 /* Return the Hamming window coefficient for sample n1 in a window of size N2. */
 float cls_sound::HammingWindow(int n1, int N2){
-    return 0.54F - 0.46F * (float)(cos((2 * M_PI * n1)) / (N2 - 1));
+    return 0.54F - 0.46F * (float)cos(2 * M_PI * n1 / (N2 - 1));
 }
 
 /* Return the Hann window coefficient for sample n1 in a window of size N2. */
 float cls_sound::HannWindow(int n1, int N2){
-    return 0.5F * (float)(1 - (cos(2 * M_PI * n1 * N2)));
+    return 0.5F * (float)(1 - cos(2 * M_PI * n1 / (N2 - 1)));
 }
 
 /* Apply the configured window function, run the FFT, identify the dominant frequency bin,

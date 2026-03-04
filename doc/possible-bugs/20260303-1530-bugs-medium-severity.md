@@ -2,6 +2,27 @@
 
 Issues that cause incorrect behavior, resource leaks, security weaknesses, or silent functional failures under specific conditions.
 
+## Bug Status
+
+| # | Bug | Status |
+|---|-----|--------|
+| 1 | movie_retain no dispatch handler | ✅ Resolved |
+| 2 | PostgreSQL conn string not escaped | ✅ Resolved |
+| 3 | draw.cpp negative array index | ✅ Resolved |
+| 4 | JSON \uXXXX not handled | ✅ Resolved |
+| 5 | log_history_init unbounded growth | ✅ Resolved |
+| 6 | write_norm 1-byte overflow | ✅ Resolved |
+| 7 | passthru_streams uninit retcd | ✅ Resolved |
+| 8 | SIGVTALRM thread termination | ⬜ Not a bug (by design) |
+| 9 | cleandir_cam unknown freq runaway | ✅ Resolved |
+| 10 | ALSA hw_params leak | ✅ Resolved |
+| 11 | thumbnail false success retcd | ✅ Resolved |
+| 12 | thumbnail partial file on disk | ✅ Resolved |
+| 13 | vlp_open_vidpipe fd leak | ✅ Resolved |
+| 14 | vlp_startpipe fd leak | ✅ Resolved |
+| 15 | is_trusted_proxy CIDR comment | ✅ Resolved |
+| 16 | clients_mtx held during exec | ✅ Resolved |
+
 ---
 
 ## 1. conf.cpp — movie_retain parameter has no handler in dispatch_edit
@@ -467,3 +488,102 @@ However, this only triggers when an attacker exceeds `webcontrol_lock_attempts` 
 | 16 | clients_mtx held during exec | **Design issue** | Low — stalls only under active attack | Fork-specific |
 
 **15 of 16 reports confirmed** as real issues. Bug #8 (SIGVTALRM) is **not a bug** — Motion intentionally installs a handler that calls `pthread_exit()`. Bug #15 is a misleading comment, not a functional bug.
+
+---
+
+## Resolution Summary
+
+**Date Resolved:** 2026-03-03
+
+### Bug #1: movie_retain no dispatch handler
+**Root Cause:** `movie_retain` defined in `config_parms[]` but missing handler in `dispatch_edit()`.
+**Fix:** Added `edit_generic_list` handler with valid values `{"all","secondary"}`, default `"all"`.
+**File:** `src/conf.cpp` — added 2 lines after `movie_passthrough` handler.
+
+### Bug #2: PostgreSQL connection string not escaped
+**Root Cause:** `PQconnectdb()` connection string values not escaped for single quotes/backslashes.
+**Fix:** Added lambda `pq_escape()` to escape `'` and `\` with backslash prefix per libpq syntax.
+**File:** `src/dbse.cpp` — added escape helper in `pgsqldb_init()`.
+
+### Bug #3: draw.cpp negative/OOB array index
+**Root Cause:** `(int)text[pos]` produces values outside 0-126 range for non-ASCII bytes. Array indexed before guard check.
+**Fix:** Cast to `(unsigned char)`, clamp `>= ASCII_MAX` to space character, removed ineffective inner-loop guard.
+**File:** `src/draw.cpp` — modified `textn()` character loop.
+
+### Bug #4: JSON \uXXXX not handled
+**Root Cause:** `parseString()` switch had no `case 'u':` handler, rejecting valid RFC 8259 JSON.
+**Fix:** Added full `\uXXXX` handler with UTF-8 encoding and surrogate pair support.
+**File:** `src/json_parse.cpp` — added `case 'u':` block in escape switch.
+
+### Bug #5: log_history_init unbounded growth
+**Root Cause:** `log_history_init()` appends 200 entries via `push_back()` without clearing existing entries on overflow reinit.
+**Fix:** Added `log_vec.clear()` before the push_back loop.
+**File:** `src/logger.cpp` — 1 line added.
+
+### Bug #6: write_norm 1-byte buffer overflow
+**Root Cause:** `strcpy(msg_full + strlen(msg_full), "\n")` can write `\0` one byte past buffer end when `add_errmsg()` fills to 1023 bytes.
+**Fix:** Replaced `strcpy` with bounds-checked direct assignment: only append `\n\0` if `strlen < sizeof(msg_full) - 2`.
+**File:** `src/logger.cpp` — replaced both `strcpy` calls in `write_norm()`.
+
+### Bug #7: passthru_streams uninitialized retcd
+**Root Cause:** `retcd` declared without initialization; if first stream is neither video nor audio, `if (retcd < 0)` reads uninitialized value.
+**Fix:** Initialized `retcd = 0` at declaration.
+**File:** `src/movie.cpp` — 1 character change.
+
+### Bug #9: cleandir_cam unknown freq runaway
+**Root Cause:** Missing `else` clause after hourly/daily/weekly check leaves `next_ts` unchanged for unrecognized freq values, causing cleanup every 30 seconds.
+**Fix:** Added `else` clause that logs a warning and defaults to daily interval.
+**File:** `src/schedule.cpp` — added 4 lines.
+
+### Bug #10: ALSA hw_params leak on error paths
+**Root Cause:** 10 error paths after `snd_pcm_hw_params_malloc()` returned without freeing `hw_params` or closing `pcm_dev`.
+**Fix:** Converted to goto-cleanup pattern. Error label frees `hw_params`, closes `pcm_dev`, nulls pointer. Special case for malloc failure (no hw_params to free).
+**File:** `src/sound.cpp` — restructured `alsa_start()` error handling.
+
+### Bug #11: thumbnail false success retcd
+**Root Cause:** After `sws_scale` success (positive retcd), three later failure paths jumped to cleanup without resetting retcd to negative. Caller reported false "Generated thumbnail".
+**Fix:** Added `retcd = -1` before each `goto cleanup` on the JPEG encode, fopen, and fwrite failure paths.
+**File:** `src/thumbnail.cpp` — 3 lines added.
+
+### Bug #12: thumbnail partial file on disk
+**Root Cause:** `fopen("wb")` creates file, but `fwrite` failure leaves it on disk. `exists()` finds the stale file and permanently skips regeneration.
+**Fix:** In cleanup block, after closing file, if `retcd != 0` call `remove(thumb_path)` to clean up partial/empty files.
+**File:** `src/thumbnail.cpp` — 3 lines added in cleanup block.
+
+### Bug #13: vlp_open_vidpipe fd leak on success
+**Root Cause:** When `tfd = open()` succeeds, `break` exits loop without closing the sysfs name fd.
+**Fix:** Added `close(fd)` before the `break` statement.
+**File:** `src/video_loopback.cpp` — 1 line added.
+
+### Bug #14: vlp_startpipe fd leak on ioctl failures
+**Root Cause:** Three ioctl error paths return -1 without closing the opened `dev` fd.
+**Fix:** Added `close(dev)` before each `return -1`.
+**File:** `src/video_loopback.cpp` — 3 lines added.
+
+### Bug #15: is_trusted_proxy misleading CIDR comment
+**Root Cause:** Comment claims "Supports comma-separated list of IPs or CIDR ranges" but code only does exact IP match.
+**Fix:** Corrected comment to "Supports comma-separated list of exact IP addresses."
+**File:** `src/webu_ans.cpp` — comment updated.
+
+### Bug #16: clients_mtx held during exec
+**Root Cause:** `lock_guard` held for entire `failauth_check()` including `util_exec_command()` call. Slow scripts block all web connections.
+**Fix:** Restructured to use scoped lock block. Mutex is released before `util_exec_command()` runs. Command string and lock state copied inside lock scope.
+**File:** `src/webu_ans.cpp` — restructured `failauth_check()`.
+
+### Files Modified
+
+| File | Bugs Fixed |
+|------|-----------|
+| `src/conf.cpp` | #1 |
+| `src/dbse.cpp` | #2 |
+| `src/draw.cpp` | #3 |
+| `src/json_parse.cpp` | #4 |
+| `src/logger.cpp` | #5, #6 |
+| `src/movie.cpp` | #7 |
+| `src/schedule.cpp` | #9 |
+| `src/sound.cpp` | #10 |
+| `src/thumbnail.cpp` | #11, #12 |
+| `src/video_loopback.cpp` | #13, #14 |
+| `src/webu_ans.cpp` | #15, #16 |
+
+**Status:** ✅ All 15 confirmed bugs resolved. Bug #8 not a bug (by design).

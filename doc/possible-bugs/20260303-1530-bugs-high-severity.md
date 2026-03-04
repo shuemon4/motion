@@ -2,6 +2,17 @@
 
 Issues that cause crashes, deadlocks, incorrect behavior, or silent data corruption.
 
+## Bug Status
+
+| # | Bug | Status |
+|---|-----|--------|
+| 1 | Double mutex lock deadlock | ✅ Resolved |
+| 2 | Null deref in passthru_check | ✅ Resolved |
+| 3 | Buffer underflow in ff_log | ✅ Resolved |
+| 4 | Schedule time comparison | ✅ Resolved |
+| 5 | HammingWindow formula | ✅ Resolved |
+| 6 | HannWindow formula | ✅ Resolved |
+
 ---
 
 ## 1. motion.cpp — Double mutex lock (deadlock) in check_restart()
@@ -29,6 +40,21 @@ Issues that cause crashes, deadlocks, incorrect behavior, or silent data corrupt
 **Mitigating factors**: Database config changes via the web UI are rare in normal operation. Most users configure the database once and don't change it at runtime, so few would trigger this code path.
 
 **Fix**: Change line 470 from `pthread_mutex_lock` to `pthread_mutex_unlock`.
+
+### Resolution
+
+**Date Resolved:** 2026-03-03
+
+**Root Cause:** Copy/paste error — second `pthread_mutex_lock` should have been `pthread_mutex_unlock`.
+
+**Solution:** Changed `pthread_mutex_lock(&dbse->mutex_dbse)` to `pthread_mutex_unlock(&dbse->mutex_dbse)` on line 470.
+
+**Files Modified:**
+| File | Change |
+|------|--------|
+| src/motion.cpp:470 | `pthread_mutex_lock` → `pthread_mutex_unlock` |
+
+**Status:** ✅ RESOLVED
 
 ---
 
@@ -58,6 +84,21 @@ Issues that cause crashes, deadlocks, incorrect behavior, or silent data corrupt
 
 **Fix**: Move the `netcam_data == nullptr` check before the status dereference, matching `passthru_put()`.
 
+### Resolution
+
+**Date Resolved:** 2026-03-03
+
+**Root Cause:** Guard ordering error — nullptr check placed after the pointer dereference, making it dead code.
+
+**Solution:** Swapped the two `if` blocks so the nullptr check comes first, matching the pattern in `passthru_put()`.
+
+**Files Modified:**
+| File | Change |
+|------|--------|
+| src/movie.cpp:1334-1344 | Moved `netcam_data == nullptr` guard before `netcam_data->status` access |
+
+**Status:** ✅ RESOLVED
+
 ---
 
 ## 3. logger.cpp — Buffer underflow when FFmpeg emits an empty message in ff_log()
@@ -86,6 +127,21 @@ if (len > 0) {
     buff[len-1] = 0;
 }
 ```
+
+### Resolution
+
+**Date Resolved:** 2026-03-03
+
+**Root Cause:** `strlen()` returns `size_t` (unsigned). With empty string, `0 - 1` wraps to `SIZE_MAX`, causing out-of-bounds write.
+
+**Solution:** Added length check with early return on empty string. Also improved the newline strip to only remove the character if it's actually `'\n'` (the original unconditionally zeroed the last character).
+
+**Files Modified:**
+| File | Change |
+|------|--------|
+| src/logger.cpp:47 | Added `len == 0` early return and conditional newline strip |
+
+**Status:** ✅ RESOLVED
 
 ---
 
@@ -127,6 +183,21 @@ if ((p_cam->schedule[cur_dy][indx].action == "stop") &&
     (cur_total >= st_total) && (cur_total <= en_total)) {
 ```
 
+### Resolution
+
+**Date Resolved:** 2026-03-03
+
+**Root Cause:** Comparing hours and minutes as four independent inequalities fails for any schedule where `start_min > end_min` (which is most practical schedules).
+
+**Solution:** Linearize time to total minutes (`hour * 60 + minute`) and compare as single integers. Also added `(int)` cast on `size()` to avoid signed/unsigned comparison warning.
+
+**Files Modified:**
+| File | Change |
+|------|--------|
+| src/schedule.cpp:68-73 | Replaced four independent hour/minute comparisons with linearized minute comparison |
+
+**Status:** ✅ RESOLVED
+
 ---
 
 ## 5. sound.cpp — HammingWindow formula is incorrect
@@ -161,6 +232,21 @@ For a typical N=2048: `0.54 - 0.46/2047 ≈ 0.5398`
 return 0.54F - 0.46F * (float)cos(2 * M_PI * n1 / (N2 - 1));
 ```
 
+### Resolution
+
+**Date Resolved:** 2026-03-03
+
+**Root Cause:** Parentheses placed incorrectly — `cos(2πn)` was computed first (always = 1.0 for integer n), then divided by `(N-1)`. Result was a flat constant ~0.54 for all samples.
+
+**Solution:** Moved `/ (N2 - 1)` inside the `cos()` argument to produce the correct smooth taper.
+
+**Files Modified:**
+| File | Change |
+|------|--------|
+| src/sound.cpp:669 | Fixed parentheses: `cos((2*M_PI*n1))/(N2-1)` → `cos(2*M_PI*n1/(N2-1))` |
+
+**Status:** ✅ RESOLVED
+
 ---
 
 ## 6. sound.cpp — HannWindow formula is incorrect
@@ -190,6 +276,21 @@ Note: In practice, due to IEEE 754 floating-point precision loss with large argu
 ```cpp
 return 0.5F * (float)(1 - cos(2 * M_PI * n1 / (N2 - 1)));
 ```
+
+### Resolution
+
+**Date Resolved:** 2026-03-03
+
+**Root Cause:** Formula used multiplication (`n1 * N2`) instead of division (`n1 / (N2 - 1)`). Since both are integers, `cos(2π * integer) = 1.0`, making every sample 0.0 — zeroing all input to the FFT.
+
+**Solution:** Changed `cos(2 * M_PI * n1 * N2)` to `cos(2 * M_PI * n1 / (N2 - 1))`.
+
+**Files Modified:**
+| File | Change |
+|------|--------|
+| src/sound.cpp:674 | `n1 * N2` → `n1 / (N2 - 1)` in Hann window formula |
+
+**Status:** ✅ RESOLVED
 
 ---
 

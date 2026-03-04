@@ -408,6 +408,7 @@ int cls_thumbnail::encode_thumbnail(AVFrame *frame, const std::string &thumb_pat
 
     if (jpg_size <= 0) {
         MOTION_LOG(ERR, TYPE_ALL, NO_ERRNO, _("Failed to encode JPEG"));
+        retcd = -1;
         goto cleanup;
     }
 
@@ -416,12 +417,14 @@ int cls_thumbnail::encode_thumbnail(AVFrame *frame, const std::string &thumb_pat
     if (f == nullptr) {
         MOTION_LOG(ERR, TYPE_ALL, SHOW_ERRNO
             , _("Failed to open thumbnail file: %s"), thumb_path.c_str());
+        retcd = -1;
         goto cleanup;
     }
 
     if (fwrite(jpg_buffer, 1, (size_t)jpg_size, f) != (size_t)jpg_size) {
         MOTION_LOG(ERR, TYPE_ALL, SHOW_ERRNO
             , _("Failed to write thumbnail: %s"), thumb_path.c_str());
+        retcd = -1;
         goto cleanup;
     }
 
@@ -430,6 +433,10 @@ int cls_thumbnail::encode_thumbnail(AVFrame *frame, const std::string &thumb_pat
 cleanup:
     if (f != nullptr) {
         fclose(f);
+        f = nullptr;
+    }
+    if (retcd != 0) {
+        remove(thumb_path.c_str());
     }
     if (jpg_buffer != nullptr) {
         free(jpg_buffer);

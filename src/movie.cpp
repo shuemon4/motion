@@ -1303,7 +1303,7 @@ int cls_movie::passthru_streams_audio( AVStream *stream_in)
 /* Set up all output streams (video + audio) from the netcam transfer format */
 int cls_movie::passthru_streams()
 {
-    int         retcd, indx;
+    int         retcd = 0, indx;
     AVStream    *stream_in;
 
     if (netcam_data->handler_stop == true) {
@@ -1331,15 +1331,15 @@ int cls_movie::passthru_streams()
 /* Verify the netcam is connected and reset packet-written flags for a new pass-through recording */
 int cls_movie::passthru_check()
 {
+    if (netcam_data == nullptr) {
+        MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO, _("RTSP context not available."));
+        return -1;
+    }
+
     if ((netcam_data->status == NETCAM_NOTCONNECTED  ) ||
         (netcam_data->status == NETCAM_RECONNECTING  )) {
         MOTION_LOG(NTC, TYPE_ENCODER, NO_ERRNO
             ,_("rtsp camera not ready for pass-through."));
-        return -1;
-    }
-
-    if (netcam_data == nullptr) {
-        MOTION_LOG(ERR, TYPE_ENCODER, NO_ERRNO, _("RTSP context not available."));
         return -1;
     }
 

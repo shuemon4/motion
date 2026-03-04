@@ -215,6 +215,54 @@ std::string JsonParser::parseString() {
                 case 'n':  result += '\n'; break;
                 case 'r':  result += '\r'; break;
                 case 't':  result += '\t'; break;
+                case 'u': {
+                    if (pos_ + 4 > json_.length()) {
+                        setError("Incomplete unicode escape");
+                        return "";
+                    }
+                    std::string hex = json_.substr(pos_, 4);
+                    pos_ += 4;
+                    char *endptr;
+                    unsigned long cp = strtoul(hex.c_str(), &endptr, 16);
+                    if (endptr != hex.c_str() + 4) {
+                        setError("Invalid unicode escape");
+                        return "";
+                    }
+                    /* Handle surrogate pairs */
+                    if (cp >= 0xD800 && cp <= 0xDBFF) {
+                        if (pos_ + 6 <= json_.length() && json_[pos_] == '\\' && json_[pos_+1] == 'u') {
+                            pos_ += 2;
+                            std::string hex2 = json_.substr(pos_, 4);
+                            pos_ += 4;
+                            unsigned long cp2 = strtoul(hex2.c_str(), &endptr, 16);
+                            if (endptr != hex2.c_str() + 4 || cp2 < 0xDC00 || cp2 > 0xDFFF) {
+                                setError("Invalid surrogate pair");
+                                return "";
+                            }
+                            cp = 0x10000 + ((cp - 0xD800) << 10) + (cp2 - 0xDC00);
+                        } else {
+                            setError("Missing low surrogate");
+                            return "";
+                        }
+                    }
+                    /* Encode as UTF-8 */
+                    if (cp < 0x80) {
+                        result += (char)cp;
+                    } else if (cp < 0x800) {
+                        result += (char)(0xC0 | (cp >> 6));
+                        result += (char)(0x80 | (cp & 0x3F));
+                    } else if (cp < 0x10000) {
+                        result += (char)(0xE0 | (cp >> 12));
+                        result += (char)(0x80 | ((cp >> 6) & 0x3F));
+                        result += (char)(0x80 | (cp & 0x3F));
+                    } else {
+                        result += (char)(0xF0 | (cp >> 18));
+                        result += (char)(0x80 | ((cp >> 12) & 0x3F));
+                        result += (char)(0x80 | ((cp >> 6) & 0x3F));
+                        result += (char)(0x80 | (cp & 0x3F));
+                    }
+                    break;
+                }
                 default:
                     setError("Invalid escape sequence");
                     return "";

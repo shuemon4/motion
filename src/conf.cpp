@@ -926,6 +926,9 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
 
     if (name == "movie_passthrough") return edit_generic_bool(movie_passthrough, parm, pact, false);
 
+    static const std::vector<std::string> movie_retain_values = {"all","secondary"};
+    if (name == "movie_retain") return edit_generic_list(movie_retain, parm, pact, "all", movie_retain_values);
+
     static const std::vector<std::string> timelapse_mode_values = {"off","hourly","daily","weekly","monthly"};
     if (name == "timelapse_mode") return edit_generic_list(timelapse_mode, parm, pact, "off", timelapse_mode_values);
 
