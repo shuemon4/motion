@@ -666,9 +666,9 @@ void cls_webu_json::api_media_folders()
     }
     closedir(dir);
 
-    /* Sort folders and files alphabetically (by first element = name) */
-    std::sort(folders.begin(), folders.end());
-    std::sort(media_files.begin(), media_files.end());
+    /* Sort folders and files reverse alphabetically (newest first) */
+    std::sort(folders.begin(), folders.end(), std::greater<>());
+    std::sort(media_files.begin(), media_files.end(), std::greater<>());
 
     /* Calculate folder statistics (file count, total size) */
     std::string cam_id = std::to_string(webua->cam->cfg->device_id);
