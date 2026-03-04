@@ -436,7 +436,7 @@ export function Media() {
       {/* Folder List (when in folders view) */}
       {viewMode === 'folders' && (foldersData?.folders?.length ?? 0) > 0 && (
         <div className="mb-6 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-          {foldersData!.folders!.map((folder) => (
+          {foldersData!.folders!.filter((f) => f.file_count > 0).map((folder) => (
             <div
               key={folder.path}
               className="bg-surface-elevated rounded-lg p-4 hover:ring-2 hover:ring-primary cursor-pointer transition-all group"
