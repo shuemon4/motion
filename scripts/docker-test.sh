@@ -47,12 +47,16 @@ test_debian12() {
         set -e
 
         echo "[INFO] Installing dependencies..."
-        apt-get update -qq
-        apt-get install -y -qq \
+        DEBIAN_FRONTEND=noninteractive apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
             build-essential autoconf automake autoconf-archive libtool pkg-config gettext autopoint git \
             libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
             libmicrohttpd-dev libjpeg-dev libsqlite3-dev zlib1g-dev \
             >/dev/null 2>&1
+
+        echo "[INFO] Cleaning host build artifacts..."
+        make distclean 2>/dev/null || true
+        rm -f src/*.o
 
         echo "[INFO] Checking FFmpeg version..."
         FFMPEG_VER=$(pkg-config --modversion libavformat)
@@ -87,6 +91,10 @@ test_debian12() {
         set +e  # Disable exit-on-error for motion -h (help exits with 1)
         /tmp/motion-install/usr/local/bin/motion -h >/dev/null 2>&1
         set -e  # Re-enable exit-on-error
+
+        echo "[INFO] Cleaning build artifacts from host source tree..."
+        make distclean 2>/dev/null || true
+        rm -f src/*.o
 
         echo "[SUCCESS] Debian 12 test passed!"
     '
@@ -108,12 +116,16 @@ test_ubuntu2404() {
         set -e
 
         echo "[INFO] Installing dependencies..."
-        apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive apt-get update -qq
         DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
             build-essential autoconf automake autoconf-archive libtool pkg-config gettext autopoint git \
             libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
             libmicrohttpd-dev libjpeg-dev libsqlite3-dev zlib1g-dev \
             >/dev/null 2>&1
+
+        echo "[INFO] Cleaning host build artifacts..."
+        make distclean 2>/dev/null || true
+        rm -f src/*.o
 
         echo "[INFO] Checking FFmpeg version..."
         FFMPEG_VER=$(pkg-config --modversion libavformat)
@@ -148,6 +160,10 @@ test_ubuntu2404() {
         set +e  # Disable exit-on-error for motion -h (help exits with 1)
         /tmp/motion-install/usr/local/bin/motion -h >/dev/null 2>&1
         set -e  # Re-enable exit-on-error
+
+        echo "[INFO] Cleaning build artifacts from host source tree..."
+        make distclean 2>/dev/null || true
+        rm -f src/*.o
 
         echo "[SUCCESS] Ubuntu 24.04 test passed!"
     '
@@ -174,6 +190,10 @@ test_fedora40() {
             ffmpeg-free-devel libmicrohttpd-devel libjpeg-turbo-devel sqlite-devel zlib-devel \
             >/dev/null 2>&1
 
+        echo "[INFO] Cleaning host build artifacts..."
+        make distclean 2>/dev/null || true
+        rm -f src/*.o
+
         echo "[INFO] Checking FFmpeg version..."
         FFMPEG_VER=$(pkg-config --modversion libavformat)
         echo "[INFO] FFmpeg version: $FFMPEG_VER"
@@ -207,6 +227,10 @@ test_fedora40() {
         set +e  # Disable exit-on-error for motion -h (help exits with 1)
         /tmp/motion-install/usr/local/bin/motion -h >/dev/null 2>&1
         set -e  # Re-enable exit-on-error
+
+        echo "[INFO] Cleaning build artifacts from host source tree..."
+        make distclean 2>/dev/null || true
+        rm -f src/*.o
 
         echo "[SUCCESS] Fedora 40 test passed!"
     '

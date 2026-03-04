@@ -25,12 +25,16 @@ echo ""
 case "$DISTRO" in
     debian12)
         docker run -it --rm -v "${MOTION_ROOT}:/motion" -w /motion debian:12 bash -c '
-            apt-get update -qq
-            apt-get install -y -qq \
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
                 build-essential autoconf automake autoconf-archive libtool pkg-config gettext autopoint git \
                 libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
                 libmicrohttpd-dev libjpeg-dev libsqlite3-dev zlib1g-dev \
                 vim less tree
+
+            echo "[INFO] Cleaning Mac build artifacts..."
+            make distclean 2>/dev/null || true
+            rm -f src/*.o
 
             echo ""
             echo "==================================================================="
@@ -50,6 +54,8 @@ case "$DISTRO" in
             echo "  echo \"threshold 3000\" > /tmp/test-config/user-config/local.conf"
             echo "  ./motion -c /tmp/test-config/motion.conf -n -d"
             echo ""
+            echo "NOTE: Run autoreconf -fiv && ./configure on Mac after exiting"
+            echo "      to restore Mac build environment."
             echo "==================================================================="
             echo ""
 
@@ -58,12 +64,16 @@ case "$DISTRO" in
         ;;
     ubuntu2404)
         docker run -it --rm -v "${MOTION_ROOT}:/motion" -w /motion ubuntu:24.04 bash -c '
-            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
             DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
                 build-essential autoconf automake autoconf-archive libtool pkg-config gettext autopoint git \
                 libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libavdevice-dev \
                 libmicrohttpd-dev libjpeg-dev libsqlite3-dev zlib1g-dev \
                 vim less tree
+
+            echo "[INFO] Cleaning Mac build artifacts..."
+            make distclean 2>/dev/null || true
+            rm -f src/*.o
 
             echo ""
             echo "==================================================================="
@@ -78,6 +88,8 @@ case "$DISTRO" in
             echo "  make -j$(nproc)"
             echo "  make install DESTDIR=/tmp/motion-install"
             echo ""
+            echo "NOTE: Run autoreconf -fiv && ./configure on Mac after exiting"
+            echo "      to restore Mac build environment."
             echo "==================================================================="
             echo ""
 
@@ -87,9 +99,13 @@ case "$DISTRO" in
     fedora40)
         docker run -it --rm -v "${MOTION_ROOT}:/motion" -w /motion fedora:40 bash -c '
             dnf install -y -q \
-                gcc gcc-c++ make autoconf automake autoconf-archive libtool pkgconfig gettext git \
+                gcc gcc-c++ make autoconf automake autoconf-archive libtool pkgconfig gettext-devel git \
                 ffmpeg-free-devel libmicrohttpd-devel libjpeg-turbo-devel sqlite-devel zlib-devel \
                 vim less tree
+
+            echo "[INFO] Cleaning Mac build artifacts..."
+            make distclean 2>/dev/null || true
+            rm -f src/*.o
 
             echo ""
             echo "==================================================================="
@@ -104,6 +120,8 @@ case "$DISTRO" in
             echo "  make -j$(nproc)"
             echo "  make install DESTDIR=/tmp/motion-install"
             echo ""
+            echo "NOTE: Run autoreconf -fiv && ./configure on Mac after exiting"
+            echo "      to restore Mac build environment."
             echo "==================================================================="
             echo ""
 
