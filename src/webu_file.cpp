@@ -123,7 +123,7 @@ static std::string get_mime_type(const std::string &filename)
 
 /**
  * Get cache control header based on path
- * - /assets/* files are hashed, cache aggressively
+ * - /assets/ files are hashed, cache aggressively
  * - index.html must not be cached (for SPA updates)
  */
 static std::string get_cache_control(const std::string &path)

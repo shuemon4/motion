@@ -862,7 +862,7 @@ mhdrslt cls_webu_ans::mhd_auth()
 
     /* Allow certain endpoints without HTTP auth so the React SPA can load
      * and handle authentication itself via session tokens/cookies:
-     * 1. Static files (device_id < 0): /assets/* etc.
+     * 1. Static files (device_id < 0): /assets/ etc.
      * 2. Root page and SPA routes (uri_cmd1 empty): /, /settings, etc.
      * 3. All API endpoints: Use session-based auth, not HTTP Basic/Digest
      *
@@ -1174,7 +1174,7 @@ void cls_webu_ans::answer_get()
         ,"processing get: %s",uri_cmd1.c_str());
 
     /* Check for static file serving (React UI) before camera validation
-     * This allows serving files like /assets/*, /settings, / without a camera ID */
+     * This allows serving files like /assets/, /settings, / without a camera ID */
     if (app->cfg->webcontrol_html_path != "" && device_id < 0) {
         if (webu_file == nullptr) {
             webu_file = new cls_webu_file(this);

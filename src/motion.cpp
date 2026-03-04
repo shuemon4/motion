@@ -574,7 +574,7 @@ void cls_motapp::init(int p_argc, char *p_argv[])
     schedule = nullptr;
     cam_list.clear();
     snd_list.clear();
-    hw_encoders = {false, false};
+    hw_encoders = {false, false, false, false, false};
 
 
     pthread_mutex_init(&mutex_camlst, NULL);
