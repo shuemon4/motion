@@ -91,6 +91,13 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
     debounceTimers.current = {}
   }, [cameraId])
 
+  const handleProfileApplied = useCallback(() => {
+    // Cancel any pending debounced API calls so they don't overwrite profile values
+    Object.values(debounceTimers.current).forEach(clearTimeout)
+    debounceTimers.current = {}
+    setLocalChanges({})
+  }, [])
+
   // Debounced change handler for sliders
   const handleChange = useCallback(
     (param: string, value: string | number | boolean) => {
@@ -155,7 +162,11 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
   return (
     <div className="space-y-2">
       {/* Configuration Presets (load-only in bottom sheet) */}
-      <ConfigurationPresets cameraId={cameraId} readOnly={true} />
+      <ConfigurationPresets
+        cameraId={cameraId}
+        readOnly={true}
+        onProfileApplied={handleProfileApplied}
+      />
 
       {/* Stream Settings */}
       <QuickSection title="Stream" defaultOpen={false}>

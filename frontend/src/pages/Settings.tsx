@@ -324,6 +324,34 @@ export function Settings() {
     }
   }
 
+  const handlePreviewProfile = useCallback((profileParams: Record<string, string | number | boolean>) => {
+    setChanges(prev => {
+      const merged = { ...prev, ...profileParams }
+      // Sync stream_maxrate when framerate is in profile (same logic as handleChange)
+      if ('framerate' in profileParams) {
+        merged['stream_maxrate'] = profileParams['framerate']
+        // Clamp exposure time if it exceeds the new max
+        const newMax = Math.floor(1000000 / Number(profileParams['framerate']))
+        const currentExposure = Number(
+          prev['libcam_exposure_time'] ??
+          originalConfig?.['libcam_exposure_time']?.value ?? 0
+        )
+        if (currentExposure > newMax && currentExposure > 0) {
+          merged['libcam_exposure_time'] = newMax
+        }
+      }
+      return merged
+    })
+    // Clear validation errors for any param that the profile sets
+    setValidationErrors(prev => {
+      const updated = { ...prev }
+      for (const key of Object.keys(profileParams)) {
+        delete updated[key]
+      }
+      return updated
+    })
+  }, [originalConfig])
+
   const handleReset = () => {
     setChanges({})
     setValidationErrors({})
@@ -501,7 +529,11 @@ export function Settings() {
         <>
           {/* 1. Configuration Presets */}
           <div className="bg-surface-elevated rounded-lg p-4 mb-6">
-            <ConfigurationPresets cameraId={Number(selectedCamera)} readOnly={false} />
+            <ConfigurationPresets
+            cameraId={Number(selectedCamera)}
+            readOnly={false}
+            onPreviewProfile={handlePreviewProfile}
+          />
           </div>
 
           {/* 2. Camera Source */}

@@ -1,13 +1,18 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useProfiles, useApplyProfile } from '../hooks/useProfiles';
+import { useProfiles } from '../hooks/useProfiles';
+import { profilesApi } from '../api/profiles';
 import { ProfileSaveDialog } from './ProfileSaveDialog';
 import { useToast } from './Toast';
 import { applyRestartRequiredChanges } from '@/api/client';
+import { useBatchUpdateConfig } from '@/api/queries';
+import { resolveProfileConflicts, convertProfileParams } from '@/lib/profileConflicts';
 
 interface ConfigurationPresetsProps {
   cameraId: number;
   readOnly?: boolean;  // Hide save button when true (for Dashboard bottom sheet)
+  onPreviewProfile?: (params: Record<string, string | number | boolean>) => void;
+  onProfileApplied?: () => void;
 }
 
 /**
@@ -18,60 +23,100 @@ interface ConfigurationPresetsProps {
  * - Apply a profile to quickly change camera settings
  * - Save current settings as a new profile
  * - Manage existing profiles (delete, set as default)
+ *
+ * Two apply paths:
+ *  - Settings page (onPreviewProfile provided): fetches params, resolves conflicts, populates
+ *    the parent's "changes" state so the user reviews before saving.
+ *  - Dashboard (no onPreviewProfile): fetches params, resolves conflicts, sends via
+ *    PATCH /{camId}/api/config so hot-reload, conf_src, and restart detection work correctly.
  */
-export function ConfigurationPresets({ cameraId, readOnly = false }: ConfigurationPresetsProps) {
+export function ConfigurationPresets({
+  cameraId,
+  readOnly = false,
+  onPreviewProfile,
+  onProfileApplied,
+}: ConfigurationPresetsProps) {
   const queryClient = useQueryClient();
   const { data: profiles, isLoading, error } = useProfiles(cameraId);
-  const { mutate: applyProfile, isPending: isApplying } = useApplyProfile();
+  const { mutateAsync: batchUpdate, isPending: isApplying } = useBatchUpdateConfig();
   const { addToast } = useToast();
 
   const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
 
-  const handleApply = () => {
-    if (selectedProfileId) {
-      const profile = profiles?.find(p => p.profile_id === selectedProfileId);
-      const profileName = profile?.name || 'profile';
+  const handleApply = useCallback(async () => {
+    if (!selectedProfileId) return;
 
-      applyProfile(selectedProfileId, {
-        onSuccess: async (requiresRestart) => {
-          if (requiresRestart.length > 0) {
+    const profile = profiles?.find(p => p.profile_id === selectedProfileId);
+    const profileName = profile?.name || 'profile';
+
+    try {
+      // Fetch full profile params from API
+      const profileData = await profilesApi.get(selectedProfileId);
+
+      // Convert string values to typed JS values, then resolve conflicts
+      const convertedParams = convertProfileParams(profileData.params);
+      const resolvedParams = resolveProfileConflicts(convertedParams);
+
+      if (onPreviewProfile) {
+        // Settings page path: hand resolved params to parent for user review
+        onPreviewProfile(resolvedParams);
+        addToast(`Profile "${profileName}" loaded for review. Click Save to apply.`, 'info');
+        setSelectedProfileId(null);
+      } else {
+        // Dashboard path: apply directly via batch config API
+        // This path gets hot-reload, conf_src updates, and restart detection for free
+        const response = await batchUpdate({ camId: cameraId, changes: resolvedParams }) as {
+          applied?: Array<{ param: string; error?: string; hot_reload?: boolean }>;
+          summary?: { total: number; success: number; errors: number };
+        } | undefined;
+
+        await queryClient.invalidateQueries({ queryKey: ['config'] });
+
+        // Check if any params require a camera restart
+        const applied = response?.applied || [];
+        const restartParams = applied
+          .filter(p => !p.error && p.hot_reload === false)
+          .map(p => p.param);
+
+        if (restartParams.length > 0) {
+          addToast(`Profile "${profileName}" applied. Restarting camera...`, 'info');
+          try {
+            await applyRestartRequiredChanges(cameraId);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await queryClient.invalidateQueries({ queryKey: ['config'] });
+            addToast(`Profile "${profileName}" applied. Camera restarted.`, 'success');
+          } catch (err) {
+            console.error('Failed to restart camera:', err);
             addToast(
-              `Profile "${profileName}" applied. Restarting camera...`,
-              'info'
-            );
-            try {
-              await applyRestartRequiredChanges(cameraId);
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              await queryClient.invalidateQueries({ queryKey: ['config'] });
-              addToast(
-                `Profile "${profileName}" applied. Camera restarted.`,
-                'success'
-              );
-            } catch (err) {
-              console.error('Failed to restart camera:', err);
-              addToast(
-                `Profile applied but camera restart failed. Please restart manually.`,
-                'warning'
-              );
-            }
-          } else {
-            addToast(
-              `Profile "${profileName}" applied successfully`,
-              'success'
+              `Profile applied but camera restart failed. Please restart manually.`,
+              'warning'
             );
           }
-          setSelectedProfileId(null);
-        },
-        onError: (error) => {
-          addToast(
-            `Failed to apply profile: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            'error'
-          );
-        },
-      });
+        } else {
+          addToast(`Profile "${profileName}" applied successfully`, 'success');
+        }
+
+        // Clear parent's local override state so profile values are visible
+        onProfileApplied?.();
+        setSelectedProfileId(null);
+      }
+    } catch (err) {
+      addToast(
+        `Failed to apply profile: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        'error'
+      );
     }
-  };
+  }, [
+    selectedProfileId,
+    profiles,
+    cameraId,
+    onPreviewProfile,
+    onProfileApplied,
+    batchUpdate,
+    queryClient,
+    addToast,
+  ]);
 
   if (error) {
     return (
