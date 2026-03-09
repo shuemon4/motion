@@ -715,18 +715,23 @@ export async function waitForCameraOnline(
 
 /**
  * Write config and restart camera - used after applying restart-required parameters
- * Uses fire-and-forget for both operations since Motion may not respond reliably.
+ * Awaits config write to ensure changes are persisted to disk before restarting.
+ * Restart is fire-and-forget since Motion kills its own HTTP handler during restart.
  * @param camId Camera ID
  * @returns true if camera came back online after restart
  */
 export async function applyRestartRequiredChanges(camId: number): Promise<boolean> {
-  // Fire config write command - don't wait for response (Motion processes but may not respond)
-  writeConfigFireAndForget();
+  // Await config write to ensure changes are persisted to disk before restart.
+  // Without this, the restart can reload the old config file, losing changes.
+  try {
+    await writeConfig();
+  } catch {
+    // If the awaited write fails, fall back to fire-and-forget to still attempt it
+    writeConfigFireAndForget();
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
 
-  // Brief delay to let config write complete before restart
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  // Fire restart command - don't wait for response
+  // Fire restart command - don't wait for response (Motion kills its HTTP handler)
   restartCameraFireAndForget(camId);
 
   // Wait a moment for Motion to start restarting
