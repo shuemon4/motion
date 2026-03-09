@@ -26,11 +26,12 @@ export function MotionSettings({ config, onChange, getError }: MotionSettingsPro
   };
 
   // Despeckle filter options
+  // E=erode9, e=erode5, D=dilate9, d=dilate5, l=label
   const despeckleOptions = [
     { value: '', label: 'Off' },
-    { value: 'EedDl', label: 'Light' },
+    { value: 'edl', label: 'Light' },
     { value: 'EedDl', label: 'Medium (default)' },
-    { value: 'EedDl', label: 'Heavy' },
+    { value: 'EEedDDl', label: 'Heavy' },
   ];
 
   return (
