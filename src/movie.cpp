@@ -2017,7 +2017,9 @@ void cls_movie::start_norm()
     }
     pkt = nullptr;
     tlapse = TIMELAPSE_NONE;
-    fps = cam->lastrate;
+    /* Use configured framerate for stable time_base. cam->lastrate is
+     * volatile and can be temporarily low, causing PTS resolution issues. */
+    fps = cam->cfg->framerate;
     if (fps < 2) {
         fps = 2;
     }
@@ -2098,7 +2100,7 @@ void cls_movie::start_motion()
     height = cam->imgs.height;
     netcam_data = nullptr;
     tlapse = TIMELAPSE_NONE;
-    fps = cam->lastrate;
+    fps = cam->cfg->framerate;
     if (fps < 2) {
         fps = 2;
     }

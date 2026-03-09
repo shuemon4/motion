@@ -210,7 +210,7 @@ void cls_h264_encoder::set_quality_params(int profile)
     switch (codec_type) {
     case H264_CODEC_V4L2M2M: {
         /* v4l2m2m: bitrate mode */
-        int fps = cam->lastrate;
+        int fps = cam->cfg->framerate;
         if (fps < 2) fps = 2;
 
         int bitrate = (int)(((int64_t)cam->imgs.width * cam->imgs.height * fps * quality) >> 7);
@@ -316,7 +316,11 @@ int cls_h264_encoder::open_encoder(int profile, int gop)
         return -1;
     }
 
-    int fps = cam->lastrate;
+    /* Use configured framerate, not volatile lastrate. lastrate can be
+     * temporarily low during startup or CPU load. A low time_base
+     * denominator causes PTS truncation and collision-bumping that
+     * stretches video duration (e.g., fps=16 at 26fps actual → 1.6x). */
+    int fps = cam->cfg->framerate;
     if (fps < 2) fps = 2;
 
     ctx_codec->codec_id = codec->id;
@@ -884,7 +888,7 @@ int cls_h264_encoder::start(h264_encoder_state new_state)
     if (new_state == H264_STATE_RECORD_ONLY) {
         profile = MY_PROFILE_H264_HIGH;
         /* Use movie_quality GOP: fps/2, capped similar to cls_movie */
-        int fps = cam->lastrate;
+        int fps = cam->cfg->framerate;
         if (fps < 2) fps = 2;
         if (fps <= 5) {
             gop = 1;
@@ -1005,7 +1009,7 @@ void cls_h264_encoder::webrtc_peer_disconnected()
         /* Start hysteresis: stay at Constrained Baseline for 30s.
          * The hysteresis_countdown is decremented each encode_frame call.
          * At 15fps, 30s = 450 frames. */
-        int fps = cam->lastrate;
+        int fps = cam->cfg->framerate;
         if (fps < 2) fps = 2;
         hysteresis_countdown = fps * 30;
         /* For now, just transition immediately to RECORD_ONLY.
