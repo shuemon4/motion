@@ -86,6 +86,8 @@ ctx_parm config_parms[] = {
     {"libcam_buffer_count",       PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, false},
     {"libcam_brightness",         PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_contrast",           PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_sharpness",          PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
+    {"libcam_saturation",         PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_gain",               PARM_TYP_FLOAT,  PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_awb_enable",         PARM_TYP_BOOL,   PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
     {"libcam_awb_mode",           PARM_TYP_INT,    PARM_CAT_02, PARM_LEVEL_ADVANCED, true},
@@ -758,6 +760,8 @@ void cls_config::dispatch_edit(const std::string& name, std::string& parm, enum 
     // FLOATS with ranges - libcam parameters
     if (name == "libcam_brightness") return edit_generic_float(parm_cam.libcam_brightness, parm, pact, 0.0f, -1.0f, 1.0f);
     if (name == "libcam_contrast") return edit_generic_float(parm_cam.libcam_contrast, parm, pact, 1.0f, 0.0f, 32.0f);
+    if (name == "libcam_sharpness") return edit_generic_float(parm_cam.libcam_sharpness, parm, pact, 1.0f, 0.0f, 16.0f);
+    if (name == "libcam_saturation") return edit_generic_float(parm_cam.libcam_saturation, parm, pact, 1.0f, 0.0f, 32.0f);
     if (name == "libcam_colour_gain_r") return edit_generic_float(parm_cam.libcam_colour_gain_r, parm, pact, 0.0f, 0.0f, 8.0f);
     if (name == "libcam_colour_gain_b") return edit_generic_float(parm_cam.libcam_colour_gain_b, parm, pact, 0.0f, 0.0f, 8.0f);
 

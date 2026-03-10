@@ -35,40 +35,6 @@ export function LibcameraSettings({ config, onChange, getError, capabilities, or
       collapsible
       defaultOpen={false}
     >
-      {/* Image Controls */}
-      <FormSlider
-        label="Brightness"
-        value={Number(getValue('libcam_brightness', 0))}
-        onChange={(val) => onChange('libcam_brightness', val)}
-        min={-1}
-        max={1}
-        step={0.1}
-        helpText="Brightness adjustment (-1.0 to 1.0)"
-        error={getError?.('libcam_brightness')}
-      />
-
-      <FormSlider
-        label="Contrast"
-        value={Number(getValue('libcam_contrast', 1))}
-        onChange={(val) => onChange('libcam_contrast', val)}
-        min={0}
-        max={32}
-        step={0.5}
-        helpText="Contrast adjustment (0.0 to 32.0)"
-        error={getError?.('libcam_contrast')}
-      />
-
-      <FormSlider
-        label="Gain (ISO)"
-        value={Number(getValue('libcam_gain', 1))}
-        onChange={(val) => onChange('libcam_gain', val)}
-        min={0}
-        max={10}
-        step={0.1}
-        helpText="Analog gain (0=auto, 1.0-10.0) (Gain 1.0 ~ ISO 100)"
-        error={getError?.('libcam_gain')}
-      />
-
       {/* Auto White Balance */}
       <FormToggle
         label="Auto White Balance"
@@ -152,6 +118,67 @@ export function LibcameraSettings({ config, onChange, getError, capabilities, or
             </div>
           )}
         </>
+      )}
+
+      {/* Gain (ISO) */}
+      <FormSlider
+        label="Gain (ISO)"
+        value={Number(getValue('libcam_gain', 1))}
+        onChange={(val) => onChange('libcam_gain', val)}
+        min={0}
+        max={10}
+        step={0.1}
+        helpText="Analog gain (0=auto, 1.0-10.0) (Gain 1.0 ~ ISO 100)"
+        error={getError?.('libcam_gain')}
+      />
+
+      {/* Image Controls */}
+      <FormSlider
+        label="Brightness"
+        value={Number(getValue('libcam_brightness', 0))}
+        onChange={(val) => onChange('libcam_brightness', val)}
+        min={-1}
+        max={1}
+        step={0.01}
+        helpText="Brightness adjustment (-1.0 to 1.0)"
+        error={getError?.('libcam_brightness')}
+      />
+
+      <FormSlider
+        label="Contrast"
+        value={Number(getValue('libcam_contrast', 1))}
+        onChange={(val) => onChange('libcam_contrast', val)}
+        min={0}
+        max={8}
+        step={0.01}
+        helpText="Contrast adjustment (0.0 to 8.0)"
+        error={getError?.('libcam_contrast')}
+      />
+
+      {capabilities?.Sharpness !== false && (
+        <FormSlider
+          label="Sharpness"
+          value={Number(getValue('libcam_sharpness', 1))}
+          onChange={(val) => onChange('libcam_sharpness', val)}
+          min={0}
+          max={16}
+          step={0.01}
+          helpText="Sharpness adjustment (0.0 to 16.0, 1.0 = default)"
+          error={getError?.('libcam_sharpness')}
+        />
+      )}
+
+      {capabilities?.Saturation !== false && (
+        <FormSlider
+          label="Saturation"
+          value={Number(getValue('libcam_saturation', 1))}
+          onChange={(val) => onChange('libcam_saturation', val)}
+          min={0}
+          max={32}
+          step={0.01}
+          helpText="Color saturation (0.0 to 32.0, 1.0 = default)"
+          error={getError?.('libcam_saturation')}
+        />
       )}
 
       {/* Image Processing Section */}

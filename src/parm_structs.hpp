@@ -150,6 +150,8 @@ struct ctx_parm_cam {
     int             libcam_buffer_count;
     float           libcam_brightness;
     float           libcam_contrast;
+    float           libcam_sharpness;
+    float           libcam_saturation;
     float           libcam_gain;
     bool            libcam_awb_enable;
     int             libcam_awb_mode;
