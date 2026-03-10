@@ -236,6 +236,8 @@ class cls_camera {
         /* Hot-reload libcam brightness/contrast/gain/AWB controls */
         void set_libcam_brightness(float value);
         void set_libcam_contrast(float value);
+        void set_libcam_sharpness(float value);
+        void set_libcam_saturation(float value);
         void set_libcam_gain(float value);
         void set_libcam_awb_enable(bool value);
         void set_libcam_awb_mode(int value);

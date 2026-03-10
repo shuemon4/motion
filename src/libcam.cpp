@@ -839,6 +839,8 @@ void cls_libcam::config_controls()
     /* Apply initial brightness/contrast/gain from config */
     controls.set(controls::Brightness, cam->cfg->parm_cam.libcam_brightness);
     controls.set(controls::Contrast, cam->cfg->parm_cam.libcam_contrast);
+    controls.set(controls::Sharpness, cam->cfg->parm_cam.libcam_sharpness);
+    controls.set(controls::Saturation, cam->cfg->parm_cam.libcam_saturation);
     controls.set(controls::AnalogueGain, cam->cfg->parm_cam.libcam_gain);
 
     /* Apply initial AWB controls from config */
@@ -1095,6 +1097,8 @@ int cls_libcam::req_add(Request *request)
             ControlList &req_controls = request->controls();
             req_controls.set(controls::Brightness, pending_ctrls.brightness);
             req_controls.set(controls::Contrast, pending_ctrls.contrast);
+            req_controls.set(controls::Sharpness, pending_ctrls.sharpness);
+            req_controls.set(controls::Saturation, pending_ctrls.saturation);
             req_controls.set(controls::AnalogueGain, pending_ctrls.gain);
 
             // Apply AWB controls
@@ -1473,6 +1477,24 @@ void cls_libcam::set_contrast(float value)
         , "Hot-reload: contrast set to %.2f", value);
 }
 
+void cls_libcam::set_sharpness(float value)
+{
+    std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
+    pending_ctrls.sharpness = value;
+    pending_ctrls.dirty = true;
+    MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+        , "Hot-reload: sharpness set to %.2f", value);
+}
+
+void cls_libcam::set_saturation(float value)
+{
+    std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
+    pending_ctrls.saturation = value;
+    pending_ctrls.dirty = true;
+    MOTION_LOG(DBG, TYPE_VIDEO, NO_ERRNO
+        , "Hot-reload: saturation set to %.2f", value);
+}
+
 void cls_libcam::set_gain(float value)
 {
     std::lock_guard<std::mutex> lock(pending_ctrls.mtx);
@@ -1783,6 +1805,8 @@ cls_libcam::cls_libcam(cls_camera *p_cam)
         /* Initialize pending controls with config values */
         pending_ctrls.brightness = cam->cfg->parm_cam.libcam_brightness;
         pending_ctrls.contrast = cam->cfg->parm_cam.libcam_contrast;
+        pending_ctrls.sharpness = cam->cfg->parm_cam.libcam_sharpness;
+        pending_ctrls.saturation = cam->cfg->parm_cam.libcam_saturation;
         pending_ctrls.gain = cam->cfg->parm_cam.libcam_gain;
         pending_ctrls.awb_enable = cam->cfg->parm_cam.libcam_awb_enable;
         pending_ctrls.awb_mode = cam->cfg->parm_cam.libcam_awb_mode;
@@ -1824,6 +1848,8 @@ cls_libcam::~cls_libcam()
 /* Stub implementations for libcam hot-reload methods when libcam is not available */
 void cls_libcam::set_brightness(float value) { (void)value; }
 void cls_libcam::set_contrast(float value) { (void)value; }
+void cls_libcam::set_sharpness(float value) { (void)value; }
+void cls_libcam::set_saturation(float value) { (void)value; }
 void cls_libcam::set_gain(float value) { (void)value; }
 void cls_libcam::set_awb_enable(bool value) { (void)value; }
 void cls_libcam::set_awb_mode(int value) { (void)value; }

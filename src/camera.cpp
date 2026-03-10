@@ -2335,6 +2335,20 @@ void cls_camera::set_libcam_contrast(float value)
     }
 }
 
+void cls_camera::set_libcam_sharpness(float value)
+{
+    if (libcam != nullptr) {
+        libcam->set_sharpness(value);
+    }
+}
+
+void cls_camera::set_libcam_saturation(float value)
+{
+    if (libcam != nullptr) {
+        libcam->set_saturation(value);
+    }
+}
+
 void cls_camera::set_libcam_gain(float value)
 {
     if (libcam != nullptr) {

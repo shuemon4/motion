@@ -56,6 +56,8 @@
             mutable std::mutex mtx;     // Protects all members below
             float brightness = 0.0f;
             float contrast = 1.0f;
+            float sharpness = 1.0f;
+            float saturation = 1.0f;
             float gain = 1.0f;  // AnalogueGain (0=auto, 1.0-16.0 manual)
             // AWB controls
             bool awb_enable = true;
@@ -85,6 +87,8 @@
                 void noimage();
                 void set_brightness(float value);
                 void set_contrast(float value);
+                void set_sharpness(float value);
+                void set_saturation(float value);
                 void set_gain(float value);
                 void set_awb_enable(bool value);
                 void set_awb_mode(int value);
@@ -171,6 +175,8 @@
                 void noimage();
                 void set_brightness(float value);
                 void set_contrast(float value);
+                void set_sharpness(float value);
+                void set_saturation(float value);
                 void set_gain(float value);
                 void set_awb_enable(bool value);
                 void set_awb_mode(int value);

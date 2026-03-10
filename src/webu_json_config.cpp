@@ -67,6 +67,12 @@ namespace {
         {"libcam_contrast", [](cls_camera *cam, const std::string &val) {
             cam->set_libcam_contrast(strtof(val.c_str(), nullptr));
         }},
+        {"libcam_sharpness", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_sharpness(strtof(val.c_str(), nullptr));
+        }},
+        {"libcam_saturation", [](cls_camera *cam, const std::string &val) {
+            cam->set_libcam_saturation(strtof(val.c_str(), nullptr));
+        }},
         {"libcam_gain", [](cls_camera *cam, const std::string &val) {
             cam->set_libcam_gain(strtof(val.c_str(), nullptr));
         }},
