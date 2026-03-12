@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { FormSlider, FormToggle, FormSelect } from '@/components/form'
+import { FormSlider, FormToggle, FormSelect, HelpTooltip } from '@/components/form'
 import { ConfigurationPresets } from '@/components/ConfigurationPresets'
 import { useBatchUpdateConfig } from '@/api/queries'
 import { percentToPixels, pixelsToPercent } from '@/utils/translations'
 import { useCameraCapabilities } from '@/hooks/useCameraCapabilities'
-import { AUTOFOCUS_MODES, AWB_MODES } from '@/utils/parameterMappings'
+import { AUTOFOCUS_MODES, AUTOFOCUS_RANGES, AUTOFOCUS_SPEEDS, AWB_MODES, NOISE_REDUCTION_MODES } from '@/utils/parameterMappings'
 
 interface QuickSettingsProps {
   cameraId: number
@@ -168,61 +168,8 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
         onProfileApplied={handleProfileApplied}
       />
 
-      {/* Stream Settings */}
-      <QuickSection title="Stream" defaultOpen={false}>
-        <FormSlider
-          label="Quality"
-          value={Number(getValue('stream_quality', 50))}
-          onChange={(val) => handleChange('stream_quality', val)}
-          min={1}
-          max={100}
-          unit="%"
-          helpText="JPEG compression quality"
-        />
-
-        <FormSlider
-          label="Max Framerate"
-          value={Number(getValue('stream_maxrate', 15))}
-          onChange={(val) => handleChange('stream_maxrate', val)}
-          min={1}
-          max={30}
-          unit=" fps"
-          helpText="Maximum stream framerate"
-        />
-      </QuickSection>
-
       {/* Image/Camera Settings (libcamera) */}
       <QuickSection title="Image" defaultOpen={false}>
-        <FormSlider
-          label="Brightness"
-          value={Number(getValue('libcam_brightness', 0))}
-          onChange={(val) => handleChange('libcam_brightness', val)}
-          min={-1}
-          max={1}
-          step={0.1}
-          helpText="Brightness adjustment"
-        />
-
-        <FormSlider
-          label="Contrast"
-          value={Number(getValue('libcam_contrast', 1))}
-          onChange={(val) => handleChange('libcam_contrast', val)}
-          min={0}
-          max={32}
-          step={0.5}
-          helpText="Contrast adjustment"
-        />
-
-        <FormSlider
-          label="Gain (ISO)"
-          value={Number(getValue('libcam_gain', 1))}
-          onChange={(val) => handleChange('libcam_gain', val)}
-          min={0}
-          max={10}
-          step={0.1}
-          helpText="Analog gain (0=auto, 1.0-10.0) (Gain 1.0 ~ ISO 100)"
-        />
-
         <FormToggle
           label="Auto White Balance"
           value={Boolean(getValue('libcam_awb_enable', true))}
@@ -304,6 +251,109 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
           </>
         )}
 
+        <FormSlider
+          label="Gain (ISO)"
+          value={Number(getValue('libcam_gain', 1))}
+          onChange={(val) => handleChange('libcam_gain', val)}
+          min={0}
+          max={10}
+          step={0.1}
+          helpText="Analog gain (0=auto, 1.0-10.0) (Gain 1.0 ~ ISO 100)"
+        />
+
+        <FormSlider
+          label="Brightness"
+          value={Number(getValue('libcam_brightness', 0))}
+          onChange={(val) => handleChange('libcam_brightness', val)}
+          min={-1}
+          max={1}
+          step={0.01}
+          helpText="Brightness adjustment (-1.0 to 1.0)"
+        />
+
+        <FormSlider
+          label="Contrast"
+          value={Number(getValue('libcam_contrast', 1))}
+          onChange={(val) => handleChange('libcam_contrast', val)}
+          min={0}
+          max={8}
+          step={0.01}
+          helpText="Contrast adjustment (0.0 to 8.0)"
+        />
+
+        {capabilities?.Sharpness !== false && (
+          <FormSlider
+            label="Sharpness"
+            value={Number(getValue('libcam_sharpness', 1))}
+            onChange={(val) => handleChange('libcam_sharpness', val)}
+            min={0}
+            max={16}
+            step={0.01}
+            helpText="Sharpness adjustment (0.0 to 16.0, 1.0 = default)"
+          />
+        )}
+
+        {capabilities?.Saturation !== false && (
+          <FormSlider
+            label="Saturation"
+            value={Number(getValue('libcam_saturation', 1))}
+            onChange={(val) => handleChange('libcam_saturation', val)}
+            min={0}
+            max={32}
+            step={0.01}
+            helpText="Color saturation (0.0 to 32.0, 1.0 = default)"
+          />
+        )}
+
+        {capabilities?.NoiseReductionMode !== false && (
+          <div>
+            <div className="flex items-center mb-1">
+              <span className="text-sm font-medium">Noise Reduction</span>
+              <HelpTooltip
+                content={
+                  <div className="space-y-1.5">
+                    <p><strong className="text-gray-200">Off</strong> — No noise reduction. Sharpest image but noisy in low light.</p>
+                    <p><strong className="text-gray-200">Fast</strong> — Spatial-only filtering. Low CPU, no ghosting. Best for motion detection.</p>
+                    <p><strong className="text-gray-200">High Quality</strong> — Temporal + spatial filtering. Cleanest image but moving objects may smear or ghost.</p>
+                    <p><strong className="text-gray-200">Minimal</strong> — Very light filtering. Preserves detail with slight noise reduction.</p>
+                    <p><strong className="text-gray-200">ZSL</strong> — Zero-shutter-lag mode. Optimized for still capture, not video.</p>
+                  </div>
+                }
+              />
+            </div>
+            <FormSelect
+              label=""
+              value={String(getValue('libcam_noise_reduction_mode', 0))}
+              onChange={(val) => handleImmediateChange('libcam_noise_reduction_mode', Number(val))}
+              options={NOISE_REDUCTION_MODES.map((mode) => ({
+                value: String(mode.value),
+                label: mode.label,
+              }))}
+              helpText="Fast recommended for motion detection (avoids temporal smearing)"
+            />
+          </div>
+        )}
+
+        {capabilities?.ExposureTime !== false && (() => {
+          const currentFramerate = Number(getValue('framerate', 15))
+          const maxExposure = Math.floor(1000000 / Math.max(currentFramerate, 1))
+          const exposureValue = Number(getValue('libcam_exposure_time', 0))
+          return (
+            <FormSlider
+              label="Exposure Time"
+              value={exposureValue}
+              onChange={(val) => handleChange('libcam_exposure_time', val)}
+              min={0}
+              max={maxExposure}
+              step={exposureValue === 0 ? maxExposure : 500}
+              unit=" μs"
+              helpText={exposureValue === 0
+                ? "Auto exposure (camera decides)"
+                : `Manual: 1/${Math.round(1000000 / exposureValue)}s — longer = brighter but more motion blur`}
+            />
+          )
+        })()}
+
         {/* Autofocus controls - conditional based on capabilities */}
         {capabilities?.AfMode && (
           <>
@@ -329,6 +379,36 @@ export function QuickSettings({ cameraId, config }: QuickSettingsProps) {
                 unit=" dioptres"
                 helpText="Manual focus position (0.0-15.0 dioptres)"
               />
+            )}
+
+            {Number(getValue('libcam_af_mode', 0)) > 0 && (
+              <>
+                {capabilities?.AfRange && (
+                  <FormSelect
+                    label="Autofocus Range"
+                    value={String(getValue('libcam_af_range', 0))}
+                    onChange={(val) => handleImmediateChange('libcam_af_range', Number(val))}
+                    options={AUTOFOCUS_RANGES.map((range) => ({
+                      value: String(range.value),
+                      label: range.label,
+                    }))}
+                    helpText="Focus range preference"
+                  />
+                )}
+
+                {capabilities?.AfSpeed && (
+                  <FormSelect
+                    label="Autofocus Speed"
+                    value={String(getValue('libcam_af_speed', 0))}
+                    onChange={(val) => handleImmediateChange('libcam_af_speed', Number(val))}
+                    options={AUTOFOCUS_SPEEDS.map((speed) => ({
+                      value: String(speed.value),
+                      label: speed.label,
+                    }))}
+                    helpText="Focus adjustment speed"
+                  />
+                )}
+              </>
             )}
           </>
         )}
