@@ -381,11 +381,6 @@ void cls_webu::mhd_opts_digest()
         mhdst->mhd_ops[mhdst->mhd_opt_nbr].value = 300;
         mhdst->mhd_ops[mhdst->mhd_opt_nbr].ptr_value = NULL;
         mhdst->mhd_opt_nbr++;
-
-        mhdst->mhd_ops[mhdst->mhd_opt_nbr].option = MHD_OPTION_CONNECTION_TIMEOUT;
-        mhdst->mhd_ops[mhdst->mhd_opt_nbr].value = (unsigned int) 120;
-        mhdst->mhd_ops[mhdst->mhd_opt_nbr].ptr_value = NULL;
-        mhdst->mhd_opt_nbr++;
     }
 
 }
@@ -430,6 +425,16 @@ void cls_webu::mhd_opts()
     mhd_opts_digest();
     mhd_opts_tls();
     mhd_opts_keepalive();
+
+    /* Connection timeout: MHD closes connections with no successful data
+     * transfer within this period. For MJPEG streams, each sent frame resets
+     * the timer so active streams are unaffected. Dead connections (client
+     * disconnected, wifi dropped) are cleaned up within 120 seconds, preventing
+     * MHD thread-per-connection threads from spinning on dead sockets. */
+    mhdst->mhd_ops[mhdst->mhd_opt_nbr].option = MHD_OPTION_CONNECTION_TIMEOUT;
+    mhdst->mhd_ops[mhdst->mhd_opt_nbr].value = (unsigned int) 120;
+    mhdst->mhd_ops[mhdst->mhd_opt_nbr].ptr_value = NULL;
+    mhdst->mhd_opt_nbr++;
 
     mhdst->mhd_ops[mhdst->mhd_opt_nbr].option = MHD_OPTION_END;
     mhdst->mhd_ops[mhdst->mhd_opt_nbr].value = 0;
