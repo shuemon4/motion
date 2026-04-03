@@ -30,20 +30,24 @@
 #include "logger.hpp"
 #include "camera.hpp"
 #include "rotate.hpp"
-#include "movie.hpp"
 #include "libcam.hpp"
+#include "conf.hpp"
+#include "webu.hpp"
+#include "draw.hpp"
+#include "webu_getimg.hpp"
+#include "picture.hpp"
+#ifndef HAVE_IPCAM
+#include "movie.hpp"
 #include "video_v4l2.hpp"
 #include "video_loopback.hpp"
 #include "netcam.hpp"
-#include "conf.hpp"
+#include "dbse.hpp"
+#endif
+#if defined(HAVE_DETECTION) && !defined(HAVE_IPCAM)
 #include "alg.hpp"
 #include "alg_sec.hpp"
-#include "picture.hpp"
-#include "webu.hpp"
-#include "dbse.hpp"
-#include "draw.hpp"
-#include "webu_getimg.hpp"
-#ifdef HAVE_WEBRTC
+#endif
+#if defined(HAVE_WEBRTC) && !defined(HAVE_IPCAM)
 #include "h264_encoder.hpp"
 #include "webu_webrtc.hpp"
 #endif
@@ -140,6 +144,7 @@ void cls_camera::ring_process_debug()
 
 void cls_camera::ring_process_image()
 {
+#ifndef HAVE_IPCAM
     if (current_image->save_pic) {
         picture->process_norm();
     }
@@ -157,6 +162,7 @@ void cls_camera::ring_process_image()
             MOTION_LOG(ERR, TYPE_EVENTS, NO_ERRNO, _("Error encoding image"));
         }
     }
+#endif
 }
 
 /* Process the entire image ring */
@@ -182,6 +188,7 @@ void cls_camera::ring_process()
         current_image->save_movie = false;
 
         if (current_image->motion) {
+#ifndef HAVE_IPCAM
             if (cfg->picture_output == "best") {
                 if (current_image->diffs > imgs.image_preview.diffs) {
                     picture->save_preview();
@@ -192,6 +199,7 @@ void cls_camera::ring_process()
                     picture->save_preview();
                 }
             }
+#endif
         }
 
         if (++imgs.ring_out >= imgs.ring_size) {
@@ -215,6 +223,7 @@ void cls_camera::info_reset()
 
 void cls_camera::movie_start()
 {
+#ifndef HAVE_IPCAM
     movie_start_time = frame_curr_ts.tv_sec;
     if (lastrate < 2) {
         movie_fps = 2;
@@ -225,13 +234,16 @@ void cls_camera::movie_start()
     movie_norm->start();
     movie_motion->start();
     movie_extpipe->start();
+#endif
 }
 
 void cls_camera::movie_end()
 {
+#ifndef HAVE_IPCAM
     movie_norm->stop();
     movie_motion->stop();
     movie_extpipe->stop();
+#endif
 }
 
 /* Process the motion detected items*/
@@ -247,7 +259,9 @@ void cls_camera::detected_trigger()
             movie_nbr = 0;
             picture_event_count = 0;  /* Reset picture counter for new event */
 
+#ifndef HAVE_IPCAM
             algsec->detected = false;
+#endif
 
             time(&raw_time);
             localtime_r(&raw_time, &evt_tm);
@@ -264,6 +278,7 @@ void cls_camera::detected_trigger()
             if (cfg->on_event_start != "") {
                 util_exec_command(this, cfg->on_event_start.c_str(), NULL);
             }
+#ifndef HAVE_IPCAM
             movie_start();
             app->dbse->exec(this, "", "event_start");
 
@@ -272,6 +287,7 @@ void cls_camera::detected_trigger()
                 (cfg->picture_output == "center")) {
                 picture->save_preview();
             }
+#endif
 
         }
         if (cfg->on_motion_detected != "") {
@@ -323,7 +339,9 @@ void cls_camera::detected()
             (current_image->shot != 1)) {
             webu_getimg_main(this);
         }
+#ifndef HAVE_IPCAM
         picture->process_motion();
+#endif
     }
 
     track_move();
@@ -417,9 +435,11 @@ void cls_camera::mask_privacy()
 void cls_camera::cam_close()
 {
     mydelete(libcam);
+#ifndef HAVE_IPCAM
     mydelete(v4l2cam);
     mydelete(netcam);
     mydelete(netcam_high);
+#endif
     device_status = STATUS_CLOSED;
 }
 
@@ -429,6 +449,7 @@ void cls_camera::cam_start()
     watchdog = cfg->watchdog_tmo;
     if (camera_type == CAMERA_TYPE_LIBCAM) {
         libcam = new cls_libcam(this);
+#ifndef HAVE_IPCAM
     } else if (camera_type == CAMERA_TYPE_NETCAM) {
         netcam = new cls_netcam(this, false);
         netcam->netcam_start();
@@ -439,6 +460,7 @@ void cls_camera::cam_start()
         }
     } else if (camera_type == CAMERA_TYPE_V4L2) {
         v4l2cam = new cls_v4l2cam(this);
+#endif
     } else {
         MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO
             ,_("No Camera device specified"));
@@ -458,6 +480,7 @@ int cls_camera::cam_next(ctx_image_data *img_data)
 
     if (camera_type == CAMERA_TYPE_LIBCAM) {
         retcd = libcam->next(img_data);
+#ifndef HAVE_IPCAM
     } else if (camera_type == CAMERA_TYPE_NETCAM) {
         retcd = netcam->next(img_data);
         if ((retcd == CAPTURE_SUCCESS) &&
@@ -467,6 +490,7 @@ int cls_camera::cam_next(ctx_image_data *img_data)
         rotate->process(img_data);
     } else if (camera_type == CAMERA_TYPE_V4L2) {
         retcd = v4l2cam->next(img_data);
+#endif
     } else {
         return CAPTURE_FAILURE;
     }
@@ -674,16 +698,18 @@ void cls_camera::init_values()
         pause = true;
     }
 
+    picture = nullptr;
+#ifndef HAVE_IPCAM
     v4l2cam = nullptr;
     netcam = nullptr;
     netcam_high = nullptr;
-    libcam = nullptr;
-    rotate = nullptr;
-    picture = nullptr;
     movie_norm = nullptr;
     movie_motion = nullptr;
     movie_timelapse = nullptr;
     movie_extpipe = nullptr;
+#endif
+    libcam = nullptr;
+    rotate = nullptr;
     draw = nullptr;
     cleandir = nullptr;
 
@@ -723,12 +749,15 @@ void cls_camera::init_ref()
     memcpy(imgs.image_vprvcy, current_image->image_norm
         , (uint)imgs.size_norm);
 
+#if defined(HAVE_DETECTION) && !defined(HAVE_IPCAM)
     alg->ref_frame_reset();
+#endif
 }
 
 /** clean up all memory etc. from motion init */
 void cls_camera::cleanup()
 {
+#ifndef HAVE_IPCAM
     movie_timelapse->stop();
     if (event_curr_nbr == event_prev_nbr) {
         ring_process();
@@ -742,6 +771,7 @@ void cls_camera::cleanup()
         movie_end();
         app->dbse->exec(this, "", "event_end");
     }
+#endif
 
     webu_getimg_deinit(this);
 
@@ -766,7 +796,7 @@ void cls_camera::cleanup()
 
     ring_destroy(); /* Cleanup the precapture ring buffer */
 
-    #ifdef HAVE_WEBRTC
+    #if defined(HAVE_WEBRTC) && !defined(HAVE_IPCAM)
     /* Delete webrtc first -- peers must be closed before encoder is destroyed */
     delete webrtc;
     webrtc = nullptr;
@@ -774,14 +804,18 @@ void cls_camera::cleanup()
     h264_enc = nullptr;
     #endif
 
+#ifndef HAVE_IPCAM
     mydelete(alg);
     mydelete(algsec);
+#endif
     mydelete(rotate);
     mydelete(picture);
+#ifndef HAVE_IPCAM
     mydelete(movie_norm);
     mydelete(movie_motion);
     mydelete(movie_timelapse);
     mydelete(movie_extpipe);
+#endif
     mydelete(draw);
     mydelete(cleandir);
 
@@ -1339,18 +1373,24 @@ void cls_camera::init()
 
     init_firstimage();
 
+#ifndef HAVE_IPCAM
     vlp_init(this);
+#endif
 
+#if defined(HAVE_DETECTION) && !defined(HAVE_IPCAM)
     alg = new cls_alg(this);
     algsec = new cls_algsec(this);
+#endif
     picture = new cls_picture(this);
-    draw = new cls_draw(this);
+#ifndef HAVE_IPCAM
     movie_norm = new cls_movie(this, "norm");
     movie_motion = new cls_movie(this, "motion");
     movie_timelapse = new cls_movie(this, "timelapse");
     movie_extpipe = new cls_movie(this, "extpipe");
+#endif
+    draw = new cls_draw(this);
 
-    #ifdef HAVE_WEBRTC
+    #if defined(HAVE_WEBRTC) && !defined(HAVE_IPCAM)
     if (cfg->webrtc_enable) {
         h264_enc = new cls_h264_encoder(this);
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
@@ -1553,10 +1593,12 @@ int cls_camera::capture()
 
             if (camera_type == CAMERA_TYPE_LIBCAM) {
                 libcam->noimage();
+#ifndef HAVE_IPCAM
             } else if (camera_type == CAMERA_TYPE_NETCAM) {
                 netcam->noimage();
             } else if (camera_type == CAMERA_TYPE_V4L2) {
                 v4l2cam->noimage();
+#endif
             } else {
                 MOTION_LOG(ERR, TYPE_VIDEO, NO_ERRNO,_("Unknown camera type"));
             }
@@ -1573,6 +1615,7 @@ void cls_camera::detection()
         return;
     }
 
+#if defined(HAVE_DETECTION) && !defined(HAVE_IPCAM)
     if (frame_skip) {
         frame_skip--;
         current_image->diffs = 0;
@@ -1586,6 +1629,12 @@ void cls_camera::detection()
         current_image->diffs_raw = 0;
         current_image->diffs_ratio = 100;
     }
+#else
+    current_image->diffs = 0;
+    current_image->diffs_raw = 0;
+    current_image->diffs_ratio = 100;
+    current_image->motion = false;
+#endif
 }
 
 /* tune the detection parameters*/
@@ -1595,6 +1644,7 @@ void cls_camera::tuning()
         return;
     }
 
+#if defined(HAVE_DETECTION) && !defined(HAVE_IPCAM)
     if ((cfg->noise_tune && shots_mt == 0) && (pause == false) &&
           (!detecting_motion && (current_image->diffs <= threshold))) {
         alg->noise_tune();
@@ -1624,6 +1674,7 @@ void cls_camera::tuning()
     previous_diffs = current_image->diffs;
     previous_location_x = current_image->location.x;
     previous_location_y = current_image->location.y;
+#endif
 }
 
 /* apply image overlays */
@@ -1708,6 +1759,7 @@ void cls_camera::actions_emulate()
 {
     int indx;
 
+#ifndef HAVE_IPCAM
     if ((detecting_motion == false) &&
         (movie_norm->is_running == true)) {
         movie_norm->reset_start_time(&current_image->imgts);
@@ -1717,6 +1769,7 @@ void cls_camera::actions_emulate()
         (movie_motion->is_running == true)) {
         movie_motion->reset_start_time(&imgs.image_motion.imgts);
     }
+#endif
 
     detecting_motion = true;
     if (cfg->post_capture > 0) {
@@ -1759,6 +1812,7 @@ void cls_camera::actions_motion()
         current_image->save_pic = true;
         current_image->save_movie = true;
 
+#ifndef HAVE_IPCAM
         if ((detecting_motion == false) &&
             (movie_norm->is_running == true)) {
             movie_norm->reset_start_time(&current_image->imgts);
@@ -1767,6 +1821,7 @@ void cls_camera::actions_motion()
             (movie_motion->is_running == true)) {
             movie_motion->reset_start_time(&imgs.image_motion.imgts);
         }
+#endif
         detecting_motion = true;
         postcap = cfg->post_capture;
 
@@ -1805,18 +1860,23 @@ void cls_camera::actions_event()
 
             ring_process();
 
+#ifndef HAVE_IPCAM
             if (imgs.image_preview.diffs) {
                 picture->process_preview();
                 imgs.image_preview.diffs = 0;
             }
+#endif
             if (cfg->on_event_end != "") {
                 util_exec_command(this, cfg->on_event_end.c_str(), NULL);
             }
+#ifndef HAVE_IPCAM
             movie_end();
             app->dbse->exec(this, "", "event_end");
+#endif
 
             track_center();
 
+#ifndef HAVE_IPCAM
             if (algsec->detected) {
                 MOTION_LOG(NTC, TYPE_EVENTS
                     , NO_ERRNO, _("Secondary detect"));
@@ -1827,6 +1887,7 @@ void cls_camera::actions_event()
                 }
             }
             algsec->detected = false;
+#endif
 
             MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("End of event %d"), event_curr_nbr);
 
@@ -1838,6 +1899,7 @@ void cls_camera::actions_event()
         event_user = false;
     }
 
+#ifndef HAVE_IPCAM
     if ((cfg->movie_max_time > 0) &&
         (event_curr_nbr == event_prev_nbr) &&
         ((frame_curr_ts.tv_sec - movie_start_time) >=
@@ -1860,6 +1922,7 @@ void cls_camera::actions_event()
         }
 #endif
     }
+#endif /* HAVE_IPCAM */
 
 }
 
@@ -1869,6 +1932,7 @@ void cls_camera::actions()
         return;
     }
 
+#if defined(HAVE_DETECTION) && !defined(HAVE_IPCAM)
      if ((current_image->diffs > threshold) &&
         (current_image->diffs < threshold_maximum)) {
         current_image->motion = true;
@@ -1916,16 +1980,22 @@ void cls_camera::actions()
     }
 
     areadetect();
+#else
+    current_image->precap = true;
+#endif
 
     ring_process();
 
+#if defined(HAVE_DETECTION) && !defined(HAVE_IPCAM)
     actions_event();
+#endif
 
 }
 
 /* Snapshot interval*/
 void cls_camera::snapshot()
 {
+#ifndef HAVE_IPCAM
     if ((restart == true) || (handler_stop == true)) {
         return;
     }
@@ -1947,11 +2017,13 @@ void cls_camera::snapshot()
         frame_last_ts.tv_sec % cfg->snapshot_interval) {
         picture->process_snapshot();
     }
+#endif
 }
 
 /* Create timelapse video*/
 void cls_camera::timelapse()
 {
+#ifndef HAVE_IPCAM
     struct tm timestamp_tm;
 
     if ((restart == true) || (handler_stop == true)) {
@@ -2006,11 +2078,13 @@ void cls_camera::timelapse()
      */
         movie_timelapse->stop();
     }
+#endif
 }
 
 /* send images to loopback device*/
 void cls_camera::loopback()
 {
+#ifndef HAVE_IPCAM
     if ((restart == true) || (handler_stop == true)) {
         return;
     }
@@ -2020,7 +2094,7 @@ void cls_camera::loopback()
     if (!cfg->stream_motion || shots_mt == 0) {
         webu_getimg_main(this);
     }
-
+#endif
 }
 
 void cls_camera::check_schedule()
@@ -2247,10 +2321,12 @@ cls_camera::cls_camera(cls_motapp *p_app)
     alg = nullptr;
     algsec = nullptr;
     rotate = nullptr;
+    picture = nullptr;
+#ifndef HAVE_IPCAM
     netcam = nullptr;
     netcam_high = nullptr;
+#endif
     draw = nullptr;
-    picture = nullptr;
 
     threadnr = -1;
     noise = -1;
@@ -2307,7 +2383,7 @@ cls_camera::cls_camera(cls_motapp *p_app)
     memset(&all_sizes, 0, sizeof(ctx_all_sizes));
     all_sizes.reset = true;
 
-    #ifdef HAVE_WEBRTC
+    #if defined(HAVE_WEBRTC) && !defined(HAVE_IPCAM)
     h264_enc = nullptr;
     webrtc = nullptr;
     #endif
@@ -2479,10 +2555,14 @@ void cls_camera::clear_libcam_ignored_controls()
 /* V4L2 accessors for web API */
 bool cls_camera::has_v4l2() const
 {
+#ifndef HAVE_IPCAM
     return v4l2cam != nullptr;
+#else
+    return false;
+#endif
 }
 
-#ifdef HAVE_V4L2
+#if defined(HAVE_V4L2) && !defined(HAVE_IPCAM)
 vec_v4l2ctrl cls_camera::get_v4l2_controls()
 {
     if (v4l2cam != nullptr) {
@@ -2495,10 +2575,18 @@ vec_v4l2ctrl cls_camera::get_v4l2_controls()
 /* NETCAM accessors for web API */
 bool cls_camera::has_netcam() const
 {
+#ifndef HAVE_IPCAM
     return netcam != nullptr;
+#else
+    return false;
+#endif
 }
 
 bool cls_camera::has_netcam_high() const
 {
+#ifndef HAVE_IPCAM
     return netcam_high != nullptr;
+#else
+    return false;
+#endif
 }

@@ -25,6 +25,9 @@ AM_CPPFLAGS= \
 LDADD = $(LIBINTL)
 
 bin_PROGRAMS = motion motion-setup
+if HAVE_IPCAM
+bin_PROGRAMS += motion-ipcam
+endif
 
 motion_SOURCES = \
 	alg.hpp            alg.cpp \
@@ -77,4 +80,38 @@ motion_SOURCES = \
 motion_setup_SOURCES = \
 	motion_setup.cpp \
 	webu_auth.hpp      webu_auth.cpp
+
+if HAVE_IPCAM
+motion_ipcam_SOURCES = \
+	conf.hpp           conf.cpp \
+	conf_file.hpp      conf_file.cpp \
+	draw.hpp           draw.cpp \
+	jpegutils.hpp      jpegutils.cpp \
+	json_parse.hpp     json_parse.cpp \
+	libcam.hpp         libcam.cpp \
+	logger.hpp         logger.cpp \
+	motion.hpp         motion.cpp \
+	camera.hpp         camera.cpp \
+	parm_registry.hpp  parm_registry.cpp \
+	parm_structs.hpp \
+	picture.hpp        picture.cpp \
+	rotate.hpp         rotate.cpp \
+	util.hpp           util.cpp \
+	video_convert.hpp  video_convert.cpp \
+	webu.hpp           webu.cpp \
+	webu_ans.hpp       webu_ans.cpp \
+	webu_auth.hpp      webu_auth.cpp \
+	webu_file.hpp      webu_file.cpp \
+	webu_getimg.hpp    webu_getimg.cpp \
+	webu_json.hpp      webu_json.cpp \
+	webu_json_auth.cpp \
+	webu_json_config.cpp \
+	webu_json_system.cpp \
+	webu_stream.hpp    webu_stream.cpp
+
+motion_ipcam_CPPFLAGS = $(AM_CPPFLAGS) -DHAVE_IPCAM
+endif
+
+install-ipcam: src/motion-ipcam
+	$(INSTALL_PROGRAM) src/motion-ipcam $(DESTDIR)$(bindir)/motion-ipcam
 

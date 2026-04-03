@@ -33,12 +33,12 @@
 #include <string>
 
 /* Forward declarations for camera type implementations */
-#ifdef HAVE_V4L2
+#if defined(HAVE_V4L2) && !defined(HAVE_IPCAM)
     struct ctx_v4l2ctrl_item;
     typedef std::vector<ctx_v4l2ctrl_item> vec_v4l2ctrl;
 #endif
 
-#ifdef HAVE_WEBRTC
+#if defined(HAVE_WEBRTC) && !defined(HAVE_IPCAM)
     class cls_h264_encoder;
     class cls_webu_webrtc;
 #endif
@@ -170,8 +170,10 @@ class cls_camera {
         cls_alg         *alg;
         cls_algsec      *algsec;
         cls_rotate      *rotate;
+#ifndef HAVE_IPCAM
         cls_netcam      *netcam;
         cls_netcam      *netcam_high;
+#endif
         ctx_all_loc     all_loc;
         ctx_all_sizes   all_sizes;
         cls_draw        *draw;
@@ -261,7 +263,7 @@ class cls_camera {
 
         /* V4L2 accessors for web API */
         bool has_v4l2() const;
-#ifdef HAVE_V4L2
+#if defined(HAVE_V4L2) && !defined(HAVE_IPCAM)
         vec_v4l2ctrl get_v4l2_controls();
 #endif
 
@@ -269,17 +271,19 @@ class cls_camera {
         bool has_netcam() const;
         bool has_netcam_high() const;
 
-        #ifdef HAVE_WEBRTC
+        #if defined(HAVE_WEBRTC) && !defined(HAVE_IPCAM)
         cls_h264_encoder *h264_enc;
         cls_webu_webrtc  *webrtc;
         #endif
 
     private:
+#ifndef HAVE_IPCAM
         cls_movie       *movie_norm;
         cls_movie       *movie_motion;
         cls_movie       *movie_timelapse;
         cls_movie       *movie_extpipe;
         cls_v4l2cam     *v4l2cam;
+#endif
         cls_libcam      *libcam;
 
         int             track_posx;

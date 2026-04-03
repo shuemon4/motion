@@ -28,7 +28,9 @@
 #include "util.hpp"
 #include "logger.hpp"
 #include "camera.hpp"
+#ifndef HAVE_IPCAM
 #include "sound.hpp"
+#endif
 #include "conf.hpp"
 #include "conf_file.hpp"
 #include <sys/types.h>
@@ -172,7 +174,11 @@ void cls_config_file::init()
     }
 
     /* If no cameras or sounds defined, add a default camera */
-    if ((app->cam_cnt == 0) && (app->snd_cnt == 0)) {
+    if (app->cam_cnt == 0
+#ifndef HAVE_IPCAM
+        && (app->snd_cnt == 0)
+#endif
+        ) {
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
             _("No camera or sound configuration files specified."));
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
@@ -188,9 +194,11 @@ void cls_config_file::init()
         app->cam_list[indx]->threadnr = indx;
     }
 
+#ifndef HAVE_IPCAM
     for (int indx = 0; indx < app->snd_cnt; indx++) {
         app->snd_list[indx]->threadnr = (indx + app->cam_cnt);
     }
+#endif
 }
 
 /*
@@ -422,6 +430,7 @@ void cls_config_file::parms_log()
         }
     }
 
+#ifndef HAVE_IPCAM
     for (indx = 0; indx < app->snd_cnt; indx++) {
         MOTION_SHT(INF, TYPE_ALL, NO_ERRNO,
             _("Sound config file: %s"),
@@ -447,6 +456,7 @@ void cls_config_file::parms_log()
             i++;
         }
     }
+#endif
 }
 
 /*
@@ -536,6 +546,7 @@ void cls_config_file::write_app()
         }
     }
 
+#ifndef HAVE_IPCAM
     for (indx = 0; indx < app->snd_cnt; indx++) {
         if (app->snd_list[indx]->conf_src->from_conf_dir == false) {
             write_parms(conffile, "sound",
@@ -543,6 +554,7 @@ void cls_config_file::write_app()
                 PARM_CAT_01, false);
         }
     }
+#endif
 
     fprintf(conffile, "\n");
 
@@ -624,6 +636,7 @@ void cls_config_file::write_cam()
  */
 void cls_config_file::write_snd()
 {
+#ifndef HAVE_IPCAM
     int i, indx;
     std::string parm_vl, parm_main, parm_nm;
     std::list<std::string> parm_array;
@@ -679,6 +692,7 @@ void cls_config_file::write_snd()
             _("Configuration written to %s"),
             app->snd_list[indx]->conf_src->conf_filename.c_str());
     }
+#endif
 }
 
 /*

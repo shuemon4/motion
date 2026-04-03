@@ -205,13 +205,17 @@ class cls_motapp {
         ~cls_motapp();
 
         std::vector<cls_camera*>    cam_list;
+#ifndef HAVE_IPCAM
         std::vector<cls_sound*>     snd_list;
+#endif
 
         bool    reload_all;
         bool    cam_add;
         int     cam_delete;
         int     cam_cnt;
+#ifndef HAVE_IPCAM
         int     snd_cnt;
+#endif
 
         int     argc;
         char    **argv;
@@ -220,12 +224,14 @@ class cls_motapp {
         cls_config          *conf_src;
         cls_config          *cfg;
         cls_webu            *webu;
+#ifndef HAVE_IPCAM
         cls_dbse            *dbse;
         cls_config_profile  *profiles;
         cls_allcam          *allcam;
         cls_schedule        *schedule;
         cls_thumbnail       *thumbnail;
         cls_cam_detect      *cam_detect;
+#endif
 
         pthread_mutex_t     mutex_camlst;       /* Lock the list of cams while adding/removing */
         pthread_mutex_t     mutex_post;         /* mutex to allow for processing of post actions*/

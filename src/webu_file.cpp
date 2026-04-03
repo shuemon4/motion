@@ -35,7 +35,9 @@
 #include "webu.hpp"
 #include "webu_ans.hpp"
 #include "webu_file.hpp"
+#ifndef HAVE_IPCAM
 #include "dbse.hpp"
+#endif
 
 #include <climits>  /* For PATH_MAX */
 
@@ -200,6 +202,7 @@ static bool parse_range_header(const char *range_str, uint64_t file_size,
 }
 
 void cls_webu_file::main() {
+#ifndef HAVE_IPCAM
     mhdrslt retcd;
     struct stat statbuf;
     struct MHD_Response *response;
@@ -422,7 +425,7 @@ void cls_webu_file::main() {
     if (retcd == MHD_NO) {
         MOTION_LOG(INF, TYPE_ALL, NO_ERRNO, "Error processing file request");
     }
-
+#endif /* HAVE_IPCAM */
 }
 
 /**

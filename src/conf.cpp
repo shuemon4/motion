@@ -37,9 +37,11 @@
 #include "util.hpp"
 #include "logger.hpp"
 #include "camera.hpp"
+#ifndef HAVE_IPCAM
 #include "sound.hpp"
-#include "conf.hpp"
 #include "cam_detect.hpp"
+#endif
+#include "conf.hpp"
 #include "parm_registry.hpp"
 #include "conf_file.hpp"
 
@@ -476,6 +478,7 @@ void cls_config::edit_device_id(std::string &parm, enum PARM_ACT pact)
                         return;
                     }
                 }
+#ifndef HAVE_IPCAM
                 for (indx=0;indx<app->snd_list.size();indx++){
                     if ((app->snd_list[indx]->conf_src->device_id == parm_in) &&
                         (app->snd_list[indx]->cfg != this)) {
@@ -484,6 +487,7 @@ void cls_config::edit_device_id(std::string &parm, enum PARM_ACT pact)
                         return;
                     }
                 }
+#endif
                 device_id = parm_in;
             }
         }
@@ -1337,11 +1341,13 @@ int cls_config::get_next_devid()
                 chkid = true;
             }
         }
+#ifndef HAVE_IPCAM
         for (indx = 0; indx<app->snd_cnt;indx++) {
             if (app->snd_list[indx]->conf_src->device_id == dev_id) {
                 chkid = true;
             }
         }
+#endif
     }
     return dev_id;
 }
@@ -1391,6 +1397,7 @@ void cls_config::camera_add(std::string fname, bool srcdir)
  */
 void cls_config::camera_add_from_detection(const ctx_detected_cam &detected)
 {
+#ifndef HAVE_IPCAM
     /* Create camera with empty filename (will be generated) */
     camera_add("", false);
 
@@ -1430,11 +1437,13 @@ void cls_config::camera_add_from_detection(const ctx_detected_cam &detected)
     MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO,
         "Camera added from detection: %s [%s]",
         detected.device_name.c_str(), detected.device_path.c_str());
+#endif
 }
 
 /* Generate next available sound config filename (sound1.conf, sound2.conf, ...) */
 void cls_config::sound_filenm()
 {
+#ifndef HAVE_IPCAM
     int indx_snd, indx;
     std::string dirnm, fullnm;
     struct stat statbuf;
@@ -1466,11 +1475,13 @@ void cls_config::sound_filenm()
     }
 
     conf_filename = fullnm;
+#endif
 }
 
 /* Add a new sound device - inherits app defaults, then overlays sound-specific config */
 void cls_config::sound_add(std::string fname, bool srcdir)
 {
+#ifndef HAVE_IPCAM
     struct stat statbuf;
     std::string parm_val;
     cls_sound *snd_cls;
@@ -1505,6 +1516,7 @@ void cls_config::sound_add(std::string fname, bool srcdir)
 
     app->snd_list.push_back(snd_cls);
     app->snd_cnt = (int)app->snd_list.size();
+#endif
 }
 
 /* Scan config_dir for .conf files, adding each as a camera or sound device */
@@ -1669,6 +1681,7 @@ void cls_config::parms_write_app()
         }
     }
 
+#ifndef HAVE_IPCAM
     for (indx=0; indx<app->snd_cnt; indx++) {
         if (app->snd_list[indx]->conf_src->from_conf_dir == false) {
             parms_write_parms(conffile, "sound"
@@ -1676,6 +1689,7 @@ void cls_config::parms_write_app()
                 , PARM_CAT_01, false);
         }
     }
+#endif
 
     fprintf(conffile, "\n");
 
@@ -1755,6 +1769,7 @@ void cls_config::parms_write_cam()
 /* Write per-sound config files containing only parameters that differ from app defaults */
 void cls_config::parms_write_snd()
 {
+#ifndef HAVE_IPCAM
     int i, indx;
     std::string parm_vl, parm_main, parm_nm;
     std::list<std::string> parm_array;
@@ -1810,6 +1825,7 @@ void cls_config::parms_write_snd()
             , _("Configuration written to %s")
             , app->snd_list[indx]->conf_src->conf_filename.c_str());
     }
+#endif
 }
 
 void cls_config::parms_write()

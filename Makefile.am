@@ -35,7 +35,9 @@ dist_libstate_DATA = \
 	data/camera1-dist.conf \
 	data/camera2-dist.conf \
 	data/camera3-dist.conf \
-	data/sound1-dist.conf
+	data/sound1-dist.conf \
+	data/pi_zero-dist.conf \
+	data/pi_zero_camera-dist.conf
 
 dist_man_MANS = man/motion.1
 

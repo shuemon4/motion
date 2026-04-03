@@ -428,7 +428,11 @@ void cls_webu_json::api_config()
 
     /* Add cameras list */
     webua->resp_page += ",\"cameras\" : ";
+#ifndef HAVE_IPCAM
     cameras_list();
+#else
+    webua->resp_page += "[]";
+#endif
 
     /* Add configuration parameters */
     webua->resp_page += ",\"configuration\" : ";
@@ -436,7 +440,11 @@ void cls_webu_json::api_config()
 
     /* Add categories */
     webua->resp_page += ",\"categories\" : ";
+#ifndef HAVE_IPCAM
     categories_list();
+#else
+    webua->resp_page += "[]";
+#endif
 
     webua->resp_page += "}";
 }

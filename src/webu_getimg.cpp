@@ -31,9 +31,11 @@
 #include "logger.hpp"
 #include "camera.hpp"
 #include "picture.hpp"
+#ifndef HAVE_IPCAM
 #include "alg_sec.hpp"
+#endif
 #include "webu_getimg.hpp"
-#ifdef HAVE_WEBRTC
+#if defined(HAVE_WEBRTC) && !defined(HAVE_IPCAM)
 #include "h264_encoder.hpp"
 #include "webu_webrtc.hpp"
 #endif
@@ -325,6 +327,7 @@ static void webu_getimg_source(cls_camera *cam)
 /* Get a secondary image from the motion loop and compress it*/
 static void webu_getimg_secondary(cls_camera *cam)
 {
+#ifndef HAVE_IPCAM
      if ((cam->stream.secondary.jpg_cnct == 0) &&
          (cam->stream.secondary.all_cnct == 0)) {
         return;
@@ -347,6 +350,9 @@ static void webu_getimg_secondary(cls_camera *cam)
             myfree(cam->stream.secondary.jpg_data);
         }
     }
+#else
+    (void)cam;
+#endif /* HAVE_IPCAM */
 
 }
 
@@ -362,7 +368,7 @@ void webu_getimg_main(cls_camera *cam)
         webu_getimg_secondary(cam);
     pthread_mutex_unlock(&cam->stream.mutex);
 
-    #ifdef HAVE_WEBRTC
+    #if defined(HAVE_WEBRTC) && !defined(HAVE_IPCAM)
     /* H.264 encode for shared encoder (WebRTC + movie passthrough).
      * Placed OUTSIDE the stream mutex since encoding can take several ms
      * and holding the mutex would block MJPEG clients. */

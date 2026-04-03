@@ -28,16 +28,20 @@
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"
+#ifndef HAVE_IPCAM
 #include "allcam.hpp"
+#endif
 #include "conf.hpp"
 #include "logger.hpp"
 #include "webu.hpp"
 #include "webu_ans.hpp"
 #include "webu_stream.hpp"
 #include "webu_json.hpp"
-#include "webu_post.hpp"
 #include "webu_file.hpp"
+#ifndef HAVE_IPCAM
+#include "webu_post.hpp"
 #include "video_v4l2.hpp"
+#endif
 
 /* MHD header iterator callback: scans request headers and sets gzip_encode
  * if the client advertises Accept-Encoding: gzip support. */
@@ -1100,6 +1104,7 @@ void cls_webu_ans::answer_delete()
     }
 
     /* Only allow DELETE for API media endpoints */
+#ifndef HAVE_IPCAM
     if (uri_cmd1 == "api" && uri_cmd2 == "media") {
         if (webu_json == nullptr) {
             webu_json = new cls_webu_json(this);
@@ -1160,6 +1165,9 @@ void cls_webu_ans::answer_delete()
         webu_json->api_webrtc_disconnect();
         mhd_send();
     } else {
+#else
+    if (true) {
+#endif
         /* DELETE not allowed for other endpoints */
         resp_type = WEBUI_RESP_TEXT;
         resp_page = "HTTP 405: Method Not Allowed\n";
@@ -1258,6 +1266,7 @@ void cls_webu_ans::answer_get()
         } else if (uri_cmd2 == "auth" && uri_cmd3 == "status") {
             webu_json->api_auth_status();
             mhd_send();
+#ifndef HAVE_IPCAM
         } else if (uri_cmd2 == "media" && uri_cmd3 == "pictures") {
             webu_json->api_media_pictures();
             mhd_send();
@@ -1273,12 +1282,14 @@ void cls_webu_ans::answer_get()
         } else if (uri_cmd2 == "media" && uri_cmd3 == "delete-progress") {
             webu_json->api_delete_progress();
             mhd_send();
+#endif
         } else if (uri_cmd2 == "system" && uri_cmd3 == "temperature") {
             webu_json->api_system_temperature();
             mhd_send();
         } else if (uri_cmd2 == "system" && uri_cmd3 == "status") {
             webu_json->api_system_status();
             mhd_send();
+#ifndef HAVE_IPCAM
         } else if (uri_cmd2 == "cameras") {
             if (uri_cmd3 == "platform") {
                 /* GET /0/api/cameras/platform */
@@ -1291,9 +1302,11 @@ void cls_webu_ans::answer_get()
                 webu_json->api_cameras();
             }
             mhd_send();
+#endif
         } else if (uri_cmd2 == "config") {
             webu_json->api_config();
             mhd_send();
+#ifndef HAVE_IPCAM
         } else if (uri_cmd2 == "mask" && uri_cmd3 != "") {
             webu_json->api_mask_get();
             mhd_send();
@@ -1306,14 +1319,19 @@ void cls_webu_ans::answer_get()
                 webu_json->api_profiles_get();
             }
             mhd_send();
+#endif
+#ifndef HAVE_IPCAM
         } else if (uri_cmd2 == "stream" && uri_cmd3 == "info") {
             /* GET /{camId}/api/stream/info */
             webu_json->api_stream_info();
             mhd_send();
+#endif
+#ifndef HAVE_IPCAM
         } else if (uri_cmd2 == "webrtc" && uri_cmd3 == "status") {
             /* GET /{camId}/api/webrtc/status */
             webu_json->api_webrtc_status();
             mhd_send();
+#endif
         } else {
             bad_request();
         }
@@ -1492,12 +1510,15 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
         if (mystreq(method,"POST")) {
             cnct_method = WEBUI_METHOD_POST;
             /* Check if this is a JSON API endpoint (mask API, power control, profiles, auth) */
-            if ((uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "") ||
-                (uri_cmd1 == "api" && uri_cmd2 == "system" &&
+            if ((uri_cmd1 == "api" && uri_cmd2 == "system" &&
                  (uri_cmd3 == "reboot" || uri_cmd3 == "shutdown" || uri_cmd3 == "service-restart")) ||
-                (uri_cmd1 == "api" && uri_cmd2 == "profiles") ||
                 (uri_cmd1 == "api" && uri_cmd2 == "auth" &&
-                 (uri_cmd3 == "login" || uri_cmd3 == "logout"))) {
+                 (uri_cmd3 == "login" || uri_cmd3 == "logout"))
+#ifndef HAVE_IPCAM
+                || (uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "")
+                || (uri_cmd1 == "api" && uri_cmd2 == "profiles")
+#endif
+                ) {
                 raw_body.clear();  /* Clear body buffer for JSON POST */
                 retcd = MHD_YES;
             } else if (uri_cmd1 == "api" && uri_cmd2 == "config" && uri_cmd3 == "write") {
@@ -1508,6 +1529,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
                 /* Camera action endpoints handled via JSON POST */
                 raw_body.clear();
                 retcd = MHD_YES;
+#ifndef HAVE_IPCAM
             } else if (uri_cmd1 == "api" && uri_cmd2 == "cameras") {
                 /* Camera detection/test endpoints handled via JSON POST */
                 raw_body.clear();
@@ -1522,6 +1544,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
                     webu_post = new cls_webu_post(this);
                 }
                 retcd = webu_post->processor_init();
+#endif
             } else {
                 /* Unknown POST endpoint */
                 bad_request();
@@ -1546,6 +1569,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
 
     if (mystreq(method,"POST")) {
         /* Check if this is a JSON API endpoint */
+#ifndef HAVE_IPCAM
         if (uri_cmd1 == "api" && uri_cmd2 == "mask" && uri_cmd3 != "") {
             /* Accumulate raw body for JSON POST */
             if (*upload_data_size > 0) {
@@ -1560,7 +1584,9 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             webu_json->api_mask_post();
             mhd_send();
             retcd = MHD_YES;
-        } else if (uri_cmd1 == "api" && uri_cmd2 == "system" && uri_cmd3 == "reboot") {
+        } else
+#endif
+        if (uri_cmd1 == "api" && uri_cmd2 == "system" && uri_cmd3 == "reboot") {
             /* System reboot - consume body first (even if empty) */
             if (*upload_data_size > 0) {
                 *upload_data_size = 0;
@@ -1599,6 +1625,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             webu_json->api_system_service_restart();
             mhd_send();
             retcd = MHD_YES;
+#ifndef HAVE_IPCAM
         } else if (uri_cmd1 == "api" && uri_cmd2 == "profiles") {
             /* Profile API endpoints - accumulate raw body for JSON POST */
             if (*upload_data_size > 0) {
@@ -1624,6 +1651,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             }
             mhd_send();
             retcd = MHD_YES;
+#endif
         } else if (uri_cmd1 == "api" && uri_cmd2 == "auth") {
             /* Auth API endpoints - accumulate raw body for JSON POST */
             if (*upload_data_size > 0) {
@@ -1658,6 +1686,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             webu_json->api_config_write();
             mhd_send();
             retcd = MHD_YES;
+#ifndef HAVE_IPCAM
         } else if (uri_cmd1 == "api" && uri_cmd2 == "camera") {
             /* Camera action API endpoints - accumulate body for JSON POST */
             if (*upload_data_size > 0) {
@@ -1695,6 +1724,8 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             }
             mhd_send();
             retcd = MHD_YES;
+#endif /* HAVE_IPCAM */
+#ifndef HAVE_IPCAM
         } else if (uri_cmd1 == "api" && uri_cmd2 == "cameras" && uri_cmd3 == "test") {
             /* POST /0/api/cameras/test - test netcam connection */
             if (*upload_data_size > 0) {
@@ -1748,6 +1779,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             /* Note: processor_start() handles CSRF validation and calls
              * process_actions() internally, then sends response */
             retcd = webu_post->processor_start(upload_data, upload_data_size);
+#endif
         } else {
             /* Unknown POST endpoint - reject */
             bad_request();
@@ -1778,6 +1810,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
                 , resp_page.length());
             mhd_send();
             MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO, "PATCH: mhd_send() completed");
+#ifndef HAVE_IPCAM
         } else if (uri_cmd1 == "api" && uri_cmd2 == "profiles" && !uri_cmd3.empty()) {
             /* PATCH /0/api/profiles/{id} */
             if (webu_json == nullptr) {
@@ -1785,6 +1818,7 @@ mhdrslt cls_webu_ans::answer_main(struct MHD_Connection *p_connection
             }
             webu_json->api_profiles_update();
             mhd_send();
+#endif
         } else {
             MOTION_LOG(ERR, TYPE_STREAM, NO_ERRNO
                 , "PATCH: Bad request - cmd1=%s cmd2=%s"
@@ -1861,6 +1895,7 @@ void cls_webu_ans::deinit_counter()
             }
         pthread_mutex_unlock(&p_cam->stream.mutex);
     }
+#ifndef HAVE_IPCAM
     /* Phase 2: for device_id==0 (all-camera view), also decrement the allcam counter. */
     if (device_id == 0) {
         pthread_mutex_lock(&app->allcam->stream.mutex);
@@ -1883,6 +1918,7 @@ void cls_webu_ans::deinit_counter()
             }
         pthread_mutex_unlock(&app->allcam->stream.mutex);
     }
+#endif
 }
 
 /* Initializes the connection answer object: zeroes all state, detects locale for
@@ -1940,7 +1976,9 @@ cls_webu_ans::cls_webu_ans(cls_motapp *p_app, const char *uri)
     cam       = nullptr;
     webu_file = nullptr;
     webu_json = nullptr;
+#ifndef HAVE_IPCAM
     webu_post = nullptr;
+#endif
     webu_stream = nullptr;
 
     url.assign(uri);
@@ -1958,7 +1996,9 @@ cls_webu_ans::~cls_webu_ans()
 
     mydelete(webu_file);
     mydelete(webu_json);
+#ifndef HAVE_IPCAM
     mydelete(webu_post);
+#endif
     mydelete(webu_stream);
 
     myfree(auth_user);

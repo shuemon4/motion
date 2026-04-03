@@ -33,7 +33,9 @@
 #include "picture.hpp"
 #include "jpegutils.hpp"
 #include "draw.hpp"
+#ifndef HAVE_IPCAM
 #include "dbse.hpp"
+#endif
 
 
 /* Build the full output path from format string, base filename, and extension */
@@ -102,9 +104,11 @@ void cls_picture::process_norm()
             save_norm(filename,cam->current_image->image_norm);
         }
         on_picture_save_command(filename);
+#ifndef HAVE_IPCAM
         cam->app->dbse->exec(cam, filename, "pic_save");
         cam->app->dbse->filelist_add(cam, &cam->current_image->imgts
             ,"pic", file_nm, full_nm, file_dir);
+#endif
 
         cam->picture_event_count++;  /* Increment picture counter */
     }
@@ -119,18 +123,21 @@ void cls_picture::process_motion()
         picname(filename,"%s/%sm.%s", cam->cfg->picture_filename, cam->cfg->picture_type);
         save_norm(filename, cam->imgs.image_motion.image_norm);
         on_picture_save_command(filename);
+#ifndef HAVE_IPCAM
         cam->app->dbse->exec(cam, filename, "pic_save");
         cam->app->dbse->filelist_add(cam, &cam->imgs.image_motion.imgts
             ,"pic", file_nm, full_nm, file_dir);
-
+#endif
 
     } else if (cam->cfg->picture_output_motion == "roi") {
         picname(filename,"%s/%sr.%s", cam->cfg->picture_filename, cam->cfg->picture_type);
         save_roi(filename, cam->current_image->image_norm);
         on_picture_save_command(filename);
+#ifndef HAVE_IPCAM
         cam->app->dbse->exec(cam, filename, "pic_save");
         cam->app->dbse->filelist_add(cam, &cam->current_image->imgts
             ,"pic", file_nm, full_nm, file_dir);
+#endif
 
     }
 }
@@ -157,9 +164,11 @@ void cls_picture::process_snapshot()
             save_norm(filename, cam->current_image->image_norm);
         }
         on_picture_save_command(filename);
+#ifndef HAVE_IPCAM
         cam->app->dbse->exec(cam, filename, "pic_save");
         cam->app->dbse->filelist_add(cam, &cam->current_image->imgts
             ,"pic", file_nm, full_nm, file_dir);
+#endif
 
         /* Update symbolic link */
         picname(linkpath,"%s/%s.%s"
@@ -182,9 +191,11 @@ void cls_picture::process_snapshot()
             save_norm(filename, cam->current_image->image_norm);
         }
         on_picture_save_command(filename);
+#ifndef HAVE_IPCAM
         cam->app->dbse->exec(cam, filename, "pic_save");
         cam->app->dbse->filelist_add(cam, &cam->current_image->imgts
             ,"pic", file_nm, full_nm, file_dir);
+#endif
     }
 
     cam->action_snapshot = false;
@@ -211,9 +222,11 @@ void cls_picture::process_preview()
             save_norm(filename, cam->imgs.image_preview.image_norm);
         }
         on_picture_save_command(filename);
+#ifndef HAVE_IPCAM
         cam->app->dbse->exec(cam, filename, "pic_save");
         cam->app->dbse->filelist_add(cam, &cam->imgs.image_preview.imgts
             ,"pic", file_nm, full_nm, file_dir);
+#endif
 
         /* Restore global context values. */
         cam->current_image = saved_current_image;

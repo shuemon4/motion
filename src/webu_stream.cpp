@@ -28,14 +28,18 @@
 #include "motion.hpp"
 #include "util.hpp"
 #include "camera.hpp"
+#ifndef HAVE_IPCAM
 #include "allcam.hpp"
+#endif
 #include "conf.hpp"
 #include "logger.hpp"
 #include "picture.hpp"
 #include "webu.hpp"
 #include "webu_ans.hpp"
 #include "webu_stream.hpp"
+#ifndef HAVE_IPCAM
 #include "alg_sec.hpp"
+#endif
 #include "jpegutils.hpp"
 
 static ssize_t webu_mjpeg_response (void *cls, uint64_t pos, char *buf, size_t max)
@@ -117,6 +121,7 @@ void cls_webu_stream::one_buffer()
 
 void cls_webu_stream::all_buffer()
 {
+#ifndef HAVE_IPCAM
     if (resp_size < (size_t)app->allcam->all_sizes.dst_sz) {
         if (resp_image != nullptr) {
             myfree(resp_image);
@@ -126,6 +131,7 @@ void cls_webu_stream::all_buffer()
         memset(resp_image, '\0', resp_size);
         resp_used = 0;
     }
+#endif
 }
 
 bool cls_webu_stream::check_finish()
@@ -168,17 +174,20 @@ bool cls_webu_stream::all_ready()
             }
         }
     }
+#ifndef HAVE_IPCAM
     if ((webua->app->allcam->all_sizes.dst_h == 0) ||
         (webua->app->allcam->all_sizes.dst_w == 0)) {
             MOTION_LOG(DBG, TYPE_STREAM, NO_ERRNO, "All cameras not ready");
             return false;
     }
+#endif
 
     return true;
 }
 
 void cls_webu_stream::mjpeg_all_img()
 {
+#ifndef HAVE_IPCAM
     char resp_head[80];
     int  header_len;
     ctx_stream_data *strm;
@@ -231,6 +240,7 @@ void cls_webu_stream::mjpeg_all_img()
         resp_used =(uint)(header_len + strm->jpg_sz + 2);
         strm->consumed = true;
     pthread_mutex_unlock(&webua->app->allcam->stream.mutex);
+#endif /* HAVE_IPCAM */
 
 }
 
@@ -300,11 +310,15 @@ ssize_t cls_webu_stream::mjpeg_response (char *buf, size_t max)
         stream_pos = 0;
         resp_used = 0;
 
+#ifndef HAVE_IPCAM
         if (webua->device_id == 0) {
             mjpeg_all_img();
         } else {
+#endif
             mjpeg_one_img();
+#ifndef HAVE_IPCAM
         }
+#endif
 
         if (resp_used == 0) {
             return 0;
@@ -358,6 +372,7 @@ void cls_webu_stream::all_cnct()
             strm->all_cnct++;
         pthread_mutex_unlock(&app->cam_list[indx_cam]->stream.mutex);
     }
+#ifndef HAVE_IPCAM
     if (webua->cnct_type == WEBUI_CNCT_JPG_SUB) {
         strm = &app->allcam->stream.sub;
     } else if (webua->cnct_type == WEBUI_CNCT_JPG_MOTION) {
@@ -377,12 +392,14 @@ void cls_webu_stream::all_cnct()
     MOTION_LOG(INF, TYPE_STREAM, NO_ERRNO,
         _("Stream opened cam=%d type=%d connections=%d (all-cam)"),
         webua->device_id, (int)webua->cnct_type, strm->all_cnct);
+#endif /* HAVE_IPCAM */
 
 }
 
 /* Obtain the current image for the camera.*/
 void cls_webu_stream::static_all_img()
 {
+#ifndef HAVE_IPCAM
     ctx_stream_data *strm;
 
     if (check_finish()) {
@@ -423,6 +440,7 @@ void cls_webu_stream::static_all_img()
         resp_used =(uint)strm->jpg_sz;
         strm->consumed = true;
     pthread_mutex_unlock(&webua->app->allcam->stream.mutex);
+#endif /* HAVE_IPCAM */
 
 }
 
@@ -534,11 +552,15 @@ void cls_webu_stream::set_cnct_type()
         if (webua->cam == NULL) {
             webua->cnct_type = WEBUI_CNCT_UNKNOWN;
         } else {
+#ifndef HAVE_IPCAM
             if (webua->cam->algsec->method != "none") {
                 webua->cnct_type = WEBUI_CNCT_JPG_SECONDARY;
             } else {
+#endif
                 webua->cnct_type = WEBUI_CNCT_UNKNOWN;
+#ifndef HAVE_IPCAM
             }
+#endif
         }
     } else if (webua->uri_cmd2 == "") {
         webua->cnct_type = WEBUI_CNCT_JPG_FULL;
@@ -637,18 +659,22 @@ void cls_webu_stream::main()
         if (webua->device_id > 0) {
             jpg_cnct();
             static_one_img();
+#ifndef HAVE_IPCAM
         } else {
             all_cnct();
             static_all_img();
+#endif
         }
         retcd = stream_static();
     } else if (webua->uri_cmd1 == "mjpg") {
         if (webua->device_id > 0) {
             jpg_cnct();
             one_buffer();
+#ifndef HAVE_IPCAM
         } else {
             all_cnct();
             all_buffer();
+#endif
         }
         retcd = stream_mjpeg();
     }

@@ -30,7 +30,9 @@
 #include "camera.hpp"
 #include "conf.hpp"
 #include "logger.hpp"
+#ifndef HAVE_IPCAM
 #include "alg.hpp"
+#endif
 #include "draw.hpp"
 
 struct draw_char {
@@ -1469,6 +1471,7 @@ void cls_draw::locate()
  * to match YUV420p subsampling. */
 void cls_draw::smartmask()
 {
+#ifndef HAVE_IPCAM
     int i, x, v, width, height, line;
     ctx_images *imgs = &cam->imgs;
     u_char *mask_final = cam->alg->smartmask_final;
@@ -1505,6 +1508,7 @@ void cls_draw::smartmask()
         }
         out_y++;
     }
+#endif
 }
 
 /* Overlay the fixed privacy mask on the motion image in green (U=0, V=0).

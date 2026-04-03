@@ -30,18 +30,20 @@
 #include "util.hpp"
 #include "camera.hpp"
 #include "conf.hpp"
-#include "conf_profile.hpp"
-#include "cam_detect.hpp"
 #include "logger.hpp"
 #include "webu.hpp"
 #include "webu_ans.hpp"
 #include "webu_auth.hpp"
 #include "webu_json.hpp"
-#include "dbse.hpp"
 #include "libcam.hpp"
+#include "json_parse.hpp"
+#ifndef HAVE_IPCAM
+#include "conf_profile.hpp"
+#include "cam_detect.hpp"
+#include "dbse.hpp"
 #include "netcam.hpp"
 #include "video_v4l2.hpp"
-#include "json_parse.hpp"
+#endif
 #include <map>
 #include <algorithm>
 #include <vector>
@@ -100,13 +102,21 @@ void cls_webu_json::main()
 {
     pthread_mutex_lock(&app->mutex_post);
         if (webua->uri_cmd1 == "config.json") {
+#ifndef HAVE_IPCAM
             config();
+#else
+            webua->bad_request();
+            pthread_mutex_unlock(&app->mutex_post);
+            return;
+#endif
+#ifndef HAVE_IPCAM
         } else if (webua->uri_cmd1 == "movies.json") {
             movies();
         } else if (webua->uri_cmd1 == "status.json") {
             status();
         } else if (webua->uri_cmd1 == "log") {
             loghistory();
+#endif
         } else {
             webua->bad_request();
             pthread_mutex_unlock(&app->mutex_post);

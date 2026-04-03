@@ -28,19 +28,21 @@
 #include "motion.hpp"
 #include "util.hpp"
 #include "conf.hpp"
-#include "conf_profile.hpp"
 #include "logger.hpp"
+#include "camera.hpp"
+#include "webu.hpp"
+#ifndef HAVE_IPCAM
+#include "conf_profile.hpp"
 #include "allcam.hpp"
 #include "schedule.hpp"
-#include "camera.hpp"
 #include "cam_detect.hpp"
 #include "sound.hpp"
 #include "dbse.hpp"
-#include "webu.hpp"
 #include "video_v4l2.hpp"
 #include "movie.hpp"
 #include "netcam.hpp"
 #include "thumbnail.hpp"
+#endif
 
 volatile enum MOTION_SIGNAL motsignal;
 
@@ -146,6 +148,7 @@ void cls_motapp::signal_process()
         webu->finish = true;
         webu->restart = false;
 
+#ifndef HAVE_IPCAM
         dbse->finish = true;
         dbse->restart = false;
         dbse->handler_stop = true;
@@ -158,12 +161,14 @@ void cls_motapp::signal_process()
             snd_list[indx]->handler_shutdown();
             snd_list[indx]->finish = true;
         }
+#endif
 
         for (indx=0; indx<cam_cnt; indx++) {
             cam_list[indx]->event_stop = true;
             cam_list[indx]->restart = false;
             cam_list[indx]->handler_stop = true;
             cam_list[indx]->finish = true;
+#ifndef HAVE_IPCAM
             if (cam_list[indx]->camera_type == CAMERA_TYPE_NETCAM) {
                 if (cam_list[indx]->netcam != nullptr) {
                     cam_list[indx]->netcam->idur = 0;
@@ -172,6 +177,7 @@ void cls_motapp::signal_process()
                     cam_list[indx]->netcam_high->idur = 0;
                 }
             }
+#endif
         }
         for (indx=0; indx<cam_cnt; indx++) {
             cam_list[indx]->handler_shutdown();
@@ -297,6 +303,7 @@ void cls_motapp::av_init()
         avdevice_register_all();
     #endif
 
+#ifndef HAVE_IPCAM
     /* Probe hardware encoder availability by actually opening each encoder.
      * avcodec_find_encoder_by_name() alone returns a valid codec on Pi 5
      * (false positive) because FFmpeg is built with v4l2 support. Only
@@ -313,6 +320,7 @@ void cls_motapp::av_init()
         , hw_encoders.h264_nvenc   ? "available" : "not available"
         , hw_encoders.h264_vaapi   ? "available" : "not available"
         , hw_encoders.h264_qsv     ? "available" : "not available");
+#endif
 }
 
 /* Tear down FFmpeg network subsystem */
@@ -409,9 +417,12 @@ void cls_motapp::watchdog(uint camindx)
         cam_list[indx]->event_stop = true;
         pthread_mutex_unlock(&mutex_camlst);
         pthread_mutex_unlock(&mutex_post);
+#ifndef HAVE_IPCAM
         pthread_mutex_unlock(&dbse->mutex_dbse);
+#endif
         pthread_mutex_unlock(&cam_list[indx]->stream.mutex);
 
+#ifndef HAVE_IPCAM
         if ((cam_list[indx]->camera_type == CAMERA_TYPE_NETCAM) &&
             (cam_list[indx]->netcam != nullptr)) {
             pthread_mutex_unlock(&cam_list[indx]->netcam->mutex);
@@ -426,6 +437,7 @@ void cls_motapp::watchdog(uint camindx)
             pthread_mutex_unlock(&cam_list[indx]->netcam_high->mutex_transfer);
             cam_list[indx]->netcam_high->handler_stop = true;
         }
+#endif
 
         cam_list[indx]->handler_shutdown();
         if (motsignal != MOTION_SIGNAL_SIGTERM) {
@@ -461,6 +473,7 @@ void cls_motapp::check_restart()
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Restarted log"));
     }
 
+#ifndef HAVE_IPCAM
     if (dbse->restart == true) {
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Restarting database"));
         pthread_mutex_lock(&dbse->mutex_dbse);
@@ -471,6 +484,7 @@ void cls_motapp::check_restart()
         dbse->restart = false;
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Restarted database"));
     }
+#endif
 
     if (webu->restart == true) {
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO, _("Restarting webcontrol"));
@@ -506,6 +520,7 @@ bool cls_motapp::check_devices()
             retcd = true;
         }
     }
+#ifndef HAVE_IPCAM
     for (indx=0; indx<snd_cnt; indx++) {
         if (snd_list[indx]->finish == false) {
             retcd = true;
@@ -516,6 +531,7 @@ bool cls_motapp::check_devices()
             retcd = true;
         }
     }
+#endif
 
     pthread_mutex_unlock(&mutex_camlst);
 
@@ -565,16 +581,20 @@ void cls_motapp::init(int p_argc, char *p_argv[])
     cam_add = false;
     cam_delete = -1;
     cam_cnt = 0;
+#ifndef HAVE_IPCAM
     snd_cnt = 0;
+#endif
     conf_src = nullptr;
     cfg = nullptr;
-    dbse = nullptr;
     webu = nullptr;
+    cam_list.clear();
+    hw_encoders = {false, false, false, false, false};
+#ifndef HAVE_IPCAM
+    dbse = nullptr;
     allcam = nullptr;
     schedule = nullptr;
-    cam_list.clear();
     snd_list.clear();
-    hw_encoders = {false, false, false, false, false};
+#endif
 
 
     pthread_mutex_init(&mutex_camlst, NULL);
@@ -606,21 +626,31 @@ void cls_motapp::init(int p_argc, char *p_argv[])
 
     av_init();
 
+#ifndef HAVE_IPCAM
     dbse = new cls_dbse(this);
     profiles = new cls_config_profile(this);
+#endif
     webu = new cls_webu(this);
+#ifndef HAVE_IPCAM
     allcam = new cls_allcam(this);
     schedule = new cls_schedule(this);
     thumbnail = new cls_thumbnail(this);
     cam_detect = new cls_cam_detect(this);
+#endif
 
-    if ((cam_cnt > 0) || (snd_cnt > 0)) {
+    if (cam_cnt > 0
+#ifndef HAVE_IPCAM
+        || (snd_cnt > 0)
+#endif
+        ) {
         for (indx=0; indx<cam_cnt; indx++) {
             cam_list[indx]->handler_startup();
         }
+#ifndef HAVE_IPCAM
         for (indx=0; indx<snd_cnt; indx++) {
             snd_list[indx]->handler_startup();
         }
+#endif
     } else {
         MOTION_LOG(NTC, TYPE_ALL, NO_ERRNO
             , _("No camera or sound configuration files specified."));
@@ -643,12 +673,14 @@ void cls_motapp::deinit()
     pid_remove();
 
     mydelete(webu);
+#ifndef HAVE_IPCAM
     mydelete(profiles);
     mydelete(dbse);
     mydelete(allcam)
     mydelete(schedule)
     mydelete(thumbnail)
     mydelete(cam_detect)
+#endif
     mydelete(conf_src);
     mydelete(cfg);
 
@@ -656,9 +688,11 @@ void cls_motapp::deinit()
         mydelete(cam_list[indx]);
     }
 
+#ifndef HAVE_IPCAM
     for (indx = 0; indx < snd_cnt;indx++) {
         mydelete(snd_list[indx]);
     }
+#endif
 
     pthread_mutex_destroy(&mutex_camlst);
     pthread_mutex_destroy(&mutex_post);
@@ -721,7 +755,9 @@ void cls_motapp::camera_delete()
     pthread_mutex_unlock(&mutex_camlst);
 
     cam_delete = -1;
+#ifndef HAVE_IPCAM
     allcam->all_sizes.reset = true;
+#endif
 
     /* Delete the camera config file from disk */
     if (!cam_conf_filename.empty()) {

@@ -738,6 +738,31 @@ dnl Note: No AM_CONDITIONAL needed — source files are added unconditionally
 dnl to Makefile.am with #ifdef HAVE_WEBRTC guards in the C++ source.
 
 ##############################################################################
+###  Detection support - optional, disable for IP camera mode
+##############################################################################
+AC_ARG_ENABLE([detection],
+  [AS_HELP_STRING([--disable-detection], [Disable motion detection (IP camera / Pi Zero mode)])],
+  [enable_detection=$enableval], [enable_detection=yes])
+DETECTION="no"
+AS_IF([test "x$enable_detection" = "xyes"], [
+    AC_DEFINE([HAVE_DETECTION], [1], [Define to 1 to enable motion detection])
+    DETECTION="yes"
+])
+
+##############################################################################
+###  IP Camera build - optional, stripped-down variant for Pi Zero / IP camera
+##############################################################################
+AC_ARG_ENABLE([ipcam],
+  [AS_HELP_STRING([--enable-ipcam], [Build motion-ipcam binary (Pi Zero / IP camera mode)])],
+  [enable_ipcam=$enableval], [enable_ipcam=no])
+IPCAM="no"
+AS_IF([test "x$enable_ipcam" = "xyes"], [
+    enable_detection=no
+    IPCAM="yes"
+])
+AM_CONDITIONAL([HAVE_IPCAM], [test "x$enable_ipcam" = "xyes"])
+
+##############################################################################
 ###  Developer Flags
 ##############################################################################
 AC_ARG_WITH([developer-flags],
@@ -873,6 +898,8 @@ echo "ALSA                  : $ALSA$ALSA_VER"
 echo "PulseAudio            : $PULSE$PULSE_VER"
 echo "FFTW                  : $FFTW3$FFTW3_VER"
 echo "WebRTC                : $WEBRTC$WEBRTC_VER"
+echo "Detection             : $DETECTION"
+echo "IP Camera build       : $IPCAM"
 echo
 echo "Install prefix        : $prefix"
 echo

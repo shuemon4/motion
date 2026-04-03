@@ -30,17 +30,19 @@
 #include "util.hpp"
 #include "camera.hpp"
 #include "conf.hpp"
-#include "conf_profile.hpp"
-#include "cam_detect.hpp"
 #include "logger.hpp"
 #include "webu.hpp"
 #include "webu_ans.hpp"
 #include "webu_auth.hpp"
 #include "webu_json.hpp"
-#include "dbse.hpp"
 #include "libcam.hpp"
+#ifndef HAVE_IPCAM
+#include "conf_profile.hpp"
+#include "cam_detect.hpp"
+#include "dbse.hpp"
 #include "netcam.hpp"
 #include "video_v4l2.hpp"
+#endif
 #include "json_parse.hpp"
 #include <map>
 #include <algorithm>
@@ -221,7 +223,11 @@ void cls_webu_json::api_system_status()
     for (int indx_cam = 0; indx_cam < app->cam_cnt; indx_cam++) {
         webua->resp_page += ",\"cam" +
             std::to_string(app->cam_list[indx_cam]->cfg->device_id) + "\":";
+#ifndef HAVE_IPCAM
         status_vars(indx_cam);
+#else
+        webua->resp_page += "{}";
+#endif
     }
     webua->resp_page += "}";
 
